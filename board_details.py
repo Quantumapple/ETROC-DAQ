@@ -12,13 +12,13 @@ A address is set using jumper pins on the ETROC1 board
 There are 7 bits with 2 addressable, default value is 00000_A1_A2
 Any inserted jumpers will flip the bit. Avoid address 00
 
-''' 
+'''
 '''
 B address is set using jumper pins on the ETROC1 board
 There are 7 bits with 2 addressable, default value is 11111_B1_B2
 Any inserted jumpers will flip the bit
 
-''' 
+'''
 
 slaveA_addr_list = [0x03,  0x02,  0x01]
 slaveB_addr_list = [0x7f,  0x7e,  0x7d]
