@@ -1,4 +1,7 @@
 from ETROC1_ArrayReg import * 
+from command_interpret import *
+
+ETROC1_ArrayReg = ETROC1_ArrayReg()                       
 
 def config_etroc():
     
