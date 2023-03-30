@@ -21,6 +21,7 @@ from command_interpret import *
 from ETROC1_ArrayReg import *
 from daq_helpers import *
 from board_details import *
+from config_etroc1 import *
 #========================================================================================#
 freqency = 1000
 duration = 1000
@@ -36,13 +37,17 @@ port = 1024									#port number
 ## main functionl
 def main(options):
 
-    num_boards = len(board_size)
+    active_channels(key = active_channels_key)
+    timestamp(key = options.timestamp)
 
+    num_boards = len(board_size)
+    DAC_Value_List = []
     for i in range(num_boards):
         DAC_Value_List.append(single_pixel_threshold(board_size[i], options.pixel_address[i], options.pixel_threshold[i]))
 
-    Pixel_board= options.pixel_address[i]
-
+    Pixel_board = options.pixel_address
+    QSel_board  = options.pixel_charge			# Select Injected Charge
+    ###################################### Begin Dir naming
     userdefinedir = "%sP%d_%sP%d_%sP%d_QInj=1M25_Ref_1202_HMC_4095"%(board_name[0], Pixel_board[0], board_name[1], Pixel_board[1], board_name[2], Pixel_board[2])
     userdefinedir_log = "%s_log"%userdefinedir
     ##  Creat a directory named path with date of today
@@ -60,11 +65,19 @@ def main(options):
         os.mkdir(userdefine_dir_log)
     except FileExistsError:
         print("User define directories already created!!!")
-
+    ###################################### End Dir naming
     logtime_stampe = time.strftime('%m-%d_%H-%M-%S',time.localtime(time.time()))
+    
     for B_num in range(len(slaveA_addr_list)):
         slaveA_addr = slaveA_addr_list[B_num]       # I2C slave A address
         slaveB_addr = slaveB_addr_list[B_num]       # I2C slave B address
+
+        if(board_type==1):
+            reg_val = config_etroc1(B_num, options.charge_injection)
+        elif(board_type==2):
+            pass
+        elif(board_type==3):
+            pass
 
         ## write data to I2C register one by one
         print("Write data into I2C slave:")
@@ -91,36 +104,13 @@ def main(options):
         # compare I2C write in data with I2C read back data
         if iic_read_val == reg_val:
             print("Wrote into data matches with read back data!")
-            #winsound.Beep(1000, 500)
         else:
             print("Wrote into data doesn't matche with read back data!!!!")
-            #for x in range(3):
-            #    winsound.Beep(1000, 500)
-
-        # add log file
-        with open("./%s/%s/log_%s.dat"%(todaystr, userdefinedir_log, logtime_stampe),'a+') as logfile:
-            logfile.write("%s\n"%time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
-            logfile.write("I2C write into data %s:\n"%board_name[B_num])
-            for i in range(len(reg_val)):
-                if i < 32:                                                      # I2C slave A write
-                    logfile.writelines("REGA_%02d %s\n"%(i, hex(reg_val[i])))
-                else:                                                           # I2C slave B write
-                    logfile.writelines("REGB_%02d %s\n"%(i-32, hex(reg_val[i])))
-            if iic_read_val == reg_val:
-                logfile.write("Wrote into data matches with read back data!\n")
-            else:
-                logfile.write("Wrote in data doesn't matche with read back data!!!!\n")
-            logfile.write("./%s/%s/log_%s"%(todaystr, userdefinedir_log, logtime_stampe))
-
-    # monitor power supply current
-    #Power_current = measure_current(External_RST)
-    #print(Power_current)
 
     time.sleep(1)                                                       # delay one second
     software_clear_fifo()                                               # clear fifo content
-    #cmd_interpret.write_config_reg(15,0xff5C)
 
-    ## strat receive_data and wirte_data threading
+    ## start receive_data and write_data threading
     store_dict = userdefine_dir
     queue = Queue()                                                     # define a queue
     receive_data = Receive_data('Receive_data', queue, options.num_file, options.num_line)        # initial receive_data class
@@ -144,7 +134,7 @@ if __name__ == "__main__":
     except socket.error:
         print("failed to connect to ip " + hostname)
     cmd_interpret = command_interpret(s)					    # Class instance
-    ETROC1_ArrayReg1 = ETROC1_ArrayReg()                        # New a class
+
 
     parser = OptionParser()                                     # Option Parser for better argument handling
     parser.add_option("-n", "--num_file", dest="num_file", action="store", type="int"
@@ -152,13 +142,27 @@ if __name__ == "__main__":
     parser.add_option("-l", "--num_line", dest="num_line", action="store", type="int"
                       help="Number of lines per file created by DAQ script", default=50000)
     parser.add_option("-pa", "--pixel_address", dest="pixel_address", action="append", type="int"
-                      help="Single pixel address under test for each board")
+                      help="Single pixel address under test for each board",
+                      default=[5, 5, 5])
     parser.add_option("-pt", "--pixel_threshold", dest="pixel_threshold", action="append", type="int"
-                      help="Single pixel threshold for pixels under test for each board")
+                      help="Single pixel threshold for pixels under test for each board",
+                      default=[550, 550, 550])
+    parser.add_option("-pq", "--pixel_charge", dest="pixel_charge", action="append", type="int"
+                      help="Single pixel charge to be injected (fC) for pixels under test for each board",
+                      default=[30, 30, 30])
+    parser.add_option("-qinj", "--charge_injection",
+                      action="store_true", dest="charge_injection", default=False,
+                      help="Flag that enables Qinj")
+    parser.add_option("-b", "--binary",
+                      action="store_true", dest="binary_output", default=False,
+                      help="print untranslated FPGA binary data (raw output)")
+    parser.add_option("-t", "--timestamp",
+                      action="store", dest="timestamp", default=0x0000,
+                      help="Set timestamp binary, see daq_helpers for more info") #MAY NEED TO SPECIFY TYPE
     parser.add_option("-q", "--quiet",
                       action="store_false", dest="verbose", default=True,
                       help="don't print status messages to stdout")
     (options, args) = parser.parse_args()
 
-    main(options)													    # execute main function
+    main(options)											    # execute main function
     s.close()												    # close socket

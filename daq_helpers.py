@@ -121,69 +121,7 @@ def Enable_FPGA_Descramblber(val):
     else:
         print("Disable FPGA Descrambler")
     cmd_interpret.write_config_reg(14, 0x0001 & val)       # write enable
-#--------------------------------------------------------------------------#
-## measure supply current
-def measure_current(val):
-    Power_Current= {"IO_Current":0, "PA_Current":0, "QInj_Current":0, "Discri_Current":0, "Clk_Current":0, "Dig_Current":0, "3V3_Current":0}
-    rm = visa.ResourceManager()
-    # print(rm.list_resources())
-    inst1 = rm.open_resource('USB0::0x2A8D::0x1102::MY58041593::0::INSTR')      # top power supply
-    inst2 = rm.open_resource('USB0::0x2A8D::0x1102::MY58041595::0::INSTR')      # bottom power supply one
-    inst3 = rm.open_resource('USB0::0x2A8D::0x1102::MY58041599::0::INSTR')
-    Power_Current['IO_Current'] = round(float(inst1.query("MEAS:CURR? CH1"))*1000.0, 3)             # IO power
-    Power_Current['PA_Current'] = round(float(inst1.query("MEAS:CURR? CH2"))*1000.0, 3)             # PA power
-    Power_Current['QInj_Current'] = round(float(inst1.query("MEAS:CURR? CH3"))*1000.0, 3)           # QInj power
-    Power_Current['Discri_Current'] = round(float(inst2.query("MEAS:CURR? CH1"))*1000.0, 3)         # Discri power
-    Power_Current['Clk_Current'] = round(float(inst2.query("MEAS:CURR? CH2"))*1000.0, 3)            # Clk power
-    Power_Current['Dig_Current'] = round(float(inst2.query("MEAS:CURR? CH3"))*1000.0, 3)            # Dig power
-    Power_Current['3V3_Current'] = round(float(inst3.query("MEAS:CURR? CH1"))*1000.0, 3)
-    inst1.write("SOURce:VOLTage 1.20,(@1)")
-    inst2.write("SOURce:VOLTage 1.20,(@3)")
-    # print(Power_Current)
-    if val == 1:
-        inst3.write("SOURce:VOLTage 0,(@2)")                                      # top channel 1
-        inst3.write("SOURce:CURRent 0.002,(@2)")
-        inst3.write("OUTPut:STATe ON,(@2)")
-        time.sleep(1)
-        inst3.write("SOURce:VOLTage 1.2,(@2)")
 
-    return Power_Current
-    # print(inst1.query("*IDN?"))
-    # print(inst2.query("*IDN?"))
-#--------------------------------------------------------------------------#
-## DAC output configuration, 0x000: 0.6V  ox200: 0.8V  0x2ff: 1V
-#@para[in] num : 0-15 value: Digital input value
-def DAC_Config(DAC_Value):
-    DAC_160bit = []
-    for i in range(len(DAC_Value)):
-        for j in range(10):
-            DAC_160bit += [(DAC_Value[i] >> j) & 0x001]
-    DAC_8bit = [[] for x in range(20)]
-    for k in range(len(DAC_8bit)):
-        DAC_Single = 0
-        for l in range(8):
-            DAC_Single += (DAC_160bit[k*8+l] & 0x1) << l
-        DAC_8bit[k] = DAC_Single
-    ETROC1_ArrayReg1.set_VTHIn7_0(DAC_8bit[0])
-    ETROC1_ArrayReg1.set_VTHIn15_8(DAC_8bit[1])
-    ETROC1_ArrayReg1.set_VTHIn23_16(DAC_8bit[2])
-    ETROC1_ArrayReg1.set_VTHIn31_24(DAC_8bit[3])
-    ETROC1_ArrayReg1.set_VTHIn39_32(DAC_8bit[4])
-    ETROC1_ArrayReg1.set_VTHIn47_40(DAC_8bit[5])
-    ETROC1_ArrayReg1.set_VTHIn55_48(DAC_8bit[6])
-    ETROC1_ArrayReg1.set_VTHIn63_56(DAC_8bit[7])
-    ETROC1_ArrayReg1.set_VTHIn71_64(DAC_8bit[8])
-    ETROC1_ArrayReg1.set_VTHIn79_72(DAC_8bit[9])
-    ETROC1_ArrayReg1.set_VTHIn87_80(DAC_8bit[10])
-    ETROC1_ArrayReg1.set_VTHIn95_88(DAC_8bit[11])
-    ETROC1_ArrayReg1.set_VTHIn103_96(DAC_8bit[12])
-    ETROC1_ArrayReg1.set_VTHIn111_104(DAC_8bit[13])
-    ETROC1_ArrayReg1.set_VTHIn119_112(DAC_8bit[14])
-    ETROC1_ArrayReg1.set_VTHIn127_120(DAC_8bit[15])
-    ETROC1_ArrayReg1.set_VTHIn135_128(DAC_8bit[16])
-    ETROC1_ArrayReg1.set_VTHIn143_136(DAC_8bit[17])
-    ETROC1_ArrayReg1.set_VTHIn151_144(DAC_8bit[18])
-    ETROC1_ArrayReg1.set_VTHIn159_152(DAC_8bit[19])
 #--------------------------------------------------------------------------#
 ## simple readout fucntion
 #@param[in]: write_num: BC0 and L1ACC loop number, 0-65535
@@ -197,4 +135,24 @@ def software_clear_fifo():
     cmd_interpret.write_pulse_reg(0x0002)                       # trigger pulser_reg[1]
 
 #--------------------------------------------------------------------------#
+## Enable channel
+## 4 bit binary, WXYZ
+## W - ch3
+## X - ch2
+## Y - ch1
+## Z - ch0
+## Note that the input needs to be a 16 bit rep as hex
+def active_channels(key = 0x0003): 
+    cmd_interpret.write_config_reg(15, key)
 
+#--------------------------------------------------------------------------#
+## TimeStamp and Testmode
+## 0x0000: Disable Testmode & Enable TimeStamp
+## 0x0001: Disable Testmode & Disable TimeStamp
+## 0x0010: Enable Testmode & Enable TimeStamp
+## 0x0011: Enable Testmode & Disable TimeStamp
+## Note that the input needs to be a 16 bit rep as hex
+def timestamp(key=0x0000):
+    cmd_interpret.write_config_reg(13, key) 
+
+#--------------------------------------------------------------------------#

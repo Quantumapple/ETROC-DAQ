@@ -22,12 +22,18 @@ Any inserted jumpers will flip the bit
 
 slaveA_addr_list = [0x03,  0x02,  0x01]
 slaveB_addr_list = [0x7f,  0x7e,  0x7d]
+
+board_type       = [1,     1,     1]            # ETROC version number
+
+active_channels_key = 0x0003
+
 board_size       = [16,    16,    16]
+
 board_name       = ["F28", "F29", "F30"]
-CLSel_board      = [  0,    0,    0 ]			# Load Capacitance of the preamp first stage
+
+CLSel_board      = [  0,    0,    0 ]			# Load Capacitance of the preamp first stage, default 0
 RfSel_board      = [  2,    2,    2 ]			# Feedback resistance seleciton
 IBSel_board      = [  0,    0,    0 ]			# Bias current selection of the input transistor in the preamp
-QSel_board       = [ 30,   30,   30 ]			# Select Injected Charge
 
 def single_pixel_threshold(size, address, threshold):
 	threshold_list = []
