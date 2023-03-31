@@ -74,7 +74,7 @@ class command_interpret:
     ## read_data_fifo
     # @param[in] Cnt read data counts 0-65535
     def read_data_fifo(self, Cnt):
-        data = 0x00190000 + (Cnt -1)                             #write sDataFifoHigh address = 25
+        data = 0x00190000 + (Cnt -1)                        #write sDataFifoHigh address = 25
         self.ss.sendall(struct.pack('I', data)[::-1])
         mem_data = []
         for i in range(Cnt-1):
