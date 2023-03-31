@@ -66,7 +66,11 @@ def main(options, cmd_interpret):
         os.mkdir(userdefine_dir)
         os.mkdir(userdefine_dir_log)
     except FileExistsError:
-        print("User defined directories %s and %s already created!!!"%(userdefine_dir, userdefine_dir_log))
+        print("User defined directory %s already created!"%(userdefine_dir))
+        print("User defined directory %s already created!"%(userdefine_dir_log))
+        if(options.overwrite != True): 
+            print("Overwriting is not enabled, exiting code abruptly...")
+            sys.exit(1)
     ###################################### End Dir naming
     logtime_stampe = time.strftime('%m-%d_%H-%M-%S',time.localtime(time.time()))
     
@@ -117,15 +121,38 @@ def main(options, cmd_interpret):
     ## start receive_data and write_data threading
     store_dict = userdefine_dir
     queue = Queue()                                                                           # define a queue
-    receive_data = Receive_data('Receive_data', queue, options.num_file, options.num_line, cmd_interpret)    # initial receive_data class
-    write_data = Write_data('Write_data', queue, options.num_file, options.num_line, 
-                            options.timestamp, store_dict, options.binary_only)               # initial write_data class
-    
-    receive_data.start()                                                                # start receive_data threading
-    write_data.start()                                                                  # start write_data threading
+    # receive_data = Receive_data('Receive_data', queue, options.num_file, options.num_line, cmd_interpret)    # initial receive_data class
+    # write_data = Write_data('Write_data', queue, options.num_file, options.num_line, 
+    #                         options.timestamp, store_dict, options.binary_only)             # initial write_data class
+    read_write_data = Read_Write_data('Read_Write_data', queue, cmd_interpret, options.num_file, options.num_line, 
+                                      options.num_fifo_read, options.timestamp, store_dict, 
+                                      options.binary_only, options.make_plots)                              # Read and Write Data into files
+    read_write_data.start()
 
-    receive_data.join()                                                                 # threading 
-    write_data.join()
+    if(options.make_plots):
+        daq_plotting = DAQ_Plotting('DAQ_Plotting', queue, options.timestamp, store_dict, options.pixel_address)
+        try:
+            # Start the thread
+            daq_plotting.start()
+            # If the child thread is still running
+            while daq_plotting.is_alive():
+                # Try to join the child thread back to parent for 0.5 seconds
+                daq_plotting.join(0.5)
+        # When ctrl+c is received
+        except KeyboardInterrupt as e:
+            # Set the alive attribute to false
+            daq_plotting.alive = False
+            # Block until child thread is joined back to the parent
+            daq_plotting.join()
+    
+    # start threading
+    # receive_data.start()
+    # write_data.start()
+
+    # wait for thread to finish before proceeding
+    # receive_data.join()                                                                  
+    # write_data.join()
+    read_write_data.join()
 #--------------------------------------------------------------------------#
 ## if statement
 if __name__ == "__main__":
@@ -148,6 +175,8 @@ if __name__ == "__main__":
                       help="Number of files created by DAQ script", default=1)
     parser.add_option("-l", "--num_line", dest="num_line", action="store", type="int",
                       help="Number of lines per file created by DAQ script", default=50000)
+    parser.add_option("-r", "--num_fifo_read", dest="num_fifo_read", action="store", type="int",
+                      help="Number of lines read per call of fifo readout", default=10000)
     parser.add_option("-o", "--output_directory", dest="output_directory", action="store", type="string",
                       help="User defined output directory", default="unnamed_output_directory")
     parser.add_option("-a", "--pixel_address", dest="pixel_address", action="callback", type="string",
@@ -168,11 +197,20 @@ if __name__ == "__main__":
     parser.add_option("-v", "--verbose",
                       action="store_true", dest="verbose", default=False,
                       help="Print status messages to stdout")
+    parser.add_option("-w", "--overwrite",
+                      action="store_true", dest="overwrite", default=False,
+                      help="Overwrite previously saved files")
+    parser.add_option("-p", "--make_plots",
+                      action="store_true", dest="make_plots", default=False,
+                      help="Enable plotting of real time hits")
     (options, args) = parser.parse_args()
 
     if(options.pixel_address == None): options.pixel_address = [5, 5, 5]
     if(options.pixel_threshold == None): options.pixel_threshold = [552, 560, 560]
     if(options.pixel_charge == None): options.pixel_charge = [30, 30, 30]
+    if(options.num_fifo_read>65536):                                                # See command_interpret.py read_memory()
+        print("Max Number of lines read by fifo capped at 65536, you entered ",options.num_fifo_read,", setting to 65536")
+        options.num_fifo_read = 65536
 
     if(options.verbose):
         print("Verbose Output: ", options.verbose)
@@ -181,6 +219,7 @@ if __name__ == "__main__":
         print("--------Set of inputs from the USER--------")
         print("Number of files created by DAQ script: ", options.num_file)
         print("Number of lines per file created by DAQ script: ", options.num_line)
+        print("Number of lines read per call of fifo readout: ", options.num_fifo_read)
         print("User defined Output Directory: ", options.output_directory)
         print("Single pixel address under test for each board: ", options.pixel_address)
         print("Single pixel threshold for pixels under test for each board: ", options.pixel_threshold)
@@ -189,6 +228,8 @@ if __name__ == "__main__":
         print("Save only the untranslated FPGA binary data (raw output): ", options.binary_only)
         print("Set timestamp binary, see daq_helpers for more info: ", options.timestamp)
         print("Set timestamp binary, see daq_helpers for more info (explicit hex string): ", "0x{:04x}".format(options.timestamp))
+        print("Overwrite previously saved files: ", options.overwrite)
+        print("Enable plotting of real time hits: ", options.make_plots)
         print("--------End of inputs from the USER--------")
         print("-------------------------------------------")
         print("\n")

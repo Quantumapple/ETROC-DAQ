@@ -28,8 +28,9 @@ class Receive_data(threading.Thread):                                   # thread
             mem_data = self.cmd_interpret.read_data_fifo(self.num_line)      # num_line: set how many lines per file you want
             print("{} is producing {} to the queue!".format(self.getName(), files))
             for i in range(self.num_line):
-                self.queue.put(mem_data[i])
+                self.queue.put(mem_data[i])  
         print("%s finished!"%self.getName())
+
 #--------------------------------------------------------------------------#
 ## define a write data class
 class Write_data(threading.Thread):                                     # threading class
@@ -48,8 +49,8 @@ class Write_data(threading.Thread):                                     # thread
             with open(file_name, 'w') as infile:
                 for j in range(self.num_line):
                     val = self.queue.get()
-                    if int(val) == 0:
-                        continue
+                    # if int(val) == 0:
+                    #     continue
                     binary = format(int(val), '032b')
                     infile.write('%s\n'%binary)
             print("%s finished!" % self.getName())
@@ -58,7 +59,75 @@ class Write_data(threading.Thread):                                     # thread
                     for line in infile.readlines():
                         TDC_data = etroc_translate_binary(line, timestamp=self.timestamp)
                         outfile.write("%s\n"%TDC_data)
+
 #--------------------------------------------------------------------------#
+class Read_Write_data(threading.Thread):
+    def __init__(self, name, queue, cmd_interpret, num_file, num_line, num_fifo_read, timestamp, store_dict, binary_only, make_plots):
+        threading.Thread.__init__(self, name=name)
+        self.queue = queue
+        self.cmd_interpret = cmd_interpret
+        self.num_file = num_file
+        self.num_line = num_line
+        self.num_fifo_read = num_fifo_read
+        self.timestamp = timestamp
+        self.store_dict = store_dict
+        self.binary_only = binary_only
+        self.make_plots = make_plots
+
+    def run(self):
+        mem_data = []
+        for files in range(self.num_file):
+            file_name="./%s/TDC_Data_%d.dat"%(self.store_dict, files)
+            with open(file_name, 'w') as infile, open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, files), 'w') as outfile:
+                print("{} is reading data and writing file {} and translation...".format(self.getName(), files))
+                i = 0
+                while i < self.num_line:
+                    mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)   # max allowed by read_memory is 65535
+                    # print(len(mem_data)," ", mem_data,"\n")
+                    for j in range(len(mem_data)):
+                        if int(mem_data[j]) == 0: continue
+                        # self.queue.put(mem_data[i])
+                        binary = format(int(mem_data[j]), '032b')
+                        infile.write('%s\n'%binary)
+                        if(self.binary_only == False):
+                            TDC_data = etroc_translate_binary(binary, timestamp=self.timestamp)
+                            outfile.write("%s\n"%TDC_data)
+                            if(self.make_plots): self.queue.put(TDC_data)  
+                        i = i+1 
+                        # print(i)
+        print("%s finished!"%self.getName())
+
+#--------------------------------------------------------------------------#
+class DAQ_Plotting(threading.Thread):
+    def __init__(self, name, queue, timestamp, store_dict, pixel_address):
+        threading.Thread.__init__(self, name=name)
+        self.queue = queue
+        self.timestamp = timestamp
+        self.store_dict = store_dict
+        self.pixel_address = pixel_address
+
+    def run(self):
+        # mem_data = []
+        # val = self.queue.get()
+        # Local reference of THIS thread object
+        t = threading.current_thread()
+        # Thread is alive by default
+        t.alive = True
+        while(True):
+            # If alive is set to false
+            if not t.alive:
+                print("Plotting Thread detected alive=False")
+                # Break out of for loop
+                break
+            print("Sleeping for 5 seconds...")
+            time.sleep(5)
+            print("Waited 5 seconds! \n")
+        # Thread then stops running
+        print("Plotting Thread broke out of loop")
+
+
+#--------------------------------------------------------------------------#
+
 ## IIC write slave device
 # @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
 # @param slave[7:0] : slave device address

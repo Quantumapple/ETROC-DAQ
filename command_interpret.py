@@ -3,9 +3,10 @@
 import struct
 import time
 '''
-@author: Wei Zhang
+@author: Wei Zhang, Murtaza Safdari
 @date: 2018-01-05
 This module is used to communicate with control_interface module on FPGA via Ethernet
+Edited 2023-03-31
 '''
 #-------------------------------------------------------------------------------#
 #comand interpret

@@ -15,7 +15,7 @@ def etroc1_translate(line, timestamp):
     else: 
         channel = int(line[1:3], base=2)
         data = line[3:]
-    if (len(data)!=29+1): print("Tried to unpack ETROC1 data with fewer than required data bits", data, " ", type(data), len(data)) 
+    if (len(data)!=29): print("Tried to unpack ETROC1 data with fewer than required data bits", data, " ", type(data), len(data)) 
     #-------------------------DTYPE CHANNEL TOT TOA CAL----------------------------------#
     TDC_data = "ETROC1 " + "{:d} ".format(channel) + "{:d} ".format(int(data[0:9], base=2)) 
     TDC_data = TDC_data + "{:d} ".format(int(data[9:19], base=2)) + "{:d}".format(int(data[19:], base=2))
@@ -31,7 +31,7 @@ def control_translate(line, timestamp):
     if(line[2:4]=='00'):
         time_code = line[4:6]
         data = line[6:]
-        if (len(data)!=26+1): print("Tried to unpack ETROC1 timestamp with fewer than required data bits", data, " ", type(data), len(data)) 
+        if (len(data)!=26): print("Tried to unpack ETROC1 timestamp with fewer than required data bits", data, " ", type(data), len(data)) 
         #------------------Time_TYPE Time_Measurememt (clock cycles)----------------------#
         if(time_code=='00'):   TDC_data = "NORMTRIG "   + "{:d}".format(int(data, base=2))
         elif(time_code=='01'): TDC_data = "RANDTRIG "   + "{:d}".format(int(data, base=2))
