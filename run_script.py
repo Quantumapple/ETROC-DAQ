@@ -130,7 +130,7 @@ def main(options, cmd_interpret):
     read_write_data.start()
 
     if(options.make_plots):
-        daq_plotting = DAQ_Plotting('DAQ_Plotting', queue, options.timestamp, store_dict, options.pixel_address)
+        daq_plotting = DAQ_Plotting('DAQ_Plotting', queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size)
         try:
             # Start the thread
             daq_plotting.start()

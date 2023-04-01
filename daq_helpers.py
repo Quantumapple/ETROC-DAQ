@@ -3,6 +3,12 @@
 import time
 import visa
 import threading
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from queue import Queue
+import queue
 from command_interpret import *
 from ETROC1_ArrayReg import *
 from translate_data import *
@@ -99,29 +105,133 @@ class Read_Write_data(threading.Thread):
 
 #--------------------------------------------------------------------------#
 class DAQ_Plotting(threading.Thread):
-    def __init__(self, name, queue, timestamp, store_dict, pixel_address):
+    def __init__(self, name, queue, timestamp, store_dict, pixel_address, board_type, board_size):
         threading.Thread.__init__(self, name=name)
         self.queue = queue
         self.timestamp = timestamp
         self.store_dict = store_dict
         self.pixel_address = pixel_address
+        self.board_type = board_type
+        self.board_size = board_size
 
     def run(self):
-        # mem_data = []
-        # val = self.queue.get()
-        # Local reference of THIS thread object
-        t = threading.current_thread()
-        # Thread is alive by default
-        t.alive = True
-        while(True):
-            # If alive is set to false
+        t = threading.current_thread()                          # Local reference of THIS thread object
+        t.alive = True                                          # Thread is alive by default
+
+        ch0 = np.zeros((int(np.sqrt(self.board_size[0])),int(np.sqrt(self.board_size[0])))) 
+        ch1 = np.zeros((int(np.sqrt(self.board_size[1])),int(np.sqrt(self.board_size[1])))) 
+        ch2 = np.zeros((int(np.sqrt(self.board_size[2])),int(np.sqrt(self.board_size[2])))) 
+        ch3 = np.zeros((int(np.sqrt(self.board_size[2])),int(np.sqrt(self.board_size[2])))) 
+
+        plt.ion()
+        fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2,2, dpi=75)
+        ax0.set_title('Channel 0: ETROC {:d}'.format(self.board_type[0]))
+        img0 = ax0.imshow(ch0, interpolation='none')
+        ax0.set_aspect('equal')
+        ax1.set_title('Channel 1: ETROC {:d}'.format(self.board_type[1]))
+        img1 = ax1.imshow(ch1, interpolation='none')
+        ax1.set_aspect('equal')
+        ax2.set_title('Channel 2: ETROC {:d}'.format(self.board_type[2]))
+        img2 = ax2.imshow(ch2, interpolation='none')
+        ax2.set_aspect('equal')
+        ax3.set_title('Channel 3: ETROC {:d}'.format(self.board_type[2]))
+        img3 = ax3.imshow(ch3, interpolation='none')
+        ax3.set_aspect('equal')
+
+        ax0.get_xaxis().set_visible(False)
+        ax0.get_yaxis().set_visible(False)
+        # ax0.set_frame_on(False)
+        ax1.get_xaxis().set_visible(False)
+        ax1.get_yaxis().set_visible(False)
+        # ax1.set_frame_on(False)
+        ax2.get_xaxis().set_visible(False)
+        ax2.get_yaxis().set_visible(False)
+        # ax2.set_frame_on(False)
+        ax3.get_xaxis().set_visible(False)
+        ax3.get_yaxis().set_visible(False)
+        # ax3.set_frame_on(False)
+
+        divider = make_axes_locatable(ax0)
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        fig.colorbar(img0, cax=cax, orientation='vertical')
+        divider = make_axes_locatable(ax1)
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        fig.colorbar(img1, cax=cax, orientation='vertical')
+        divider = make_axes_locatable(ax2)
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        fig.colorbar(img2, cax=cax, orientation='vertical')
+        divider = make_axes_locatable(ax3)
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        fig.colorbar(img3, cax=cax, orientation='vertical')
+
+        # plt.tight_layout()
+        # plt.draw()
+        # def init():
+        #     line.set_data([], [])
+        #     return line,
+        # def animate(i):
+        #     x = np.linspace(0, 4, 1000)
+        #     y = np.sin(2 * np.pi * (x - 0.01 * i))
+        #     line.set_data(x, y)
+        #     return line,
+
+        # anim = FuncAnimation(fig, animate, init_func=init,
+        #                                frames=200, interval=20, blit=False)
+
+        # anim.save('sine_wave.gif', writer='imagemagick')
+
+        while(True):                                            # If alive is set to false
             if not t.alive:
                 print("Plotting Thread detected alive=False")
-                # Break out of for loop
-                break
-            print("Sleeping for 5 seconds...")
-            time.sleep(5)
-            print("Waited 5 seconds! \n")
+                break                                           # Break out of for loop
+
+            start_time = time.time()
+            delta_time = 0
+            mem_data = []
+            while(delta_time < 0.1):                              # 1 sec needs to be user controlled
+                try:
+                    task = self.queue.get(False)                # 5 sec before exception is thrown
+                    mem_data.append(task)
+                except queue.Empty:                             # Handle empty queue here
+                    pass
+                # else:                                         # Handle task here and call q.task_done()
+                delta_time = time.time() - start_time
+
+            for line in mem_data:
+                words = line.split()
+                if(words[0]!="ETROC1" and words[0]!="ETROC2" and words[0]!="ETROC3"): continue
+                if(words[1]=="0"):   ch0[self.pixel_address[0]%int(np.sqrt(self.board_size[0])),self.pixel_address[0]//int(np.sqrt(self.board_size[0]))] += 1
+                elif(words[1]=="1"): ch1[self.pixel_address[1]%int(np.sqrt(self.board_size[1])),self.pixel_address[1]//int(np.sqrt(self.board_size[1]))] += 1
+                elif(words[1]=="2"): ch2[self.pixel_address[2]%int(np.sqrt(self.board_size[2])),self.pixel_address[2]//int(np.sqrt(self.board_size[2]))] += 1
+                elif(words[1]=="3"): ch3[self.pixel_address[2]%int(np.sqrt(self.board_size[2])),self.pixel_address[2]//int(np.sqrt(self.board_size[2]))] += 1
+
+            img0.set_data(ch0)
+            img0.autoscale()
+            img1.set_data(ch1)
+            img1.autoscale()
+            img2.set_data(ch2)
+            img2.autoscale()
+            img3.set_data(ch3)
+            img3.autoscale()
+            # ax0.relim()
+            # ax0.autoscale_view()
+            # ax1.relim()
+            # ax1.autoscale_view()
+            # ax2.relim()
+            # ax2.autoscale_view()
+            # ax3.relim()
+            # ax3.autoscale_view()
+            # plt.tight_layout()
+            fig.canvas.draw_idle()
+            plt.pause(0.01)
+            print("This pass of the Plotting function loop registered {:d} hits".format(len(mem_data)))
+
+        plt.ioff()
+        plt.show()
+
+        print(ch0)
+        print(ch1)
+
         # Thread then stops running
         print("Plotting Thread broke out of loop")
 
