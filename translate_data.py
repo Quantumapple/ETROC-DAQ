@@ -9,7 +9,7 @@ This script is composed of functions to translate binary data into TDC codes
 '''
 #----------------------------------------------------------------------------------------#
 def etroc1_translate(line, timestamp):
-    if(timestamp==1): 
+    if(timestamp==1 or timestamp==3): 
         channel = int(line[0:2], base=2)
         data = line[2:-1]                               ## Ignore final bit (hitflag =1)
     else: 

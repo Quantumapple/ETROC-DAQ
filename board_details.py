@@ -25,11 +25,11 @@ Any inserted jumpers will flip the bit
 slaveA_addr_list = [0x03,  0x02,  0x01]
 slaveB_addr_list = [0x7f,  0x7e,  0x7d]
 
-board_type       = [1,     1,     1]            # ETROC version number
+board_type       = [1,     1,     1 ]            # ETROC version number
 
 active_channels_key = 0x0003
 
-board_size       = [16,    16,    16]
+board_size       = [16,    16,    16,    16]
 
 board_name       = ["F28", "F29", "F30"]
 

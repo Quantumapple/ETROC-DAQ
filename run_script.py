@@ -39,120 +39,123 @@ port = 1024									# port number
 ## main function
 def main(options, cmd_interpret):
 
-    active_channels(cmd_interpret, key = active_channels_key)
-    timestamp(cmd_interpret, key = options.timestamp)
-
-    num_boards = len(board_size)
-    DAC_Value_List = []
-    for i in range(num_boards):
-        DAC_Value_List.append(single_pixel_threshold(board_size[i], options.pixel_address[i], options.pixel_threshold[i]))
-
+    num_boards = len(board_type)
     Pixel_board = options.pixel_address
     QSel_board  = options.pixel_charge			                                        # Select Injected Charge
-    ###################################### Begin Dir naming
-    userdefinedir = options.output_directory
-    userdefinedir_log = "%s_log"%userdefinedir
-    ##  Creat a directory named path with date of today
-    today = datetime.date.today()
-    todaystr = "../" + today.isoformat() + "_Array_Test_Results"
-    try:
-        os.mkdir(todaystr)
-        print("Directory %s was created!"%todaystr)
-    except FileExistsError:
-        print("Directory %s already exists!"%todaystr)
-    userdefine_dir = todaystr + "/%s"%userdefinedir
-    userdefine_dir_log = todaystr + "/%s"%userdefinedir_log
-    try:
-        os.mkdir(userdefine_dir)
-        os.mkdir(userdefine_dir_log)
-    except FileExistsError:
-        print("User defined directory %s already created!"%(userdefine_dir))
-        print("User defined directory %s already created!"%(userdefine_dir_log))
-        if(options.overwrite != True): 
-            print("Overwriting is not enabled, exiting code abruptly...")
-            sys.exit(1)
-    ###################################### End Dir naming
+
+    if(not options.old_data_format):
+        if(options.i2c):
+            active_channels(cmd_interpret, key = active_channels_key)
+            timestamp(cmd_interpret, key = options.timestamp)
+    
+    if(options.i2c):
+        DAC_Value_List = []
+        for i in range(num_boards):
+            DAC_Value_List.append(single_pixel_threshold(board_size[i], options.pixel_address[i], options.pixel_threshold[i]))
+
+    ###################################### Begin Dir making
+    if(not options.nodaq):
+        userdefinedir = options.output_directory
+        userdefinedir_log = "%s_log"%userdefinedir
+        ##  Creat a directory named path with date of today
+        today = datetime.date.today()
+        todaystr = "../" + today.isoformat() + "_Array_Test_Results"
+        try:
+            os.mkdir(todaystr)
+            print("Directory %s was created!"%todaystr)
+        except FileExistsError:
+            print("Directory %s already exists!"%todaystr)
+        userdefine_dir = todaystr + "/%s"%userdefinedir
+        # userdefine_dir_log = todaystr + "/%s"%userdefinedir_log
+        try:
+            os.mkdir(userdefine_dir)
+            # os.mkdir(userdefine_dir_log)
+        except FileExistsError:
+            print("User defined directory %s already created!"%(userdefine_dir))
+            # print("User defined directory %s already created!"%(userdefine_dir_log))
+            if(options.overwrite != True): 
+                print("Overwriting is not enabled, exiting code abruptly...")
+                sys.exit(1)
+    ###################################### End Dir making
     logtime_stampe = time.strftime('%m-%d_%H-%M-%S',time.localtime(time.time()))
     
-    for B_num in range(num_boards):
-        slaveA_addr = slaveA_addr_list[B_num]                                           # I2C slave A address
-        slaveB_addr = slaveB_addr_list[B_num]                                           # I2C slave B address
+    if(options.i2c):
+        for B_num in range(num_boards):
 
-        if(board_type[B_num]==1):
-            reg_val = config_etroc1(B_num, options.charge_injection, DAC_Value_List, 
-                                    options.pixel_address, options.pixel_charge, cmd_interpret)
-        elif(board_type[B_num]==2):
-            pass
-        elif(board_type[B_num]==3):
-            pass
+            slaveA_addr = slaveA_addr_list[B_num]                                           # I2C slave A address
+            slaveB_addr = slaveB_addr_list[B_num]                                           # I2C slave B address
 
-        ## write data to I2C register one by one
-        if(options.verbose):
-            print("Write data into I2C slave:")
-            print(reg_val)
-        for i in range(len(reg_val)):
-            time.sleep(0.01)
-            if i < 32:                                                                  # I2C slave A write
-                iic_write(1, slaveA_addr_list[B_num], 0, i, reg_val[i], cmd_interpret)
-            else:                                                                       # I2C slave B write
-                iic_write(1, slaveB_addr_list[B_num], 0, i-32, reg_val[i], cmd_interpret)
+            if(board_type[B_num]==1):
+                reg_val = config_etroc1(B_num, options.charge_injection, DAC_Value_List, 
+                                        options.pixel_address, options.pixel_charge, cmd_interpret)
+            elif(board_type[B_num]==2):
+                pass
+            elif(board_type[B_num]==3):
+                pass
 
-        ## read back data from I2C register one by one
-        iic_read_val = []
-        for j in range(len(reg_val)):
-            time.sleep(0.01)
-            if j < 32:
-                iic_read_val += [iic_read(0, slaveA_addr_list[B_num], 1, j, cmd_interpret)]            # I2C slave A read
+            ## write data to I2C register one by one
+            if(options.verbose):
+                print("Write data into I2C slave:")
+                print(reg_val)
+            for i in range(len(reg_val)):
+                time.sleep(0.01)
+                if i < 32:                                                                  # I2C slave A write
+                    iic_write(1, slaveA_addr_list[B_num], 0, i, reg_val[i], cmd_interpret)
+                else:                                                                       # I2C slave B write
+                    iic_write(1, slaveB_addr_list[B_num], 0, i-32, reg_val[i], cmd_interpret)
+
+            ## read back data from I2C register one by one
+            iic_read_val = []
+            for j in range(len(reg_val)):
+                time.sleep(0.01)
+                if j < 32:
+                    iic_read_val += [iic_read(0, slaveA_addr_list[B_num], 1, j, cmd_interpret)]            # I2C slave A read
+                else:
+                    iic_read_val += [iic_read(0, slaveB_addr_list[B_num], 1, j-32, cmd_interpret)]         # I2C slave B read
+            if(options.verbose):
+                print("I2C read back data:")
+                print(iic_read_val)
+
+            # compare I2C write in data with I2C read back data
+            if iic_read_val == reg_val:
+                print("I2C SUCCESS! Write data matches read data for Board ", B_num)
             else:
-                iic_read_val += [iic_read(0, slaveB_addr_list[B_num], 1, j-32, cmd_interpret)]         # I2C slave B read
-        if(options.verbose):
-            print("I2C read back data:")
-            print(iic_read_val)
-
-        # compare I2C write in data with I2C read back data
-        if iic_read_val == reg_val:
-            print("I2C SUCCESS! Write data matches read data for Board ", B_num)
-        else:
-            print("I2C ERROR! Write data does not match read data for Board ", B_num)
+                print("I2C ERROR! Write data does not match read data for Board ", B_num)
 
     time.sleep(1)                                                                       # delay one second
-    software_clear_fifo(cmd_interpret)                                                               # clear fifo content
+    software_clear_fifo(cmd_interpret)                                                  # clear fifo content
 
-    ## start receive_data and write_data threading
-    store_dict = userdefine_dir
-    queue = Queue()                                                                           # define a queue
-    # receive_data = Receive_data('Receive_data', queue, options.num_file, options.num_line, cmd_interpret)    # initial receive_data class
-    # write_data = Write_data('Write_data', queue, options.num_file, options.num_line, 
-    #                         options.timestamp, store_dict, options.binary_only)             # initial write_data class
-    read_write_data = Read_Write_data('Read_Write_data', queue, cmd_interpret, options.num_file, options.num_line, 
-                                      options.num_fifo_read, options.timestamp, store_dict, 
-                                      options.binary_only, options.make_plots)                              # Read and Write Data into files
-    read_write_data.start()
+    if(not options.nodaq):
+        ## start receive_data and write_data threading
+        store_dict = userdefine_dir
+        queue = Queue()                                                                 # define a queue
+        # receive_data = Receive_data('Receive_data', queue, options.num_file, options.num_line, cmd_interpret)    # initial receive_data class
+        # write_data = Write_data('Write_data', queue, options.num_file, options.num_line, 
+        #                         options.timestamp, store_dict, options.binary_only)             # initial write_data class
+        read_write_data = Read_Write_data('Read_Write_data', queue, cmd_interpret, options.num_file, options.num_line, 
+                                        options.num_fifo_read, options.timestamp, store_dict, 
+                                        options.binary_only, options.make_plots)        # Read and Write Data into files
+        # start threading
+        read_write_data.start()
 
-    if(options.make_plots):
-        daq_plotting = DAQ_Plotting('DAQ_Plotting', queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size)
-        try:
-            # Start the thread
-            daq_plotting.start()
-            # If the child thread is still running
-            while daq_plotting.is_alive():
-                # Try to join the child thread back to parent for 0.5 seconds
-                daq_plotting.join(0.5)
-        # When ctrl+c is received
-        except KeyboardInterrupt as e:
-            # Set the alive attribute to false
-            daq_plotting.alive = False
-            # Block until child thread is joined back to the parent
-            daq_plotting.join()
-    
-    # start threading
-    # receive_data.start()
-    # write_data.start()
-
-    # wait for thread to finish before proceeding
-    # receive_data.join()                                                                  
-    # write_data.join()
-    read_write_data.join()
+        if(options.make_plots):
+            daq_plotting = DAQ_Plotting('DAQ_Plotting', queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time)
+            try:
+                # Start the thread
+                daq_plotting.start()
+                # If the child thread is still running
+                while daq_plotting.is_alive():
+                    # Try to join the child thread back to parent for 0.5 seconds
+                    daq_plotting.join(0.5)
+            # When ctrl+c is received
+            except KeyboardInterrupt as e:
+                # Set the alive attribute to false
+                daq_plotting.alive = False
+                # Block until child thread is joined back to the parent
+                daq_plotting.join()
+        
+        # wait for thread to finish before proceeding
+        read_write_data.join()
 #--------------------------------------------------------------------------#
 ## if statement
 if __name__ == "__main__":
@@ -203,6 +206,17 @@ if __name__ == "__main__":
     parser.add_option("-p", "--make_plots",
                       action="store_true", dest="make_plots", default=False,
                       help="Enable plotting of real time hits")
+    parser.add_option("--plot_queue_time", dest="plot_queue_time", action="store", type="float",
+                      help="Time (s) used to pop lines off the queue for plotting", default=0.1)
+    parser.add_option("--old_data_format",
+                      action="store_true", dest="old_data_format", default=False,
+                      help="(Dev Only) Set if Data is in old format for ETROC1")
+    parser.add_option("--i2c",
+                      action="store_true", dest="i2c", default=False,
+                      help="Config ETROC boards over I2C")
+    parser.add_option("--nodaq",
+                      action="store_true", dest="nodaq", default=False,
+                      help="Switch off DAQ via the FPGA")
     (options, args) = parser.parse_args()
 
     if(options.pixel_address == None): options.pixel_address = [5, 5, 5]
@@ -217,6 +231,8 @@ if __name__ == "__main__":
         print("\n")
         print("-------------------------------------------")
         print("--------Set of inputs from the USER--------")
+        print("Config ETROC boards over I2C: ", options.i2c)
+        print("Switch off DAQ via the FPGA?: ", options.nodaq)
         print("Number of files created by DAQ script: ", options.num_file)
         print("Number of lines per file created by DAQ script: ", options.num_line)
         print("Number of lines read per call of fifo readout: ", options.num_fifo_read)
@@ -230,6 +246,7 @@ if __name__ == "__main__":
         print("Set timestamp binary, see daq_helpers for more info (explicit hex string): ", "0x{:04x}".format(options.timestamp))
         print("Overwrite previously saved files: ", options.overwrite)
         print("Enable plotting of real time hits: ", options.make_plots)
+        print("Time (s) used to pop lines off the queue for plotting: ", options.plot_queue_time)
         print("--------End of inputs from the USER--------")
         print("-------------------------------------------")
         print("\n")
@@ -250,4 +267,4 @@ if __name__ == "__main__":
         print("\n")
         
     main(options, cmd_interpret)											    # execute main function
-    s.close()												    # close socket
+    s.close()												                    # close socket

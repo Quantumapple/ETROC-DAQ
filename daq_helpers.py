@@ -4,6 +4,8 @@ import time
 import visa
 import threading
 import numpy as np
+import matplotlib
+# matplotlib.use('WebAgg')
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -87,6 +89,7 @@ class Read_Write_data(threading.Thread):
             with open(file_name, 'w') as infile, open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, files), 'w') as outfile:
                 print("{} is reading data and writing file {} and translation...".format(self.getName(), files))
                 i = 0
+                start_time = time.time()
                 while i < self.num_line:
                     mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)   # max allowed by read_memory is 65535
                     # print(len(mem_data)," ", mem_data,"\n")
@@ -101,11 +104,14 @@ class Read_Write_data(threading.Thread):
                             if(self.make_plots): self.queue.put(TDC_data)  
                         i = i+1 
                         # print(i)
+                    if(time.time()-start_time > 10):
+                        print("BREAKING OUT OF WRITE LOOP CAUSE I'VE BEEN FOR 10s !!!")
+                        break
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
 class DAQ_Plotting(threading.Thread):
-    def __init__(self, name, queue, timestamp, store_dict, pixel_address, board_type, board_size):
+    def __init__(self, name, queue, timestamp, store_dict, pixel_address, board_type, board_size, plot_queue_time):
         threading.Thread.__init__(self, name=name)
         self.queue = queue
         self.timestamp = timestamp
@@ -113,6 +119,7 @@ class DAQ_Plotting(threading.Thread):
         self.pixel_address = pixel_address
         self.board_type = board_type
         self.board_size = board_size
+        self.plot_queue_time = plot_queue_time
 
     def run(self):
         t = threading.current_thread()                          # Local reference of THIS thread object
@@ -121,10 +128,16 @@ class DAQ_Plotting(threading.Thread):
         ch0 = np.zeros((int(np.sqrt(self.board_size[0])),int(np.sqrt(self.board_size[0])))) 
         ch1 = np.zeros((int(np.sqrt(self.board_size[1])),int(np.sqrt(self.board_size[1])))) 
         ch2 = np.zeros((int(np.sqrt(self.board_size[2])),int(np.sqrt(self.board_size[2])))) 
-        ch3 = np.zeros((int(np.sqrt(self.board_size[2])),int(np.sqrt(self.board_size[2])))) 
+        ch3 = np.zeros((int(np.sqrt(self.board_size[3])),int(np.sqrt(self.board_size[3])))) 
 
         plt.ion()
-        fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2,2, dpi=75)
+        # fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2,2, dpi=75)
+        fig = plt.figure(dpi=75, figsize=(6, 5))
+        gs = fig.add_gridspec(5,6)
+        ax0 = fig.add_subplot(gs[0, 0])
+        ax1 = fig.add_subplot(gs[2, 0])
+        ax2 = fig.add_subplot(gs[4, 0])
+        ax3 = fig.add_subplot(gs[:, 2:])
         ax0.set_title('Channel 0: ETROC {:d}'.format(self.board_type[0]))
         img0 = ax0.imshow(ch0, interpolation='none')
         ax0.set_aspect('equal')
@@ -181,6 +194,20 @@ class DAQ_Plotting(threading.Thread):
         # anim.save('sine_wave.gif', writer='imagemagick')
 
         while(True):                                            # If alive is set to false
+
+            ch0 = np.zeros((int(np.sqrt(self.board_size[0])),int(np.sqrt(self.board_size[0])))) 
+            ch1 = np.zeros((int(np.sqrt(self.board_size[1])),int(np.sqrt(self.board_size[1])))) 
+            ch2 = np.zeros((int(np.sqrt(self.board_size[2])),int(np.sqrt(self.board_size[2])))) 
+            ch3 = np.zeros((int(np.sqrt(self.board_size[3])),int(np.sqrt(self.board_size[3])))) 
+            img0.set_data(ch0)
+            img0.autoscale()
+            img1.set_data(ch1)
+            img1.autoscale()
+            img2.set_data(ch2)
+            img2.autoscale()
+            img3.set_data(ch3)
+            img3.autoscale()
+
             if not t.alive:
                 print("Plotting Thread detected alive=False")
                 break                                           # Break out of for loop
@@ -188,9 +215,9 @@ class DAQ_Plotting(threading.Thread):
             start_time = time.time()
             delta_time = 0
             mem_data = []
-            while(delta_time < 0.1):                              # 1 sec needs to be user controlled
+            while(delta_time < self.plot_queue_time):
                 try:
-                    task = self.queue.get(False)                # 5 sec before exception is thrown
+                    task = self.queue.get(False)                # Empty exception is thrown right away
                     mem_data.append(task)
                 except queue.Empty:                             # Handle empty queue here
                     pass
@@ -203,7 +230,7 @@ class DAQ_Plotting(threading.Thread):
                 if(words[1]=="0"):   ch0[self.pixel_address[0]%int(np.sqrt(self.board_size[0])),self.pixel_address[0]//int(np.sqrt(self.board_size[0]))] += 1
                 elif(words[1]=="1"): ch1[self.pixel_address[1]%int(np.sqrt(self.board_size[1])),self.pixel_address[1]//int(np.sqrt(self.board_size[1]))] += 1
                 elif(words[1]=="2"): ch2[self.pixel_address[2]%int(np.sqrt(self.board_size[2])),self.pixel_address[2]//int(np.sqrt(self.board_size[2]))] += 1
-                elif(words[1]=="3"): ch3[self.pixel_address[2]%int(np.sqrt(self.board_size[2])),self.pixel_address[2]//int(np.sqrt(self.board_size[2]))] += 1
+                elif(words[1]=="3"): ch3[self.pixel_address[2]%int(np.sqrt(self.board_size[3])),self.pixel_address[2]//int(np.sqrt(self.board_size[3]))] += 1
 
             img0.set_data(ch0)
             img0.autoscale()
@@ -224,7 +251,7 @@ class DAQ_Plotting(threading.Thread):
             # plt.tight_layout()
             fig.canvas.draw_idle()
             plt.pause(0.01)
-            print("This pass of the Plotting function loop registered {:d} hits".format(len(mem_data)))
+            print("This pass of the Plotting function loop parsed {:d} lines of output".format(len(mem_data)))
 
         plt.ioff()
         plt.show()
@@ -306,11 +333,12 @@ def active_channels(cmd_interpret, key = 0x0003):
 
 #--------------------------------------------------------------------------#
 ## TimeStamp and Testmode
-## 0x0000: Disable Testmode & Enable TimeStamp
-## 0x0001: Disable Testmode & Disable TimeStamp
-## 0x0010: Enable Testmode & Enable TimeStamp
-## 0x0011: Enable Testmode & Disable TimeStamp
-## Note that the input needs to be a 4-digit 16 bit hex
+## Following is binary key, 4 bit binary WXYZ
+## 0000: Enable  Testmode & Enable TimeStamp
+## 0001: Enable  Testmode & Disable TimeStamp
+## 0010: Disable Testmode & Enable TimeStamp
+## 0011: Disable Testmode & Disable TimeStamp                  ##BUGGED as of 03-04-2023
+## Note that the input needs to be a 4-digit 16 bit hex, 0x000(WXYZ)
 def timestamp(cmd_interpret, key=0x0000):
     cmd_interpret.write_config_reg(13, key) 
 
