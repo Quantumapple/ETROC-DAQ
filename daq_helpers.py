@@ -14,7 +14,7 @@ from ETROC1_ArrayReg import *
 from translate_data import *
 #========================================================================================#
 '''
-@author: Wei Zhang, Murtaza Safdari, Jongho Lee
+@author: Wei Zhang, Murtaza Safdari
 @date: 2023-03-24
 This script is composed of all the helper functions needed for I2C comms, FPGA, etc
 '''

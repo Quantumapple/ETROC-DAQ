@@ -3,7 +3,7 @@
 import sys
 #========================================================================================#
 '''
-@author: Murtaza Safdari, Jongho Lee
+@author: Murtaza Safdari
 @date: 2023-03-30
 This script is composed of functions to translate binary data into TDC codes
 '''
