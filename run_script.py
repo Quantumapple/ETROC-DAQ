@@ -134,7 +134,7 @@ def main(options, cmd_interpret):
         #                         options.timestamp, store_dict, options.binary_only)             # initial write_data class
         read_write_data = Read_Write_data('Read_Write_data', queue, cmd_interpret, options.num_file, options.num_line, 
                                         options.num_fifo_read, options.timestamp, store_dict, 
-                                        options.binary_only, options.make_plots)        # Read and Write Data into files
+                                        options.binary_only, options.make_plots, board_ID)        # Read and Write Data into files
         # start threading
         read_write_data.start()
 
@@ -255,6 +255,7 @@ if __name__ == "__main__":
         print("ETROC Board Type: ",   board_type)
         print("ETROC Board Size: ",   board_size)
         print("ETROC Board Name: ",   board_name)
+        print("ETROC Chip ID: ",      board_ID)
         print("I2C A Address List: ", slaveA_addr_list)
         print("I2C B Address List: ", slaveB_addr_list)
         print("Load Capacitance of the preamp first stage: ", CLSel_board)

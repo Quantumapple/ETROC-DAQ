@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from queue import Queue
+from collections import deque
 import queue
 from command_interpret import *
 from ETROC1_ArrayReg import *
@@ -22,55 +23,70 @@ This script is composed of all the helper functions needed for I2C comms, FPGA, 
 '''
 #--------------------------------------------------------------------------#
 ## define a receive data class
-class Receive_data(threading.Thread):                                   # threading class
-    def __init__(self, name, queue, num_file, num_line, cmd_interpret):
-        threading.Thread.__init__(self, name=name)
-        self.queue = queue
-        self.num_file = num_file
-        self.num_line = num_line
-        self.cmd_interpret = cmd_interpret
+# class Receive_data(threading.Thread):                                   # threading class
+#     def __init__(self, name, queue, num_file, num_line, cmd_interpret):
+#         threading.Thread.__init__(self, name=name)
+#         self.queue = queue
+#         self.num_file = num_file
+#         self.num_line = num_line
+#         self.cmd_interpret = cmd_interpret
     
-    def run(self):                                                      # num_file: set how many data file you want to get
-        mem_data = []
-        for files in range(self.num_file):
-            mem_data = self.cmd_interpret.read_data_fifo(self.num_line)      # num_line: set how many lines per file you want
-            print("{} is producing {} to the queue!".format(self.getName(), files))
-            for i in range(self.num_line):
-                self.queue.put(mem_data[i])  
-        print("%s finished!"%self.getName())
+#     def run(self):                                                      # num_file: set how many data file you want to get
+#         mem_data = []
+#         for files in range(self.num_file):
+#             mem_data = self.cmd_interpret.read_data_fifo(self.num_line)      # num_line: set how many lines per file you want
+#             print("{} is producing {} to the queue!".format(self.getName(), files))
+#             for i in range(self.num_line):
+#                 self.queue.put(mem_data[i])  
+#         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
 ## define a write data class
-class Write_data(threading.Thread):                                     # threading class
-    def __init__(self, name, queue, num_file, num_line, timestamp, store_dict, binary_only):
-        threading.Thread.__init__(self, name=name)
-        self.queue = queue
-        self.num_file = num_file
-        self.num_line = num_line
-        self.timestamp = timestamp
-        self.store_dict = store_dict
-        self.binary_only = binary_only
+# class Write_data(threading.Thread):                                     # threading class
+#     def __init__(self, name, queue, num_file, num_line, timestamp, store_dict, binary_only):
+#         threading.Thread.__init__(self, name=name)
+#         self.queue = queue
+#         self.num_ficlass Receive_data(threading.Thread):                                   # threading class
+#     def __init__(self, name, queue, num_file, num_line, cmd_interpret):
+#         threading.Thread.__init__(self, name=name)
+#         self.queue = queue
+#         self.num_file = num_file
+#         self.num_line = num_line
+#         self.cmd_interpret = cmd_interpret
     
-    def run(self):
-        for files in range(self.num_file):
-            file_name="./%s/TDC_Data_%d.dat"%(self.store_dict, files)
-            with open(file_name, 'w') as infile:
-                for j in range(self.num_line):
-                    val = self.queue.get()
-                    # if int(val) == 0:
-                    #     continue
-                    binary = format(int(val), '032b')
-                    infile.write('%s\n'%binary)
-            print("%s finished!" % self.getName())
-            if(self.binary_only == False):
-                with open(file_name,'r') as infile, open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, files), 'w') as outfile:
-                    for line in infile.readlines():
-                        TDC_data = etroc_translate_binary(line, timestamp=self.timestamp)
-                        outfile.write("%s\n"%TDC_data)
+#     def run(self):                                                      # num_file: set how many data file you want to get
+#         mem_data = []
+#         for files in range(self.num_file):
+#             mem_data = self.cmd_interpret.read_data_fifo(self.num_line)      # num_line: set how many lines per file you want
+#             print("{} is producing {} to the queue!".format(self.getName(), files))
+#             for i in range(self.num_line):
+#                 self.queue.put(mem_data[i])  
+#         print("%s finished!"%self.getName())le = num_file
+#         self.num_line = num_line
+#         self.timestamp = timestamp
+#         self.store_dict = store_dict
+#         self.binary_only = binary_only
+    
+#     def run(self):
+#         for files in range(self.num_file):
+#             file_name="./%s/TDC_Data_%d.dat"%(self.store_dict, files)
+#             with open(file_name, 'w') as infile:
+#                 for j in range(self.num_line):
+#                     val = self.queue.get()
+#                     # if int(val) == 0:
+#                     #     continue
+#                     binary = format(int(val), '032b')
+#                     infile.write('%s\n'%binary)
+#             print("%s finished!" % self.getName())
+#             if(self.binary_only == False):
+#                 with open(file_name,'r') as infile, open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, files), 'w') as outfile:
+#                     for line in infile.readlines():
+#                         TDC_data = etroc_translate_binary(line, timestamp=self.timestamp)
+#                         outfile.write("%s\n"%TDC_data)
 
 #--------------------------------------------------------------------------#
 class Read_Write_data(threading.Thread):
-    def __init__(self, name, queue, cmd_interpret, num_file, num_line, num_fifo_read, timestamp, store_dict, binary_only, make_plots):
+    def __init__(self, name, queue, cmd_interpret, num_file, num_line, num_fifo_read, timestamp, store_dict, binary_only, make_plots, board_ID):
         threading.Thread.__init__(self, name=name)
         self.queue = queue
         self.cmd_interpret = cmd_interpret
@@ -81,6 +97,8 @@ class Read_Write_data(threading.Thread):
         self.store_dict = store_dict
         self.binary_only = binary_only
         self.make_plots = make_plots
+        self.board_ID = board_ID
+        self.queue_ch = [deque() for i in range(4)]                # Inelegant solution making a deque for each channel
 
     def run(self):
         mem_data = []
@@ -92,20 +110,26 @@ class Read_Write_data(threading.Thread):
                 start_time = time.time()
                 while i < self.num_line:
                     mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)   # max allowed by read_memory is 65535
-                    # print(len(mem_data)," ", mem_data,"\n")
                     for j in range(len(mem_data)):
                         if int(mem_data[j]) == 0: continue
-                        # self.queue.put(mem_data[i])
                         binary = format(int(mem_data[j]), '032b')
                         infile.write('%s\n'%binary)
                         if(self.binary_only == False):
-                            TDC_data = etroc_translate_binary(binary, timestamp=self.timestamp)
-                            outfile.write("%s\n"%TDC_data)
-                            if(self.make_plots): self.queue.put(TDC_data)  
-                        i = i+1 
+                            TDC_data, write_flag = etroc_translate_binary(binary, timestamp=self.timestamp, self.queue_ch, self.board_ID)
+                            if(write_flag==1):
+                                outfile.write("%s\n"%TDC_data)
+                                if(self.make_plots): self.queue.put(TDC_data) 
+                            elif(write_flag==2):
+                                for TDC_line in TDC_data:
+                                    outfile.write("%s\n"%TDC_line)
+                                    if(self.make_plots): self.queue.put(TDC_line)
+                            else:
+                                pass
+                        i = i+1
+                        start_time = time.time()
                         # print(i)
-                    if(time.time()-start_time > 10):
-                        print("BREAKING OUT OF WRITE LOOP CAUSE I'VE BEEN FOR 10s !!!")
+                    if(time.time()-start_time > 30):
+                        print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST WRITE!!!")
                         break
         print("%s finished!"%self.getName())
 
@@ -132,12 +156,13 @@ class DAQ_Plotting(threading.Thread):
 
         plt.ion()
         # fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2,2, dpi=75)
-        fig = plt.figure(dpi=75, figsize=(6, 5))
-        gs = fig.add_gridspec(5,6)
-        ax0 = fig.add_subplot(gs[0, 0])
-        ax1 = fig.add_subplot(gs[2, 0])
-        ax2 = fig.add_subplot(gs[4, 0])
-        ax3 = fig.add_subplot(gs[:, 2:])
+        fig = plt.figure(dpi=75, figsize=(8,8))
+        gs = fig.add_gridspec(8,8)
+        ax0 = fig.add_subplot(gs[0:int(np.sqrt(self.board_size[0]))//4, 0:int(np.sqrt(self.board_size[0]))//4])
+        ax1 = fig.add_subplot(gs[4:4+int(np.sqrt(self.board_size[1]))//4, 0:int(np.sqrt(self.board_size[1]))//4])
+        ax2 = fig.add_subplot(gs[0:int(np.sqrt(self.board_size[2]))//4, 4:4+int(np.sqrt(self.board_size[2]))//4])
+        ax3 = fig.add_subplot(gs[4:4+int(np.sqrt(self.board_size[3]))//4, 4:4+int(np.sqrt(self.board_size[3]))//4])
+
         ax0.set_title('Channel 0: ETROC {:d}'.format(self.board_type[0]))
         img0 = ax0.imshow(ch0, interpolation='none')
         ax0.set_aspect('equal')
@@ -179,7 +204,7 @@ class DAQ_Plotting(threading.Thread):
 
         # plt.tight_layout()
         # plt.draw()
-        # def init():
+        # def init():etroc_translate_binary
         #     line.set_data([], [])
         #     return line,
         # def animate(i):

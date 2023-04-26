@@ -32,6 +32,7 @@ active_channels_key = 0x0003
 board_size       = [16,    16,    16,    16]
 
 board_name       = ["F28", "F29", "F30"]
+board_ID         = ["00000000000000000","00000000000000000","00000000000000000"] 
 
 CLSel_board      = [  0,    0,    0 ]			# Load Capacitance of the preamp first stage, default 0
 RfSel_board      = [  2,    2,    2 ]			# Feedback resistance seleciton
