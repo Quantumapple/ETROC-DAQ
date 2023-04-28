@@ -132,36 +132,67 @@ def main(options, cmd_interpret):
     software_clear_fifo(cmd_interpret)                                                  # clear fifo content
 
     if(not options.nodaq):
-        ## start receive_data and write_data threading
+        ## start receive_data, write_data, daq_plotting threading
         store_dict = userdefine_dir
-        queue = Queue()                                                                 # define a queue
-        # receive_data = Receive_data('Receive_data', queue, options.num_file, options.num_line, cmd_interpret)    # initial receive_data class
-        # write_data = Write_data('Write_data', queue, options.num_file, options.num_line, 
-        #                         options.timestamp, store_dict, options.binary_only)             # initial write_data class
-        read_write_data = Read_Write_data('Read_Write_data', queue, cmd_interpret, options.num_file, options.num_line, 
-                                        options.num_fifo_read, options.timestamp, store_dict, 
-                                        options.binary_only, options.make_plots, board_ID)        # Read and Write Data into files
+        read_queue = Queue() 
+        plot_queue = Queue()
+        read_stop_event = threading.Event()     # This is how we stop the read thread
+        receive_data = Receive_data('Receive_data', read_queue, cmd_interpret,
+        options.num_fifo_read, read_stop_event)
+        write_data = Write_data('Write_data', read_queue, plot_queue, cmd_interpret, options.num_file, options.num_line, options.time_limit, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, read_stop_event)
+        # read_write_data = Read_Write_data('Read_Write_data', plot_queue, cmd_interpret, options.num_file, options.num_line, 
+        #                                 options.num_fifo_read, options.timestamp, store_dict, 
+        #                                 options.binary_only, options.make_plots, board_ID)
         # start threading
-        read_write_data.start()
+        # read_data.start()
+        # write_data.start()
+        # read_write_data.start()
 
         if(options.make_plots):
-            daq_plotting = DAQ_Plotting('DAQ_Plotting', queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time)
-            try:
-                # Start the thread
-                daq_plotting.start()
-                # If the child thread is still running
+            daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time)
+            # try:
+            #     # Start the thread
+            #     daq_plotting.start()
+            #     # If the child thread is still running
+            #     while daq_plotting.is_alive():
+            #         # Try to join the child thread back to parent for 0.5 seconds
+            #         daq_plotting.join(0.5)
+            # # When ctrl+c is received
+            # except KeyboardInterrupt as e:
+            #     # Set the alive attribute to false
+            #     daq_plotting.alive = False
+            #     # Block until child thread is joined back to the parent
+            #     daq_plotting.join()
+        try:
+            # Start the thread
+            receive_data.start()
+            write_data.start()
+            if(options.make_plots): daq_plotting.start()
+            # If the child thread is still running
+            while receive_data.is_alive():
+                # Try to join the child thread back to parent for 0.5 seconds
+                receive_data.join(0.5)
+            while write_data.is_alive():
+                write_data.join(0.5)
+            if(options.make_plots):
                 while daq_plotting.is_alive():
-                    # Try to join the child thread back to parent for 0.5 seconds
                     daq_plotting.join(0.5)
-            # When ctrl+c is received
-            except KeyboardInterrupt as e:
-                # Set the alive attribute to false
-                daq_plotting.alive = False
-                # Block until child thread is joined back to the parent
-                daq_plotting.join()
+        # When ctrl+c is received
+        except KeyboardInterrupt as e:
+            # Set the alive attribute to false
+            receive_data.alive = False
+            write_data.alive = False
+            if(options.make_plots): daq_plotting.alive = False
+            # Block until child thread is joined back to the parent
+            receive_data.join()
+            write_data.join()
+            if(options.make_plots): daq_plotting.join()
+        
         
         # wait for thread to finish before proceeding
-        read_write_data.join()
+        # receive_data.join()
+        # write_data.join()
+        # read_write_data.join()
 #--------------------------------------------------------------------------#
 ## if statement
 if __name__ == "__main__":
@@ -186,11 +217,13 @@ if __name__ == "__main__":
                       help="Number of lines per file created by DAQ script", default=50000)
     parser.add_option("-r", "--num_fifo_read", dest="num_fifo_read", action="store", type="int",
                       help="Number of lines read per call of fifo readout", default=10000)
+    parser.add_option("-t", "--time_limit", dest="time_limit", action="store", type="int",
+                      help="Number of seconds to run this code", default=-1)
     parser.add_option("-o", "--output_directory", dest="output_directory", action="store", type="string",
                       help="User defined output directory", default="unnamed_output_directory")
     parser.add_option("-a", "--pixel_address", dest="pixel_address", action="callback", type="string",
                       help="Single pixel address under test for each board", callback=int_list_callback)
-    parser.add_option("-t", "--pixel_threshold", dest="pixel_threshold", action="callback", type="string",
+    parser.add_option("--pixel_threshold", dest="pixel_threshold", action="callback", type="string",
                       help="Single pixel threshold for pixels under test for each board", callback=int_list_callback)
     parser.add_option("-q", "--pixel_charge", dest="pixel_charge", action="callback", type="string",
                       help="Single pixel charge to be injected (fC) for pixels under test for each board", callback=int_list_callback)
@@ -246,6 +279,7 @@ if __name__ == "__main__":
         print("Number of files created by DAQ script: ", options.num_file)
         print("Number of lines per file created by DAQ script: ", options.num_line)
         print("Number of lines read per call of fifo readout: ", options.num_fifo_read)
+        print("Number of seconds to run this code (>0 means effective): ", options.time_limit)
         print("User defined Output Directory: ", options.output_directory)
         print("Single pixel address under test for each board: ", options.pixel_address)
         print("Single pixel threshold for pixels under test for each board: ", options.pixel_threshold)
@@ -276,6 +310,10 @@ if __name__ == "__main__":
         print("-------------------------------------------")
         print("-------------------------------------------")
         print("\n")
+
+    if(options.binary_only==True and options.make_plots==True):
+        print("ERROR! Can't make plots without translating data!")
+        sys.exit(1)
         
-    main(options, cmd_interpret)											    # execute main function
-    s.close()												                    # close socket
+    main(options, cmd_interpret)    # execute main function
+    s.close()                       # close socket
