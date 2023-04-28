@@ -41,12 +41,18 @@ def main(options, cmd_interpret):
 
     num_boards = len(board_type)
     Pixel_board = options.pixel_address
-    QSel_board  = options.pixel_charge			                                        # Select Injected Charge
+    QSel_board  = options.pixel_charge			                           # Select Injected Charge
 
     if(not options.old_data_format):
-        if(options.i2c):
+        if(options.firmware):
+            print("Setting firmware...")
+            print("Active channels: ", active_channels_key)
             active_channels(cmd_interpret, key = active_channels_key)
+            print("Timestamp: ", options.timestamp)
             timestamp(cmd_interpret, key = options.timestamp)
+            Enable_FPGA_Descramblber(1, cmd_interpret)                     # Enable FPGA Firmware Descramble
+            print('\n')
+
     
     if(options.i2c):
         DAC_Value_List = []
@@ -217,6 +223,9 @@ if __name__ == "__main__":
     parser.add_option("--nodaq",
                       action="store_true", dest="nodaq", default=False,
                       help="Switch off DAQ via the FPGA")
+    parser.add_option("--firmware",
+                      action="store_true", dest="firmware", default=False,
+                      help="Configure FPGA firmware settings")
     (options, args) = parser.parse_args()
 
     if(options.pixel_address == None): options.pixel_address = [5, 5, 5, 5]
@@ -233,6 +242,7 @@ if __name__ == "__main__":
         print("--------Set of inputs from the USER--------")
         print("Config ETROC boards over I2C: ", options.i2c)
         print("Switch off DAQ via the FPGA?: ", options.nodaq)
+        print("Configure FPGA firmware settings?: ", options.firmware)
         print("Number of files created by DAQ script: ", options.num_file)
         print("Number of lines per file created by DAQ script: ", options.num_line)
         print("Number of lines read per call of fifo readout: ", options.num_fifo_read)

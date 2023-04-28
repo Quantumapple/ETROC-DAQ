@@ -140,7 +140,7 @@ def config_etroc1(B_num, charge_injection, DAC_Value_List, Pixel_board, QSel_boa
     ETROC1_ArrayReg1.set_DMRO_testMode(0)                               # DMRO work on test mode
 
     ############################## DOES THIS NEED TO HAPPEN EVERYTIME ###################################
-    Enable_FPGA_Descramblber(EnScr, cmd_interpret)                      # Enable FPGA Firmware Descramble
+    # Enable_FPGA_Descramblber(EnScr, cmd_interpret)                      # Enable FPGA Firmware Descramble
 
     ## DMRO CML driver
     ETROC1_ArrayReg1.set_Dataout_AmplSel(7)
