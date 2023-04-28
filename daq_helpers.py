@@ -22,67 +22,86 @@ from translate_data import *
 This script is composed of all the helper functions needed for I2C comms, FPGA, etc
 '''
 #--------------------------------------------------------------------------#
-## define a receive data class
-# class Receive_data(threading.Thread):                                   # threading class
-#     def __init__(self, name, queue, num_file, num_line, cmd_interpret):
-#         threading.Thread.__init__(self, name=name)
-#         self.queue = queue
-#         self.num_file = num_file
-#         self.num_line = num_line
-#         self.cmd_interpret = cmd_interpret
+# define a receive data class
+class Receive_data(threading.Thread):                                   # threading class
+    def __init__(self, name, queue, cmd_interpret, num_file, num_line, num_fifo_read):
+        threading.Thread.__init__(self, name=name)
+        self.queue = queue
+        self.cmd_interpret = cmd_interpret
+        self.num_file = num_file
+        self.num_line = num_line
+        self.num_fifo_read = num_fifo_read
     
-#     def run(self):                                                      # num_file: set how many data file you want to get
-#         mem_data = []
-#         for files in range(self.num_file):
-#             mem_data = self.cmd_interpret.read_data_fifo(self.num_line)      # num_line: set how many lines per file you want
-#             print("{} is producing {} to the queue!".format(self.getName(), files))
-#             for i in range(self.num_line):
-#                 self.queue.put(mem_data[i])  
-#         print("%s finished!"%self.getName())
+    def run(self):
+        mem_data = []
+        for files in range(self.num_file):
+            mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)      # max allowed by read_memory is 65535
+            print("{} is reading data and pushing to the queue...".format(self.getName()))
+            for mem_line in mem_data:
+                self.queue.put(mem_line)  
+        print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
-## define a write data class
-# class Write_data(threading.Thread):                                     # threading class
-#     def __init__(self, name, queue, num_file, num_line, timestamp, store_dict, binary_only):
-#         threading.Thread.__init__(self, name=name)
-#         self.queue = queue
-#         self.num_ficlass Receive_data(threading.Thread):                                   # threading class
-#     def __init__(self, name, queue, num_file, num_line, cmd_interpret):
-#         threading.Thread.__init__(self, name=name)
-#         self.queue = queue
-#         self.num_file = num_file
-#         self.num_line = num_line
-#         self.cmd_interpret = cmd_interpret
-    
-#     def run(self):                                                      # num_file: set how many data file you want to get
-#         mem_data = []
-#         for files in range(self.num_file):
-#             mem_data = self.cmd_interpret.read_data_fifo(self.num_line)      # num_line: set how many lines per file you want
-#             print("{} is producing {} to the queue!".format(self.getName(), files))
-#             for i in range(self.num_line):
-#                 self.queue.put(mem_data[i])  
-#         print("%s finished!"%self.getName())le = num_file
-#         self.num_line = num_line
-#         self.timestamp = timestamp
-#         self.store_dict = store_dict
-#         self.binary_only = binary_only
-    
-#     def run(self):
-#         for files in range(self.num_file):
-#             file_name="./%s/TDC_Data_%d.dat"%(self.store_dict, files)
-#             with open(file_name, 'w') as infile:
-#                 for j in range(self.num_line):
-#                     val = self.queue.get()
-#                     # if int(val) == 0:
-#                     #     continue
-#                     binary = format(int(val), '032b')
-#                     infile.write('%s\n'%binary)
-#             print("%s finished!" % self.getName())
-#             if(self.binary_only == False):
-#                 with open(file_name,'r') as infile, open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, files), 'w') as outfile:
-#                     for line in infile.readlines():
-#                         TDC_data = etroc_translate_binary(line, timestamp=self.timestamp)
-#                         outfile.write("%s\n"%TDC_data)
+# define a write data class
+class Write_data(threading.Thread):
+    def __init__(self, name, queue, cmd_interpret, num_file, num_line, num_fifo_read, timestamp, store_dict, binary_only, make_plots, board_ID):
+        threading.Thread.__init__(self, name=name)
+        self.queue = queue
+        self.cmd_interpret = cmd_interpret
+        self.num_file = num_file
+        self.num_line = num_line
+        self.num_fifo_read = num_fifo_read
+        self.timestamp = timestamp
+        self.store_dict = store_dict
+        self.binary_only = binary_only
+        self.make_plots = make_plots
+        self.board_ID = board_ID
+        self.queue_ch = [deque() for i in range(4)]                # Inelegant solution making a deque for each channel
+
+    def run(self):
+        mem_data = []
+        for files in range(self.num_file):
+            file_name="./%s/TDC_Data_%d.dat"%(self.store_dict, files)
+            with open(file_name, 'w') as infile, open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, files), 'w') as outfile:
+                print("{} is reading data and writing file {} and translation...".format(self.getName(), files))
+                i = 0
+                start_time = time.time()
+                while i < self.num_line:
+                    mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)   # max allowed by read_memory is 65535
+                    for j in range(len(mem_data)):
+                        if int(mem_data[j]) == 0: continue
+                        binary = format(int(mem_data[j]), '032b')
+                        infile.write('%s\n'%binary)
+                        if(self.binary_only == False):
+                            TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.board_ID)
+                            if(write_flag==1):
+                                outfile.write("%s\n"%TDC_data)
+                                i = i+1
+                                if(TDC_data[0:6]=='ETROC1'):
+                                    if(self.make_plots): self.queue.put(TDC_data)
+                            elif(write_flag==2):
+                                TDC_len = len(TDC_data)
+                                TDC_header_index = -1
+                                for j,TDC_line in enumerate(TDC_data):
+                                    if(TDC_line=="HEADER_KEY"):
+                                        if(TDC_header_index<0):
+                                            TDC_header_index = j
+                                        else:
+                                            print("ERROR! Found more than two headers in data block!!")
+                                        continue
+                                    outfile.write("%s\n"%TDC_line)
+                                    if(TDC_line[9:13]!='DATA'): continue
+                                    if(self.make_plots): self.queue.put(TDC_line)
+                                i = i+(TDC_len-TDC_header_index)
+                            else:
+                                pass
+                        
+                        start_time = time.time()
+                        # print(i)
+                    if(time.time()-start_time > 30):
+                        print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST WRITE!!!")
+                        break
+        print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
 class Read_Write_data(threading.Thread):
@@ -115,17 +134,29 @@ class Read_Write_data(threading.Thread):
                         binary = format(int(mem_data[j]), '032b')
                         infile.write('%s\n'%binary)
                         if(self.binary_only == False):
-                            TDC_data, write_flag = etroc_translate_binary(binary, timestamp=self.timestamp, self.queue_ch, self.board_ID)
+                            TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.board_ID)
                             if(write_flag==1):
                                 outfile.write("%s\n"%TDC_data)
-                                if(self.make_plots): self.queue.put(TDC_data) 
+                                i = i+1
+                                if(TDC_data[0:6]=='ETROC1'):
+                                    if(self.make_plots): self.queue.put(TDC_data)
                             elif(write_flag==2):
-                                for TDC_line in TDC_data:
+                                TDC_len = len(TDC_data)
+                                TDC_header_index = -1
+                                for j,TDC_line in enumerate(TDC_data):
+                                    if(TDC_line=="HEADER_KEY"):
+                                        if(TDC_header_index<0):
+                                            TDC_header_index = j
+                                        else:
+                                            print("ERROR! Found more than two headers in data block!!")
+                                        continue
                                     outfile.write("%s\n"%TDC_line)
+                                    if(TDC_line[9:13]!='DATA'): continue
                                     if(self.make_plots): self.queue.put(TDC_line)
+                                i = i+(TDC_len-TDC_header_index)
                             else:
                                 pass
-                        i = i+1
+                        
                         start_time = time.time()
                         # print(i)
                     if(time.time()-start_time > 30):
@@ -163,16 +194,21 @@ class DAQ_Plotting(threading.Thread):
         ax2 = fig.add_subplot(gs[0:int(np.sqrt(self.board_size[2]))//4, 4:4+int(np.sqrt(self.board_size[2]))//4])
         ax3 = fig.add_subplot(gs[4:4+int(np.sqrt(self.board_size[3]))//4, 4:4+int(np.sqrt(self.board_size[3]))//4])
 
-        ax0.set_title('Channel 0: ETROC {:d}'.format(self.board_type[0]))
+        if(len(self.board_type)>0):
+            ax0.set_title('Channel 0: ETROC {:d}'.format(self.board_type[0]))       
+        if(len(self.board_type)>1):
+            ax1.set_title('Channel 1: ETROC {:d}'.format(self.board_type[1]))
+        if(len(self.board_type)>2):
+            ax2.set_title('Channel 2: ETROC {:d}'.format(self.board_type[2]))
+        if(len(self.board_type)>3):
+            ax3.set_title('Channel 3: ETROC {:d}'.format(self.board_type[2]))
+        
         img0 = ax0.imshow(ch0, interpolation='none')
         ax0.set_aspect('equal')
-        ax1.set_title('Channel 1: ETROC {:d}'.format(self.board_type[1]))
         img1 = ax1.imshow(ch1, interpolation='none')
         ax1.set_aspect('equal')
-        ax2.set_title('Channel 2: ETROC {:d}'.format(self.board_type[2]))
         img2 = ax2.imshow(ch2, interpolation='none')
         ax2.set_aspect('equal')
-        ax3.set_title('Channel 3: ETROC {:d}'.format(self.board_type[2]))
         img3 = ax3.imshow(ch3, interpolation='none')
         ax3.set_aspect('equal')
 
@@ -249,13 +285,23 @@ class DAQ_Plotting(threading.Thread):
                 # else:                                         # Handle task here and call q.task_done()
                 delta_time = time.time() - start_time
 
+            # NEED TO DOUBLE CHECK PIXEL LAYOUT
             for line in mem_data:
                 words = line.split()
-                if(words[0]!="ETROC1" and words[0]!="ETROC2" and words[0]!="ETROC3"): continue
-                if(words[1]=="0"):   ch0[self.pixel_address[0]%int(np.sqrt(self.board_size[0])),self.pixel_address[0]//int(np.sqrt(self.board_size[0]))] += 1
-                elif(words[1]=="1"): ch1[self.pixel_address[1]%int(np.sqrt(self.board_size[1])),self.pixel_address[1]//int(np.sqrt(self.board_size[1]))] += 1
-                elif(words[1]=="2"): ch2[self.pixel_address[2]%int(np.sqrt(self.board_size[2])),self.pixel_address[2]//int(np.sqrt(self.board_size[2]))] += 1
-                elif(words[1]=="3"): ch3[self.pixel_address[2]%int(np.sqrt(self.board_size[3])),self.pixel_address[2]//int(np.sqrt(self.board_size[3]))] += 1
+                if(words[0]=="ETROC1"):
+                    if(words[1]=="0"):   ch0[self.pixel_address[0]%int(np.sqrt(self.board_size[0])),self.pixel_address[0]//int(np.sqrt(self.board_size[0]))] += 1
+                    elif(words[1]=="1"): ch1[self.pixel_address[1]%int(np.sqrt(self.board_size[1])),self.pixel_address[1]//int(np.sqrt(self.board_size[1]))] += 1
+                    elif(words[1]=="2"): ch2[self.pixel_address[2]%int(np.sqrt(self.board_size[2])),self.pixel_address[2]//int(np.sqrt(self.board_size[2]))] += 1
+                    elif(words[1]=="3"): ch3[self.pixel_address[3]%int(np.sqrt(self.board_size[3])),self.pixel_address[3]//int(np.sqrt(self.board_size[3]))] += 1
+                elif(words[0]=="ETROC2"):
+                    if(words[2]!="DATA"): continue
+                    if(words[1]=="0"):   ch0[int(words[8]),int(words[6])] += 1
+                    elif(words[1]=="1"): ch1[int(words[8]),int(words[6])] += 1
+                    elif(words[1]=="2"): ch2[int(words[8]),int(words[6])] += 1
+                    elif(words[1]=="3"): ch3[int(words[8]),int(words[6])] += 1
+                elif(words[0]=="ETROC3"): continue
+                else: continue
+                
 
             img0.set_data(ch0)
             img0.autoscale()
@@ -280,9 +326,6 @@ class DAQ_Plotting(threading.Thread):
 
         plt.ioff()
         plt.show()
-
-        print(ch0)
-        print(ch1)
 
         # Thread then stops running
         print("Plotting Thread broke out of loop")

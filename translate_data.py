@@ -49,6 +49,8 @@ def etroc2_translate(line, timestamp, queues , board_ID):
             last_line = "ETROC2 " + "{:d} ".format(channel)
             if(last_element[0:18]=='0'+'001111001011100'+'00'):
                 # Translating frame header
+                # We add a unique element here to track how many data lines there are in this block
+                queues[channel].append("HEADER_KEY")
                 last_line = last_line + "HEADER "
                 last_line = last_line + "L1COUNTER " + last_element[18:26]
                 last_line = last_line + "TYPE " + last_element[26:28]

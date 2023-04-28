@@ -219,9 +219,9 @@ if __name__ == "__main__":
                       help="Switch off DAQ via the FPGA")
     (options, args) = parser.parse_args()
 
-    if(options.pixel_address == None): options.pixel_address = [5, 5, 5]
-    if(options.pixel_threshold == None): options.pixel_threshold = [552, 560, 560]
-    if(options.pixel_charge == None): options.pixel_charge = [30, 30, 30]
+    if(options.pixel_address == None): options.pixel_address = [5, 5, 5, 5]
+    if(options.pixel_threshold == None): options.pixel_threshold = [552, 560, 560, 560]
+    if(options.pixel_charge == None): options.pixel_charge = [30, 30, 30, 30]
     if(options.num_fifo_read>65536):                                                # See command_interpret.py read_memory()
         print("Max Number of lines read by fifo capped at 65536, you entered ",options.num_fifo_read,", setting to 65536")
         options.num_fifo_read = 65536
