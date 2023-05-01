@@ -330,21 +330,21 @@ class DAQ_Plotting(threading.Thread):
                     elif(words[1]=="3"): ch3[(self.pixel_address[3]%4),self.pixel_address[3]//4] += 1
                 elif(words[0]=="ETROC2"):
                     if(words[2]!="DATA"): continue
-                    if(words[1]=="0"):   ch0[int(words[8]),15-int(words[6])] += 1
-                    elif(words[1]=="1"): ch1[int(words[8]),15-int(words[6])] += 1
-                    elif(words[1]=="2"): ch2[int(words[8]),15-int(words[6])] += 1
-                    elif(words[1]=="3"): ch3[int(words[8]),15-int(words[6])] += 1
+                    if(words[1]=="0"):   ch0[15-int(words[8]),15-int(words[6])] += 1
+                    elif(words[1]=="1"): ch1[15-int(words[8]),15-int(words[6])] += 1
+                    elif(words[1]=="2"): ch2[15-int(words[8]),15-int(words[6])] += 1
+                    elif(words[1]=="3"): ch3[15-int(words[8]),15-int(words[6])] += 1
                 elif(words[0]=="ETROC3"): continue
                 else: continue
                 
 
-            img0.set_data(ch0.T)
+            img0.set_data(ch0)
             img0.autoscale()
-            img1.set_data(ch1.T)
+            img1.set_data(ch1)
             img1.autoscale()
-            img2.set_data(ch2.T)
+            img2.set_data(ch2)
             img2.autoscale()
-            img3.set_data(ch3.T)
+            img3.set_data(ch3)
             img3.autoscale()
             # ax0.relim()
             # ax0.autoscale_view()

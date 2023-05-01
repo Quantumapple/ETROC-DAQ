@@ -32,7 +32,7 @@ This script is used for testing ETROC1/2 Array chips.
 The main function of this script is I2C write and read, Ethernet communication, 
 instrument control and so on.
 '''
-hostname = '192.168.2.7'					# FPGA IP address
+# hostname = '192.168.2.7'					# FPGA IP address
 port = 1024									# port number
 #--------------------------------------------------------------------------#
 
@@ -200,21 +200,12 @@ def main(options, cmd_interpret):
 #--------------------------------------------------------------------------#
 ## if statement
 if __name__ == "__main__":
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)	                        # initial socket
-    except socket.error:
-        print("Failed to create socket!")
-        sys.exit()
-    try:
-        s.connect((hostname, port))								                        # connect socket
-    except socket.error:
-        print("failed to connect to ip " + hostname)
-    cmd_interpret = command_interpret(s)					                            # Class instance
 
     def int_list_callback(option, opt, value, parser):
         setattr(parser.values, option.dest, list(map(int, value.split(','))))
-
     parser = OptionParser()
+    parser.add_option("--hostname", dest="hostname", action="store", type="string",
+                      help="FPGA IP Address", default="192.168.2.7")
     parser.add_option("-n", "--num_file", dest="num_file", action="store", type="int",
                       help="Number of files created by DAQ script", default=1)
     parser.add_option("-l", "--num_line", dest="num_line", action="store", type="int",
@@ -277,6 +268,7 @@ if __name__ == "__main__":
         print("\n")
         print("-------------------------------------------")
         print("--------Set of inputs from the USER--------")
+        print("FPGA IP Address: ", options.hostname)
         print("Config ETROC boards over I2C: ", options.i2c)
         print("Switch off DAQ via the FPGA?: ", options.nodaq)
         print("Configure FPGA firmware settings?: ", options.firmware)
@@ -318,6 +310,17 @@ if __name__ == "__main__":
     if(options.binary_only==True and options.make_plots==True):
         print("ERROR! Can't make plots without translating data!")
         sys.exit(1)
+    
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)	                        # initial socket
+    except socket.error:
+        print("Failed to create socket!")
+        sys.exit()
+    try:
+        s.connect((options.hostname, port))								                        # connect socket
+    except socket.error:
+        print("failed to connect to ip " + options.hostname)
+    cmd_interpret = command_interpret(s)					                            # Class instance
         
     main(options, cmd_interpret)    # execute main function
     s.close()                       # close socket
