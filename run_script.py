@@ -26,13 +26,13 @@ from config_etroc1 import *
 freqency = 1000
 duration = 1000
 '''
-@author: Wei Zhang, Murtaza Safdari, Jongho Lee
+@author: Wei Zhang, Murtaza Safdari
 @date: 2023-03-24
 This script is used for testing ETROC1/2 Array chips. 
 The main function of this script is I2C write and read, Ethernet communication, 
 instrument control and so on.
 '''
-hostname = '192.168.2.3'					# FPGA IP address
+hostname = '192.168.2.7'					# FPGA IP address
 port = 1024									# port number
 #--------------------------------------------------------------------------#
 
@@ -51,6 +51,10 @@ def main(options, cmd_interpret):
             print("Timestamp: ", options.timestamp)
             timestamp(cmd_interpret, key = options.timestamp)
             Enable_FPGA_Descramblber(1, cmd_interpret)                     # Enable FPGA Firmware Descramble
+            # LED configuration
+            testregister = cmd_interpret.read_config_reg(13)
+            print(testregister)
+            # cmd_interpret.write_config_reg(15, key)
             print('\n')
 
     
