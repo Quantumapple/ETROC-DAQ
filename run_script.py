@@ -43,19 +43,19 @@ def main(options, cmd_interpret):
     Pixel_board = options.pixel_address
     QSel_board  = options.pixel_charge			                           # Select Injected Charge
 
-    if(not options.old_data_format):
-        if(options.firmware):
+    if(options.firmware):
+        if(not options.old_data_format):
             print("Setting firmware...")
             print("Active channels: ", active_channels_key)
             active_channels(cmd_interpret, key = active_channels_key)
             print("Timestamp: ", options.timestamp)
             timestamp(cmd_interpret, key = options.timestamp)
-            Enable_FPGA_Descramblber(1, cmd_interpret)                     # Enable FPGA Firmware Descramble
-            # LED configuration
-            testregister = cmd_interpret.read_config_reg(13)
-            print(testregister)
-            # cmd_interpret.write_config_reg(15, key)
-            print('\n')
+        Enable_FPGA_Descramblber(1, cmd_interpret)                     # Enable FPGA Firmware Descramble
+        # LED configuration
+        testregister = cmd_interpret.read_config_reg(13)
+        print(testregister)
+        # cmd_interpret.write_config_reg(15, key)
+        print('\n')
 
     
     if(options.i2c):
