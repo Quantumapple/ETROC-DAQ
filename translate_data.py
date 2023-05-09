@@ -100,7 +100,7 @@ def control_translate(line, timestamp):
         if (len(data)!=26): print("Tried to unpack ETROC1 timestamp with fewer than required data bits", data, " ", type(data), len(data)) 
         #------------------Time_TYPE Time_Measurememt (clock cycles)----------------------#
         #--NORMTRIG is 26 bit counter, MSBTIME is also 26 bit counter cathes NORMTRIG overflows--#
-        # --25ns per counter cycle, so 25*32 ns per NORMTRIG increment in nominal operations --#
+        # --25ns per counter cycle, and 25*32 ns per NORMTRIG increment in Qing operations --#
         if(time_code=='00'):   TDC_data = "NORMTRIG "   + "{:d}".format(int(data, base=2))
         elif(time_code=='01'): TDC_data = "RANDTRIG "   + "{:d}".format(int(data, base=2))
         elif(time_code=='10'): TDC_data = "FILLERTIME " + "0"
