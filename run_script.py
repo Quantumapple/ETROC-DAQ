@@ -51,12 +51,83 @@ def main(options, cmd_interpret):
             print("Timestamp: ", options.timestamp)
             timestamp(cmd_interpret, key = options.timestamp)
         Enable_FPGA_Descramblber(1, cmd_interpret)                     # Enable FPGA Firmware Descramble
-        # LED configuration
+        
+        if(options.reset_pulse_register):
+            print("\n", "Resetting Pulse Register 0x0002")
+            cmd_interpret.write_pulse_reg(0x0002)	
+        
+        # _ 2b data rate 3b LED configuration 1b testmode 1b timestamp
         testregister = cmd_interpret.read_config_reg(13)
-        print(testregister)
-        # cmd_interpret.write_config_reg(15, key)
         print('\n')
+        print("Written into Reg 13: ", format(testregister, '016b'))
 
+        if(options.reset_pulse_register):
+            print("Resetting Pulse Register 0x0002")
+            cmd_interpret.write_pulse_reg(0x0002)
+
+        if(options.developments):				              
+            testregister_2 = cmd_interpret.read_status_reg(2)
+            print("Status Reg Addr 2  : ", format(testregister_2, '016b'))
+            testregister_3 = cmd_interpret.read_status_reg(3)
+            print("Status Reg Addr 3  : ", format(testregister_3, '016b'))
+            print("Status Reg Addr 2+3: ", (format(testregister_2, '016b'))+
+            (format(testregister_3, '016b')))
+            print('\n')
+
+            fixed_32 = 0xabaaafac
+            fixed_16 = int(format(fixed_32,  '032b')[-16:], base=2)
+            fixed_8  = int(format(fixed_32,  '032b')[-8:],  base=2)
+
+            quad_8  = ""
+            for elem in format(fixed_8,  '08b'): quad_8 = quad_8 + elem + elem + elem + elem
+            doub_16 = ""
+            for elem in format(fixed_16,  '016b'): doub_16 = doub_16 + elem + elem
+
+            print("Processed Data Checks, look only at relavant bit length")
+            print("Fixed Pattern 8    : ", format(fixed_8,  '08b'))
+            if(format(fixed_8,  '08b') in format(testregister_2, '016b') and 
+            format(fixed_8,  '08b') in format(testregister_3, '016b')):
+                print("08 bit pattern found in both Status Reg 2 & 3")
+            elif(format(fixed_8,  '08b') in format(testregister_2, '016b') or 
+            format(fixed_8,  '08b') in format(testregister_3, '016b')):
+                print("08 bit pattern found in ONLY ONE of Status Reg 2 & 3!")
+            else: print("08 bit pattern not found in any of the Status Reg 2 or 3!")
+
+            print("Fixed Pattern 16   : ", format(fixed_16, '016b'))
+            if(format(fixed_16,  '016b') in format(testregister_2, '016b')*2 and 
+            format(fixed_16,  '016b') in format(testregister_3, '016b')*2):
+                print("16 bit pattern found in both Status Reg 2 & 3")
+            elif(format(fixed_16,  '016b') in format(testregister_2, '016b')*2 or 
+            format(fixed_16,  '016b') in format(testregister_3, '016b')*2):
+                print("16 bit pattern found in ONLY ONE of Status Reg 2 & 3!")
+            else: print("16 bit pattern not found in any of the Status Reg 2 or 3!")
+
+            print("Fixed Pattern 32   : ", format(fixed_32, '032b'))
+            if(format(fixed_32,  '032b') in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
+                print("32 bit pattern found in Status Reg 2 + 3")
+            else: print("32 bit pattern not found in Status Reg 2 + 3!")
+
+            print('\n')
+            print("Raw Data Checks")
+            print("Inflated 8-bit pattern : ", quad_8)
+            print("Inflated 16-bit pattern: ", doub_16)
+            if(quad_8 in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
+                print("Quadrupled 8 bit pattern found in Status Reg 2 + 3")
+            else: print("Quadrupled 8 bit pattern not found in Status Reg 2 + 3!")
+            if(doub_16 in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
+                print("Doubled 16 bit pattern found in Status Reg 2 + 3")
+            else: print("Doubled 16 bit pattern not found in Status Reg 2 + 3!")
+
+            print('\n')
+
+            # 8b data source 4b board type 4b channel enable
+            register_15 = cmd_interpret.read_config_reg(15)
+            string_15   = format(register_15, '016b')
+            print("Written into Reg 15: ", string_15)
+            print("Channel Enable     : ", string_15[-4:])
+            print("Board Type         : ", string_15[-8:-4])
+            print("Data Source        : ", string_15[-16:-8])
+            print('\n')
     
     if(options.i2c):
         DAC_Value_List = []
@@ -254,6 +325,13 @@ if __name__ == "__main__":
     parser.add_option("--firmware",
                       action="store_true", dest="firmware", default=False,
                       help="Configure FPGA firmware settings")
+    parser.add_option("--reset_pulse_register", type="int",
+                      action="store", dest="reset_pulse_register", default=0,
+                      help="(DEV ONLY) Reset Pulse Register")
+    parser.add_option("--developments",
+                      action="store_true", dest="developments", default=False,
+                      help="(DEV ONLY) Decode the register binary values")
+
     (options, args) = parser.parse_args()
 
     if(options.pixel_address == None): options.pixel_address = [5, 5, 5, 5]
