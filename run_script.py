@@ -26,7 +26,7 @@ from config_etroc1 import *
 freqency = 1000
 duration = 1000
 '''
-@author: Wei Zhang, Murtaza Safdari
+@author: Wei Zhang, Murtaza Safdari, Jongho Lee
 @date: 2023-03-24
 This script is used for testing ETROC1/2 Array chips. 
 The main function of this script is I2C write and read, Ethernet communication, 
