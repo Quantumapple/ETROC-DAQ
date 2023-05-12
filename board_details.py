@@ -26,14 +26,14 @@ slaveA_addr_list = [0x03,  0x02,  0x01]
 slaveB_addr_list = [0x7f,  0x7e,  0x7d]
 
 # Use this to control how many boards are actually attempted for connection
-board_type       = [1, 1]            # ETROC version number
+board_type       = [2, 1, 1, 2]            # ETROC version number
 
 active_channels_key = 0x0003
 
-board_size       = [16,    16,    16,    256]
+board_size       = [256, 16, 16, 256]
 
 board_name       = ["F28", "F29", "F30", "F47"]
-board_ID         = ["00000000000000000","00000000000000000","00000000000000000", "00000000000000000"] 
+board_ID         = ["10111111100001111","00000000000000000","00000000000000000", "00000000000000000"] 
 
 CLSel_board      = [  0,    0,    0, 0 ]			# Load Capacitance of the preamp first stage, default 0
 RfSel_board      = [  2,    2,    2, 2 ]			# Feedback resistance seleciton

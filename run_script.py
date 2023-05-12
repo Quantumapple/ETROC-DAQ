@@ -55,17 +55,13 @@ def main(options, cmd_interpret):
         if(options.reset_pulse_register):
             print("\n", "Resetting Pulse Register 0x0002")
             cmd_interpret.write_pulse_reg(0x0002)	
-        
-        # _ 2b data rate 3b LED configuration 1b testmode 1b timestamp
-        testregister = cmd_interpret.read_config_reg(13)
-        print('\n')
-        print("Written into Reg 13: ", format(testregister, '016b'))
 
-        if(options.reset_pulse_register):
-            print("Resetting Pulse Register 0x0002")
-            cmd_interpret.write_pulse_reg(0x0002)
-
-        if(options.developments):				              
+        if(options.developments):		
+            # _ 2b data rate 3b LED configuration 1b testmode 1b timestamp
+            testregister = cmd_interpret.read_config_reg(13)
+            print('\n')
+            print("Written into Reg 13: ", format(testregister, '016b'))
+            print('\n')		              
             testregister_2 = cmd_interpret.read_status_reg(2)
             print("Status Reg Addr 2  : ", format(testregister_2, '016b'))
             testregister_3 = cmd_interpret.read_status_reg(3)
@@ -74,7 +70,7 @@ def main(options, cmd_interpret):
             (format(testregister_3, '016b')))
             print('\n')
 
-            fixed_32 = 0xabaaafac
+            fixed_32 = 0xabaaafaa
             fixed_16 = int(format(fixed_32,  '032b')[-16:], base=2)
             fixed_8  = int(format(fixed_32,  '032b')[-8:],  base=2)
 
@@ -209,39 +205,24 @@ def main(options, cmd_interpret):
     if(not options.nodaq):
         ## start receive_data, write_data, daq_plotting threading
         store_dict = userdefine_dir
-        read_queue = Queue() 
+        read_queue = Queue()
+        translate_queue = Queue() 
         plot_queue = Queue()
         read_stop_event = threading.Event()     # This is how we stop the read thread
         receive_data = Receive_data('Receive_data', read_queue, cmd_interpret,
         options.num_fifo_read, read_stop_event)
-        write_data = Write_data('Write_data', read_queue, plot_queue, cmd_interpret, options.num_file, options.num_line, options.time_limit, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, read_stop_event)
-        # read_write_data = Read_Write_data('Read_Write_data', plot_queue, cmd_interpret, options.num_file, options.num_line, 
-        #                                 options.num_fifo_read, options.timestamp, store_dict, 
-        #                                 options.binary_only, options.make_plots, board_ID)
-        # start threading
-        # read_data.start()
-        # write_data.start()
-        # read_write_data.start()
-
+        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_file, options.num_line, options.time_limit, store_dict, options.binary_only, options.compressed_binary, options.make_plots, read_stop_event)
+        if(options.make_plots or (not options.binary_only)):
+            translate_data = Translate_data('Translate_data', translate_queue, plot_queue, cmd_interpret, options.num_file, options.num_line, options.time_limit, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, read_stop_event)
         if(options.make_plots):
-            daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time)
-            # try:
-            #     # Start the thread
-            #     daq_plotting.start()
-            #     # If the child thread is still running
-            #     while daq_plotting.is_alive():
-            #         # Try to join the child thread back to parent for 0.5 seconds
-            #         daq_plotting.join(0.5)
-            # # When ctrl+c is received
-            # except KeyboardInterrupt as e:
-            #     # Set the alive attribute to false
-            #     daq_plotting.alive = False
-            #     # Block until child thread is joined back to the parent
-            #     daq_plotting.join()
+            daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time, read_stop_event)
+
+        # read_write_data.start()
         try:
             # Start the thread
             receive_data.start()
             write_data.start()
+            if(options.make_plots or (not options.binary_only)): translate_data.start()
             if(options.make_plots): daq_plotting.start()
             # If the child thread is still running
             while receive_data.is_alive():
@@ -249,6 +230,9 @@ def main(options, cmd_interpret):
                 receive_data.join(0.5)
             while write_data.is_alive():
                 write_data.join(0.5)
+            if(options.make_plots or (not options.binary_only)):
+                while translate_data.is_alive():
+                    translate_data.join(0.5)
             if(options.make_plots):
                 while daq_plotting.is_alive():
                     daq_plotting.join(0.5)
@@ -257,16 +241,15 @@ def main(options, cmd_interpret):
             # Set the alive attribute to false
             receive_data.alive = False
             write_data.alive = False
+            if(options.make_plots or (not options.binary_only)): translate_data.alive = False
             if(options.make_plots): daq_plotting.alive = False
             # Block until child thread is joined back to the parent
             receive_data.join()
             write_data.join()
+            if(options.make_plots or (not options.binary_only)): translate_data.join()
             if(options.make_plots): daq_plotting.join()
         
-        
-        # wait for thread to finish before proceeding
-        # receive_data.join()
-        # write_data.join()
+        # wait for thread to finish before proceeding)
         # read_write_data.join()
 #--------------------------------------------------------------------------#
 ## if statement
@@ -299,6 +282,9 @@ if __name__ == "__main__":
     parser.add_option("-b", "--binary_only",
                       action="store_true", dest="binary_only", default=False,
                       help="Save only the untranslated FPGA binary data (raw output)")
+    parser.add_option("-c", "--compressed_binary",
+                      action="store_true", dest="compressed_binary", default=False,
+                      help="Save FPGA binary data (raw output) in int format")
     parser.add_option("-s", "--timestamp", type="int",
                       action="store", dest="timestamp", default=0x0000,
                       help="Set timestamp binary, see daq_helpers for more info")
@@ -360,6 +346,7 @@ if __name__ == "__main__":
         print("Single pixel charge to be injected (fC) for pixels under test for each board: ", options.pixel_charge)
         print("Flag that enables Qinj: ", options.charge_injection)
         print("Save only the untranslated FPGA binary data (raw output): ", options.binary_only)
+        print("Save FPGA binary data (raw output) in int format: ", options.compressed_binary)
         print("Set timestamp binary, see daq_helpers for more info: ", options.timestamp)
         print("Set timestamp binary, see daq_helpers for more info (explicit hex string): ", "0x{:04x}".format(options.timestamp))
         print("Overwrite previously saved files: ", options.overwrite)

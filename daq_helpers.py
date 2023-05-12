@@ -52,20 +52,17 @@ class Receive_data(threading.Thread):               # threading class
 #--------------------------------------------------------------------------#
 # define a write data class
 class Write_data(threading.Thread):
-    def __init__(self, name, read_queue, plot_queue, cmd_interpret, num_file, num_line, time_limit, timestamp, store_dict, binary_only, make_plots, board_ID, read_stop_event):
+    def __init__(self, name, read_queue, translate_queue, num_file, num_line, time_limit, store_dict, binary_only, compressed_binary, make_plots, read_stop_event):
         threading.Thread.__init__(self, name=name)
         self.read_queue = read_queue
-        self.plot_queue = plot_queue
-        self.cmd_interpret = cmd_interpret
+        self.translate_queue = translate_queue
         self.num_file = num_file
         self.num_line = num_line
         self.time_limit = time_limit
-        self.timestamp = timestamp
         self.store_dict = store_dict
         self.binary_only = binary_only
+        self.compressed_binary = compressed_binary
         self.make_plots = make_plots
-        self.board_ID = board_ID
-        self.queue_ch = [deque() for i in range(4)]  # Inelegant solution making a deque for each channel
         self.read_stop_event = read_stop_event
 
     def run(self):
@@ -75,23 +72,19 @@ class Write_data(threading.Thread):
         total_start_time = time.time()
         file_lines = 0
         file_counter = 0
-        infile = open("./%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
-        outfile = open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
-        print("{} is reading queue and writing file {} and translation...".format(self.getName(), file_counter))
+        outfile = open("./%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
+        print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
         while (total_lines<=self.num_file*self.num_line) if (self.time_limit<0) else (time.time()-total_start_time<=self.time_limit):
             if not t.alive:
                 print("Write Thread detected alive=False")
-                infile.close()
                 outfile.close()
                 break 
             if(file_lines>self.num_line):
-                infile.close()
                 outfile.close()
                 file_lines=0
                 file_counter = file_counter + 1
-                infile = open("./%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
-                outfile = open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
-                print("{} is reading queue and writing file {} and translation...".format(self.getName(), file_counter))
+                outfile = open("./%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
+                print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
             mem_data = ""
             # Attempt to pop off the read_queue for 30 secs, fail if nothing found
             try:
@@ -103,16 +96,78 @@ class Write_data(threading.Thread):
             # Handle the raw (binary) line
             if int(mem_data) == 0: continue
             binary = format(int(mem_data), '032b')
-            infile.write('%s\n'%binary)
-            if(self.binary_only):
-                file_lines = file_lines + 1
-                total_lines = total_lines + 1
-                continue
+            if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
+            else: outfile.write('%s\n'%binary)
+            # Increment line counters
+            file_lines = file_lines + 1
+            total_lines = total_lines + 1
             # Perform translation related activities if requested
-            TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.board_ID)
+            if(self.make_plots or (not self.binary_only)):
+                self.translate_queue.put(binary)
+        else:
+            print("Write Thread gracefully sending STOP signal to other threads") 
+            self.read_stop_event.set()
+        print("%s finished!"%self.getName())
+
+#--------------------------------------------------------------------------#
+class Translate_data(threading.Thread):
+    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_file, num_line, time_limit, timestamp, store_dict, binary_only, make_plots, board_ID, read_stop_event):
+        threading.Thread.__init__(self, name=name)
+        self.translate_queue = translate_queue
+        self.plot_queue = plot_queue
+        self.cmd_interpret = cmd_interpret
+        self.num_file = num_file
+        self.num_line = num_line
+        self.time_limit = time_limit
+        self.timestamp = timestamp
+        self.store_dict = store_dict
+        self.binary_only = binary_only
+        self.make_plots = make_plots
+        self.board_ID = board_ID
+        self.queue_ch = [deque() for i in range(4)]
+        self.link_ch  = ["" for i in range(4)]
+        self.read_stop_event = read_stop_event
+
+    def run(self):
+        t = threading.current_thread()
+        t.alive = True
+        total_lines = 0
+        total_start_time = time.time()
+        file_lines = 0
+        file_counter = 0
+        if(not self.binary_only): 
+            outfile = open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
+            print("{} is reading queue and translating file {}...".format(self.getName(), file_counter))
+        else:
+            print("{} is reading queue and translating...".format(self.getName()))
+        while True:
+            if not t.alive:
+                print("Translate Thread detected alive=False")
+                if(not self.binary_only): outfile.close()
+                break 
+            if self.read_stop_event.is_set():
+                print("Translate Thread received STOP signal from Write Thread")
+                if(not self.binary_only): outfile.close()
+                break
+            if((not self.binary_only) and file_lines>self.num_line):
+                outfile.close()
+                file_lines=0
+                file_counter = file_counter + 1
+                outfile = open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
+                print("{} is reading queue and translating file {}...".format(self.getName(), file_counter))
+            binary = ""
+            # Attempt to pop off the translate_queue for 30 secs, fail if nothing found
+            try:
+                binary = self.translate_queue.get(True, 30)
+            except queue.Empty:
+                print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!! THIS SENDS STOP SIGNAL TO ALL THREADS!!!")
+                self.read_stop_event.set()
+                break
+            TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID)
             if(write_flag==1):
-                outfile.write("%s\n"%TDC_data)
-                file_lines = file_lines + 1
+                if(not self.binary_only): 
+                    outfile.write("%s\n"%TDC_data)
+                    file_lines = file_lines + 1
                 total_lines = total_lines + 1
                 if(TDC_data[0:6]=='ETROC1'):
                     if(self.make_plots): self.plot_queue.put(TDC_data)
@@ -126,77 +181,11 @@ class Write_data(threading.Thread):
                         else:
                             print("ERROR! Found more than two headers in data block!!")
                         continue
-                    outfile.write("%s\n"%TDC_line)
+                    if(not self.binary_only): outfile.write("%s\n"%TDC_line)
                     if(TDC_line[9:13]!='DATA'): continue
                     if(self.make_plots): self.plot_queue.put(TDC_line)
-                file_lines  = file_lines  + (TDC_len-TDC_header_index)
+                if(not self.binary_only): file_lines  = file_lines  + (TDC_len-TDC_header_index)
                 total_lines = total_lines + (TDC_len-TDC_header_index)
-        else:
-            print("Write Thread gracefully sending signal to Read Thread") 
-            self.read_stop_event.set()
-
-        print("%s finished!"%self.getName())
-
-#--------------------------------------------------------------------------#
-class Read_Write_data(threading.Thread):
-    def __init__(self, name, queue, cmd_interpret, num_file, num_line, num_fifo_read, timestamp, store_dict, binary_only, make_plots, board_ID):
-        threading.Thread.__init__(self, name=name)
-        self.queue = queue
-        self.cmd_interpret = cmd_interpret
-        self.num_file = num_file
-        self.num_line = num_line
-        self.num_fifo_read = num_fifo_read
-        self.timestamp = timestamp
-        self.store_dict = store_dict
-        self.binary_only = binary_only
-        self.make_plots = make_plots
-        self.board_ID = board_ID
-        self.queue_ch = [deque() for i in range(4)]  # Inelegant solution making a deque for each channel
-
-    def run(self):
-        mem_data = []
-        for files in range(self.num_file):
-            file_name="./%s/TDC_Data_%d.dat"%(self.store_dict, files)
-            with open(file_name, 'w') as infile, open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, files), 'w') as outfile:
-                print("{} is reading data and writing file {} and translation...".format(self.getName(), files))
-                i = 0
-                start_time = time.time()
-                while i < self.num_line:
-                    # max allowed by read_memory is 65535
-                    mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
-                    for j in range(len(mem_data)):
-                        if int(mem_data[j]) == 0: continue
-                        binary = format(int(mem_data[j]), '032b')
-                        infile.write('%s\n'%binary)
-                        if(self.binary_only == False):
-                            TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.board_ID)
-                            if(write_flag==1):
-                                outfile.write("%s\n"%TDC_data)
-                                i = i+1
-                                if(TDC_data[0:6]=='ETROC1'):
-                                    if(self.make_plots): self.queue.put(TDC_data)
-                            elif(write_flag==2):
-                                TDC_len = len(TDC_data)
-                                TDC_header_index = -1
-                                for j,TDC_line in enumerate(TDC_data):
-                                    if(TDC_line=="HEADER_KEY"):
-                                        if(TDC_header_index<0):
-                                            TDC_header_index = j
-                                        else:
-                                            print("ERROR! Found more than two headers in data block!!")
-                                        continue
-                                    outfile.write("%s\n"%TDC_line)
-                                    if(TDC_line[9:13]!='DATA'): continue
-                                    if(self.make_plots): self.queue.put(TDC_line)
-                                i = i+(TDC_len-TDC_header_index)
-                            else:
-                                pass
-                        
-                        start_time = time.time()
-                        # print(i)
-                    if(time.time()-start_time > 30):
-                        print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST WRITE!!!")
-                        break
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
@@ -210,10 +199,11 @@ class DAQ_Plotting(threading.Thread):
         self.board_type = board_type
         self.board_size = board_size
         self.plot_queue_time = plot_queue_time
+        self.read_stop_event = read_stop_event
 
     def run(self):
-        t = threading.current_thread()                          # Local reference of THIS thread object
-        t.alive = True                                          # Thread is alive by default
+        t = threading.current_thread()
+        t.alive = True
 
         ch0 = np.zeros((int(np.sqrt(self.board_size[0])),int(np.sqrt(self.board_size[0])))) 
         ch1 = np.zeros((int(np.sqrt(self.board_size[1])),int(np.sqrt(self.board_size[1])))) 
@@ -236,7 +226,7 @@ class DAQ_Plotting(threading.Thread):
         if(len(self.board_type)>2):
             ax2.set_title('Channel 2: ETROC {:d}'.format(self.board_type[2]))
         if(len(self.board_type)>3):
-            ax3.set_title('Channel 3: ETROC {:d}'.format(self.board_type[2]))
+            ax3.set_title('Channel 3: ETROC {:d}'.format(self.board_type[3]))
         
         img0 = ax0.imshow(ch0, interpolation='none')
         ax0.set_aspect('equal')
@@ -283,14 +273,11 @@ class DAQ_Plotting(threading.Thread):
         #     y = np.sin(2 * np.pi * (x - 0.01 * i))
         #     line.set_data(x, y)
         #     return line,
-
         # anim = FuncAnimation(fig, animate, init_func=init,
         #                                frames=200, interval=20, blit=False)
-
         # anim.save('sine_wave.gif', writer='imagemagick')
 
-        while(True):                                            # If alive is set to false
-
+        while(True):
             ch0 = np.zeros((int(np.sqrt(self.board_size[0])),int(np.sqrt(self.board_size[0])))) 
             ch1 = np.zeros((int(np.sqrt(self.board_size[1])),int(np.sqrt(self.board_size[1])))) 
             ch2 = np.zeros((int(np.sqrt(self.board_size[2])),int(np.sqrt(self.board_size[2])))) 
@@ -303,11 +290,12 @@ class DAQ_Plotting(threading.Thread):
             img2.autoscale()
             img3.set_data(ch3)
             img3.autoscale()
-
             if not t.alive:
                 print("Plotting Thread detected alive=False")
-                break                                           # Break out of for loop
-
+                break
+            if self.read_stop_event.is_set():
+                print("Plot Thread received STOP signal from Write Thread")
+                break
             start_time = time.time()
             delta_time = 0
             mem_data = []
@@ -320,7 +308,6 @@ class DAQ_Plotting(threading.Thread):
                 # else:                                         # Handle task here and call q.task_done()
                 delta_time = time.time() - start_time
 
-            # NEED TO DOUBLE CHECK PIXEL LAYOUT
             for line in mem_data:
                 words = line.split()
                 if(words[0]=="ETROC1"):
@@ -336,7 +323,6 @@ class DAQ_Plotting(threading.Thread):
                     elif(words[1]=="3"): ch3[15-int(words[8]),15-int(words[6])] += 1
                 elif(words[0]=="ETROC3"): continue
                 else: continue
-                
 
             img0.set_data(ch0)
             img0.autoscale()
