@@ -41,7 +41,7 @@ def main(options, cmd_interpret):
 
     num_boards = len(board_type)
     Pixel_board = options.pixel_address
-    QSel_board  = options.pixel_charge			                           # Select Injected Charge
+    QSel_board  = options.pixel_charge
 
     if(options.firmware):
         if(not options.old_data_format):
@@ -50,80 +50,97 @@ def main(options, cmd_interpret):
             active_channels(cmd_interpret, key = active_channels_key)
             print("Timestamp: ", options.timestamp)
             timestamp(cmd_interpret, key = options.timestamp)
-        Enable_FPGA_Descramblber(1, cmd_interpret)                     # Enable FPGA Firmware Descramble
-        
-        if(options.reset_pulse_register):
-            print("\n", "Resetting Pulse Register 0x0002")
-            cmd_interpret.write_pulse_reg(0x0002)	
+        Enable_FPGA_Descramblber(1, cmd_interpret)
 
-        if(options.developments):		
-            # _ 2b data rate 3b LED configuration 1b testmode 1b timestamp
-            testregister = cmd_interpret.read_config_reg(13)
-            print('\n')
-            print("Written into Reg 13: ", format(testregister, '016b'))
-            print('\n')		              
-            testregister_2 = cmd_interpret.read_status_reg(2)
-            print("Status Reg Addr 2  : ", format(testregister_2, '016b'))
-            testregister_3 = cmd_interpret.read_status_reg(3)
-            print("Status Reg Addr 3  : ", format(testregister_3, '016b'))
-            print("Status Reg Addr 2+3: ", (format(testregister_2, '016b'))+
-            (format(testregister_3, '016b')))
-            print('\n')
+    # if(options.reset_pulse_register):
+    #     print("\n", "Resetting Pulse Register 0x0002")
+    #     software_clear_fifo(cmd_interpret)
 
-            fixed_32 = 0xabaaafaa
-            fixed_16 = int(format(fixed_32,  '032b')[-16:], base=2)
-            fixed_8  = int(format(fixed_32,  '032b')[-8:],  base=2)
+    if(options.inspect_serial_output):		
+        # _ 2b data rate 3b LED configuration 1b testmode 1b timestamp
+        testregister = cmd_interpret.read_config_reg(13)
+        print('\n')
+        print("Written into Reg 13: ", format(testregister, '016b'))
+        print('\n')		              
+        testregister_2 = cmd_interpret.read_status_reg(2)
+        print("Status Reg Addr 2  : ", format(testregister_2, '016b'))
+        testregister_3 = cmd_interpret.read_status_reg(3)
+        print("Status Reg Addr 3  : ", format(testregister_3, '016b'))
+        print("Status Reg Addr 2+3: ", (format(testregister_2, '016b'))+
+        (format(testregister_3, '016b')))
+        print('\n')
 
-            quad_8  = ""
-            for elem in format(fixed_8,  '08b'): quad_8 = quad_8 + elem + elem + elem + elem
-            doub_16 = ""
-            for elem in format(fixed_16,  '016b'): doub_16 = doub_16 + elem + elem
+        fixed_32 = 0xabaaafaa
+        fixed_16 = int(format(fixed_32,  '032b')[-16:], base=2)
+        fixed_8  = int(format(fixed_32,  '032b')[-8:],  base=2)
 
-            print("Processed Data Checks, look only at relavant bit length")
-            print("Fixed Pattern 8    : ", format(fixed_8,  '08b'))
-            if(format(fixed_8,  '08b') in format(testregister_2, '016b') and 
-            format(fixed_8,  '08b') in format(testregister_3, '016b')):
-                print("08 bit pattern found in both Status Reg 2 & 3")
-            elif(format(fixed_8,  '08b') in format(testregister_2, '016b') or 
-            format(fixed_8,  '08b') in format(testregister_3, '016b')):
-                print("08 bit pattern found in ONLY ONE of Status Reg 2 & 3!")
-            else: print("08 bit pattern not found in any of the Status Reg 2 or 3!")
+        quad_8  = ""
+        for elem in format(fixed_8,  '08b'): quad_8 = quad_8 + elem + elem + elem + elem
+        doub_16 = ""
+        for elem in format(fixed_16,  '016b'): doub_16 = doub_16 + elem + elem
 
-            print("Fixed Pattern 16   : ", format(fixed_16, '016b'))
-            if(format(fixed_16,  '016b') in format(testregister_2, '016b')*2 and 
-            format(fixed_16,  '016b') in format(testregister_3, '016b')*2):
-                print("16 bit pattern found in both Status Reg 2 & 3")
-            elif(format(fixed_16,  '016b') in format(testregister_2, '016b')*2 or 
-            format(fixed_16,  '016b') in format(testregister_3, '016b')*2):
-                print("16 bit pattern found in ONLY ONE of Status Reg 2 & 3!")
-            else: print("16 bit pattern not found in any of the Status Reg 2 or 3!")
+        print("Processed Data Checks, look only at relavant bit length")
+        print("Fixed Pattern 8    : ", format(fixed_8,  '08b'))
+        if(format(fixed_8,  '08b') in format(testregister_2, '016b') and 
+        format(fixed_8,  '08b') in format(testregister_3, '016b')):
+            print("08 bit pattern found in both Status Reg 2 & 3")
+        elif(format(fixed_8,  '08b') in format(testregister_2, '016b') or 
+        format(fixed_8,  '08b') in format(testregister_3, '016b')):
+            print("08 bit pattern found in ONLY ONE of Status Reg 2 & 3!")
+        else: print("08 bit pattern not found in any of the Status Reg 2 or 3!")
 
-            print("Fixed Pattern 32   : ", format(fixed_32, '032b'))
-            if(format(fixed_32,  '032b') in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
-                print("32 bit pattern found in Status Reg 2 + 3")
-            else: print("32 bit pattern not found in Status Reg 2 + 3!")
+        print("Fixed Pattern 16   : ", format(fixed_16, '016b'))
+        if(format(fixed_16,  '016b') in format(testregister_2, '016b')*2 and 
+        format(fixed_16,  '016b') in format(testregister_3, '016b')*2):
+            print("16 bit pattern found in both Status Reg 2 & 3")
+        elif(format(fixed_16,  '016b') in format(testregister_2, '016b')*2 or 
+        format(fixed_16,  '016b') in format(testregister_3, '016b')*2):
+            print("16 bit pattern found in ONLY ONE of Status Reg 2 & 3!")
+        else: print("16 bit pattern not found in any of the Status Reg 2 or 3!")
 
-            print('\n')
-            print("Raw Data Checks")
-            print("Inflated 8-bit pattern : ", quad_8)
-            print("Inflated 16-bit pattern: ", doub_16)
-            if(quad_8 in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
-                print("Quadrupled 8 bit pattern found in Status Reg 2 + 3")
-            else: print("Quadrupled 8 bit pattern not found in Status Reg 2 + 3!")
-            if(doub_16 in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
-                print("Doubled 16 bit pattern found in Status Reg 2 + 3")
-            else: print("Doubled 16 bit pattern not found in Status Reg 2 + 3!")
+        print("Fixed Pattern 32   : ", format(fixed_32, '032b'))
+        if(format(fixed_32,  '032b') in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
+            print("32 bit pattern found in Status Reg 2 + 3")
+        else: print("32 bit pattern not found in Status Reg 2 + 3!")
 
-            print('\n')
+        print('\n')
+        print("Raw Data Checks")
+        print("Inflated 8-bit pattern : ", quad_8)
+        print("Inflated 16-bit pattern: ", doub_16)
+        if(quad_8 in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
+            print("Quadrupled 8 bit pattern found in Status Reg 2 + 3")
+        else: print("Quadrupled 8 bit pattern not found in Status Reg 2 + 3!")
+        if(doub_16 in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
+            print("Doubled 16 bit pattern found in Status Reg 2 + 3")
+        else: print("Doubled 16 bit pattern not found in Status Reg 2 + 3!")
+        print('\n')
 
-            # 8b data source 4b board type 4b channel enable
-            register_15 = cmd_interpret.read_config_reg(15)
-            string_15   = format(register_15, '016b')
-            print("Written into Reg 15: ", string_15)
-            print("Channel Enable     : ", string_15[-4:])
-            print("Board Type         : ", string_15[-8:-4])
-            print("Data Source        : ", string_15[-16:-8])
-            print('\n')
+    if(options.do_fc):
+        register_11(cmd_interpret, key = register_11_key)
+        register_12(cmd_interpret, key = register_12_key)
+        fc_signal_start(cmd_interpret)
+
+    if(options.verbose):
+        read_register_11 = cmd_interpret.read_config_reg(11)
+        read_register_12 = cmd_interpret.read_config_reg(12)
+        print("Written into Reg 11: ", format(read_register_11, '016b'))
+        print("Written into Reg 12: ", format(read_register_12, '016b'))
+        print('\n')
+        register_13 = cmd_interpret.read_config_reg(13)
+        string_13   = format(register_13, '016b')
+        print("Written into Reg 13: ", string_13)
+        print("Data Rate              : ", string_13[-7:-5])
+        print("LED pages              : ", string_13[-5:-2])
+        print("Testmode               : ", string_13[-2])
+        print("Timestamp (active low) : ", string_13[-1])
+        print('\n')
+        register_15 = cmd_interpret.read_config_reg(15)
+        string_15   = format(register_15, '016b')
+        print("Written into Reg 15: ", string_15)
+        print("Channel Enable     : ", string_15[-4:])
+        print("Board Type         : ", string_15[-8:-4])
+        print("Data Source        : ", string_15[-16:-8])
+        print('\n')
     
     if(options.i2c):
         DAC_Value_List = []
@@ -159,48 +176,41 @@ def main(options, cmd_interpret):
     if(options.i2c):
         for B_num in range(num_boards):
 
-            slaveA_addr = slaveA_addr_list[B_num]                                           # I2C slave A address
-            slaveB_addr = slaveB_addr_list[B_num]                                           # I2C slave B address
-
+            slaveA_addr = slaveA_addr_list[B_num]
+            slaveB_addr = slaveB_addr_list[B_num]
+            reg_val = []
             if(board_type[B_num]==1):
-                reg_val = config_etroc1(B_num, options.charge_injection, DAC_Value_List, 
-                                        options.pixel_address, options.pixel_charge, cmd_interpret)
+                reg_val = config_etroc1(B_num, options.charge_injection, DAC_Value_List, options.pixel_address, options.pixel_charge, cmd_interpret)
             elif(board_type[B_num]==2):
                 pass
             elif(board_type[B_num]==3):
                 pass
-
-            ## write data to I2C register one by one
             if(options.verbose):
                 print("Write data into I2C slave:")
                 print(reg_val)
             for i in range(len(reg_val)):
                 time.sleep(0.01)
-                if i < 32:                                                                  # I2C slave A write
+                if i < 32:
                     iic_write(1, slaveA_addr_list[B_num], 0, i, reg_val[i], cmd_interpret)
-                else:                                                                       # I2C slave B write
+                else:
                     iic_write(1, slaveB_addr_list[B_num], 0, i-32, reg_val[i], cmd_interpret)
-
-            ## read back data from I2C register one by one
             iic_read_val = []
             for j in range(len(reg_val)):
                 time.sleep(0.01)
                 if j < 32:
-                    iic_read_val += [iic_read(0, slaveA_addr_list[B_num], 1, j, cmd_interpret)]            # I2C slave A read
+                    iic_read_val += [iic_read(0, slaveA_addr_list[B_num], 1, j, cmd_interpret)]
                 else:
-                    iic_read_val += [iic_read(0, slaveB_addr_list[B_num], 1, j-32, cmd_interpret)]         # I2C slave B read
+                    iic_read_val += [iic_read(0, slaveB_addr_list[B_num], 1, j-32, cmd_interpret)]
             if(options.verbose):
                 print("I2C read back data:")
                 print(iic_read_val)
-
-            # compare I2C write in data with I2C read back data
             if iic_read_val == reg_val:
                 print("I2C SUCCESS! Write data matches read data for Board ", B_num)
             else:
                 print("I2C ERROR! Write data does not match read data for Board ", B_num)
 
-    time.sleep(1)                                                                       # delay one second
-    software_clear_fifo(cmd_interpret)                                                  # clear fifo content
+    time.sleep(1)                                 # delay one second
+    software_clear_fifo(cmd_interpret)            # clear fifo content
 
     if(not options.nodaq):
         ## start receive_data, write_data, daq_plotting threading
@@ -311,12 +321,24 @@ if __name__ == "__main__":
     parser.add_option("--firmware",
                       action="store_true", dest="firmware", default=False,
                       help="Configure FPGA firmware settings")
-    parser.add_option("--reset_pulse_register", type="int",
-                      action="store", dest="reset_pulse_register", default=0,
-                      help="(DEV ONLY) Reset Pulse Register")
-    parser.add_option("--developments",
-                      action="store_true", dest="developments", default=False,
-                      help="(DEV ONLY) Decode the register binary values")
+    # parser.add_option("--reset_pulse_register", type="int",
+    #                   action="store", dest="reset_pulse_register", default=0,
+    #                   help="(DEV ONLY) Reset Pulse Register")
+    parser.add_option("--inspect_serial_output",
+                      action="store_true", dest="inspect_serial_output", default=False,
+                      help="(DEV ONLY) Decode the register binary values for serial port inspection")
+    # parser.add_option("--register_11", type="int",
+    #                   action="store", dest="register_11", default=0x0000,
+    #                   help="(DEV ONLY) Set timestamp binary, see daq_helpers for more info")
+    # parser.add_option("--register_12", type="int",
+    #                   action="store", dest="register_12", default=0x0000,
+    #                   help="(DEV ONLY) Set timestamp binary, see daq_helpers for more info")
+    # parser.add_option("--fc_signal_start", type="int",
+    #                   action="store", dest="fc_signal_start", default=0x0000,
+    #                   help="(DEV ONLY) Set timestamp binary, see daq_helpers for more info")
+    parser.add_option("--do_fc",
+                      action="store_true", dest="do_fc", default=False,
+                      help="(DEV ONLY) Do Fast Command register setting")
 
     (options, args) = parser.parse_args()
 

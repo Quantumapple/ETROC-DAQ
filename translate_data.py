@@ -112,7 +112,7 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
             # Expected
             if(links[channel]=="HEADER" or links[channel]=="DATA"): links[channel] = "TRAILER"
             # Error in frame, clear queue, reset link, exit function
-            elif(links[channel]=="TRAILER" or links[channel]=="FILLER"):
+            elif(links[channel]=="TRAILER" or links[channel]=="FILLER" or links[channel]=="START"):
                 queues[channel].clear()
                 links[channel]==""
                 return TDC_data, 2
@@ -161,11 +161,12 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
             last_line = last_line + "TOA " + "{:d} ".format(int(last_element[11:21], base=2))
             last_line = last_line + "TOT " + "{:d} ".format(int(last_element[21:30], base=2))
             last_line = last_line + "CAL " + "{:d} ".format(int(last_element[30:40], base=2))
-            last_line = last_line + last_element[11:]
+            last_line = last_line + last_element[11:11+4] + " " + last_element[15:15+4] + " "
+            last_line = last_line + last_element[19:19+12] + " " + last_element[31:40]
             # Expected
             if(links[channel]=="HEADER" or links[channel]=="DATA"): links[channel] = "DATA"
             # Error in frame, clear queue, reset link, exit function
-            elif(links[channel]=="TRAILER" or links[channel]=="FILLER"):
+            elif(links[channel]=="TRAILER" or links[channel]=="FILLER" or links[channel]=="START"):
                 queues[channel].clear()
                 links[channel]==""
                 return TDC_data, 2

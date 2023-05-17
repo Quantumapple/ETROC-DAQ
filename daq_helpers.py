@@ -190,7 +190,7 @@ class Translate_data(threading.Thread):
 
 #--------------------------------------------------------------------------#
 class DAQ_Plotting(threading.Thread):
-    def __init__(self, name, queue, timestamp, store_dict, pixel_address, board_type, board_size, plot_queue_time):
+    def __init__(self, name, queue, timestamp, store_dict, pixel_address, board_type, board_size, plot_queue_time, read_stop_event):
         threading.Thread.__init__(self, name=name)
         self.queue = queue
         self.timestamp = timestamp
@@ -212,7 +212,7 @@ class DAQ_Plotting(threading.Thread):
 
         plt.ion()
         # fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2,2, dpi=75)
-        fig = plt.figure(dpi=75, figsize=(8,8))
+        fig = plt.figure(dpi=75, figsize=(5,5))
         gs = fig.add_gridspec(8,8)
         ax0 = fig.add_subplot(gs[0:int(np.sqrt(self.board_size[0]))//4, 0:int(np.sqrt(self.board_size[0]))//4])
         ax1 = fig.add_subplot(gs[4:4+int(np.sqrt(self.board_size[1]))//4, 0:int(np.sqrt(self.board_size[1]))//4])
@@ -228,13 +228,13 @@ class DAQ_Plotting(threading.Thread):
         if(len(self.board_type)>3):
             ax3.set_title('Channel 3: ETROC {:d}'.format(self.board_type[3]))
         
-        img0 = ax0.imshow(ch0, interpolation='none')
+        img0 = ax0.imshow(ch0, interpolation='none', vmin=1)
         ax0.set_aspect('equal')
-        img1 = ax1.imshow(ch1, interpolation='none')
+        img1 = ax1.imshow(ch1, interpolation='none', vmin=1)
         ax1.set_aspect('equal')
-        img2 = ax2.imshow(ch2, interpolation='none')
+        img2 = ax2.imshow(ch2, interpolation='none', vmin=1)
         ax2.set_aspect('equal')
-        img3 = ax3.imshow(ch3, interpolation='none')
+        img3 = ax3.imshow(ch3, interpolation='none', vmin=1)
         ax3.set_aspect('equal')
 
         ax0.get_xaxis().set_visible(False)
@@ -410,6 +410,7 @@ def software_clear_fifo(cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0002)                                     # trigger pulser_reg[1]
 
 #--------------------------------------------------------------------------#
+## Register 15
 ## Enable channel
 ## 4 bit binary, WXYZ
 ## W - ch3
@@ -421,6 +422,7 @@ def active_channels(cmd_interpret, key = 0x0003):
     cmd_interpret.write_config_reg(15, key)
 
 #--------------------------------------------------------------------------#
+## Register 13
 ## TimeStamp and Testmode
 ## Following is binary key, 4 bit binary WXYZ
 ## 0000: Enable  Testmode & Enable TimeStamp
@@ -432,3 +434,23 @@ def timestamp(cmd_interpret, key=0x0000):
     cmd_interpret.write_config_reg(13, key) 
 
 #--------------------------------------------------------------------------#
+## Register 12
+## 4-digit 16 bit hex, 0xWXYZ
+## WX (8 bit) - Duration
+## Y - N/A,N/A,Period,Hold
+## Z - Input command
+def register_12(cmd_interpret, key = 0x0000): 
+    cmd_interpret.write_config_reg(12, key)
+
+#--------------------------------------------------------------------------#
+## Register 11
+## 4-digit 16 bit hex, 0xWXYZ
+## WX (8 bit) - N/A
+## YZ (8 bit) - Error Mask
+def register_11(cmd_interpret, key = 0x0000): 
+    cmd_interpret.write_config_reg(11, key)
+
+#--------------------------------------------------------------------------#
+## Fast Command Signal Start
+def fc_signal_start(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0004)

@@ -24,17 +24,30 @@ Any inserted jumpers will flip the bit
 
 slaveA_addr_list = [0x03,  0x02,  0x01]
 slaveB_addr_list = [0x7f,  0x7e,  0x7d]
+#slaveA_addr_list = [0x03,  0x02,  0x01, 0x00]
+#slaveB_addr_list = [0x7f,  0x7e,  0x7d, 0x7c]
 
 # Use this to control how many boards are actually attempted for connection
 board_type       = [2, 1, 1, 2]            # ETROC version number
 
-active_channels_key = 0x0003
+active_channels_key = 0x0011
+## Register 11
+## 4-digit 16 bit hex, 0xWXYZ
+## WX (8 bit) - N/A
+## YZ (8 bit) - Error Mask
+register_11_key = 0x0003
+## Register 12
+## 4-digit 16 bit hex, 0xWXYZ
+## WX (8 bit) - Duration
+## Y - N/A,N/A,Period,Hold
+## Z - Input command
+register_12_key = 0x0805
 
 board_size       = [256, 16, 16, 256]
 
 board_name       = ["F28", "F29", "F30", "F47"]
-board_ID         = ["10111111100001111","00000000000000000","00000000000000000", "00000000000000000"] 
-
+board_ID         = ["00000000000000000","00000000000000000","00000000000000000", "00000000000000000"] 
+# 10111111100001111
 CLSel_board      = [  0,    0,    0, 0 ]			# Load Capacitance of the preamp first stage, default 0
 RfSel_board      = [  2,    2,    2, 2 ]			# Feedback resistance seleciton
 IBSel_board      = [  0,    0,    0, 0 ]			# Bias current selection of the input transistor in the preamp
