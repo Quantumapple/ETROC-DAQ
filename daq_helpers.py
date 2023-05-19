@@ -165,12 +165,13 @@ class Translate_data(threading.Thread):
                 break
             TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID)
             if(write_flag==1):
-                if(not self.binary_only): 
-                    outfile.write("%s\n"%TDC_data)
-                    file_lines = file_lines + 1
-                total_lines = total_lines + 1
-                if(TDC_data[0:6]=='ETROC1'):
-                    if(self.make_plots): self.plot_queue.put(TDC_data)
+                pass
+                # if(not self.binary_only): 
+                #     outfile.write("%s\n"%TDC_data)
+                #     file_lines = file_lines + 1
+                # total_lines = total_lines + 1
+                # if(TDC_data[0:6]=='ETROC1'):
+                #     if(self.make_plots): self.plot_queue.put(TDC_data)
             elif(write_flag==2):
                 TDC_len = len(TDC_data)
                 TDC_header_index = -1

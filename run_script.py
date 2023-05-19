@@ -275,7 +275,7 @@ if __name__ == "__main__":
     parser.add_option("-l", "--num_line", dest="num_line", action="store", type="int",
                       help="Number of lines per file created by DAQ script", default=50000)
     parser.add_option("-r", "--num_fifo_read", dest="num_fifo_read", action="store", type="int",
-                      help="Number of lines read per call of fifo readout", default=10000)
+                      help="Number of lines read per call of fifo readout", default=50000)
     parser.add_option("-t", "--time_limit", dest="time_limit", action="store", type="int",
                       help="Number of seconds to run this code", default=-1)
     parser.add_option("-o", "--output_directory", dest="output_directory", action="store", type="string",
