@@ -89,11 +89,14 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
             last_line = last_line + "HEADER "
             last_line = last_line + "L1COUNTER " + last_element[18:26] + " "
             last_line = last_line + "TYPE " + last_element[26:28] + " "
-            last_line = last_line + "BCID " + last_element[28:40]
+            # last_line = last_line + "BCID " + last_element[28:40]
+            last_line = last_line + "BCID " + f"{int(last_element[28:40], base=2)}"
             # Expected
             if(links[channel]=="START" or links[channel]=="FILLER" or links[channel]=="TRAILER"): links[channel] = "HEADER"
             # Error in frame, clear queue, reset link, exit function
             elif(links[channel]=="DATA" or links[channel]=="HEADER"):
+                # print("QD at HEADER, because found after",links[channel])
+                # print(list(queues[channel]))
                 queues[channel].clear()
                 links[channel]==""
                 return TDC_data, 2
@@ -113,6 +116,8 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
             if(links[channel]=="HEADER" or links[channel]=="DATA"): links[channel] = "TRAILER"
             # Error in frame, clear queue, reset link, exit function
             elif(links[channel]=="TRAILER" or links[channel]=="FILLER" or links[channel]=="START"):
+                # print("QD at Trailer, because found after",links[channel])
+                # print(list(queues[channel]))
                 queues[channel].clear()
                 links[channel]==""
                 return TDC_data, 2
@@ -125,11 +130,13 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
             last_line = last_line + "FRAMEFILLER "
             last_line = last_line + "L1COUNTER " + last_element[18:26] + " "
             last_line = last_line + "EBS " + last_element[26:28] + " "
-            last_line = last_line + "BCID " + last_element[28:40]
+            last_line = last_line + "BCID " + f"{int(last_element[28:40], base=2)}"
             # Expected
             if(links[channel]=="START" or links[channel]=="FILLER" or links[channel]=="TRAILER"): links[channel] = "FILLER"
             # Error in frame, clear queue, reset link, exit function
             elif(links[channel]=="DATA" or links[channel]=="HEADER"):
+                # print("QD at FF, because found after",links[channel])
+                # print(list(queues[channel]))
                 queues[channel].clear()
                 links[channel]==""
                 return TDC_data, 2
@@ -145,6 +152,8 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
             if(links[channel]=="START" or links[channel]=="FILLER" or links[channel]=="TRAILER"): links[channel] = "FILLER"
             # Error in frame, clear queue, reset link, exit function
             elif(links[channel]=="DATA" or links[channel]=="HEADER"):
+                # print("QD at F, because found after",links[channel])
+                # print(list(queues[channel]))
                 queues[channel].clear()
                 links[channel]==""
                 return TDC_data, 2
@@ -161,12 +170,14 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
             last_line = last_line + "TOA " + "{:d} ".format(int(last_element[11:21], base=2))
             last_line = last_line + "TOT " + "{:d} ".format(int(last_element[21:30], base=2))
             last_line = last_line + "CAL " + "{:d} ".format(int(last_element[30:40], base=2))
-            last_line = last_line + last_element[11:11+4] + " " + last_element[15:15+4] + " "
-            last_line = last_line + last_element[19:19+12] + " " + last_element[31:40]
+            # last_line = last_line + last_element[11:11+4] + " " + last_element[15:15+4] + " "
+            # last_line = last_line + last_element[19:19+12] + " " + last_element[31:40]
             # Expected
             if(links[channel]=="HEADER" or links[channel]=="DATA"): links[channel] = "DATA"
             # Error in frame, clear queue, reset link, exit function
             elif(links[channel]=="TRAILER" or links[channel]=="FILLER" or links[channel]=="START"):
+                # print("QD at Data, because found after",links[channel])
+                # print(list(queues[channel]))
                 queues[channel].clear()
                 links[channel]==""
                 return TDC_data, 2
@@ -176,7 +187,8 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
                 sys.exit(1)
         # When the 40 bit word is none of the above, clear queue, reset link, exit function
         else:
-            queues[channel].clear()
+            # print("QD at INVALID 40 Word")
+            # queues[channel].clear()
             links[channel]==""
             return TDC_data, 2
         #-----------------------------------------#

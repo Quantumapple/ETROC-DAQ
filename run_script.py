@@ -50,7 +50,8 @@ def main(options, cmd_interpret):
             active_channels(cmd_interpret, key = active_channels_key)
             print("Timestamp: ", options.timestamp)
             timestamp(cmd_interpret, key = options.timestamp)
-        Enable_FPGA_Descramblber(1, cmd_interpret)
+        # Enable_FPGA_Descramblber(1, cmd_interpret)
+        Enable_FPGA_Descramblber(cmd_interpret, register_14_key)
 
     # if(options.reset_pulse_register):
     #     print("\n", "Resetting Pulse Register 0x0002")
@@ -119,6 +120,41 @@ def main(options, cmd_interpret):
         register_11(cmd_interpret, key = register_11_key)
         register_12(cmd_interpret, key = register_12_key)
         fc_signal_start(cmd_interpret)
+    if(options.memo_fc):
+        ## 4-digit 16 bit hex, Duration is LSB 12 bits
+        ## This tells us how many memory slots to use
+        ## dec = 3564
+        # register_12(cmd_interpret, 0x0000)
+        # fc_signal_start(cmd_interpret)
+
+        register_11(cmd_interpret, 0x0deb)
+
+        ## 4-digit 16 bit hex, 0xWXYZ
+        ## WX (8 bit) -  Error Mask
+        ## Y - trigSize[1:0],Period,testTrig
+        ## Z - Input command
+        register_12(cmd_interpret, 0x0030)
+        cmd_interpret.write_config_reg(10, 0x0000)
+        cmd_interpret.write_config_reg(9, 0x0deb)
+        fc_init_pulse(cmd_interpret)
+
+        register_12(cmd_interpret, 0x0032)
+        cmd_interpret.write_config_reg(10, 0x0001)
+        cmd_interpret.write_config_reg(9, 0x0001)
+        fc_init_pulse(cmd_interpret)
+
+        register_12(cmd_interpret, 0x0035)
+        cmd_interpret.write_config_reg(10, 0x0000)
+        cmd_interpret.write_config_reg(9, 0x0000)
+        fc_init_pulse(cmd_interpret)
+
+        register_12(cmd_interpret, 0x0036)
+        cmd_interpret.write_config_reg(10, 0x01f6)
+        cmd_interpret.write_config_reg(9, 0x01f9)
+        fc_init_pulse(cmd_interpret)
+
+        fc_signal_start(cmd_interpret)
+        
 
     if(options.verbose):
         read_register_11 = cmd_interpret.read_config_reg(11)
@@ -134,6 +170,14 @@ def main(options, cmd_interpret):
         print("Testmode               : ", string_13[-2])
         print("Timestamp (active low) : ", string_13[-1])
         print('\n')
+        register_14 = cmd_interpret.read_config_reg(14)
+        string_14   = format(register_14, '016b')
+        print("Written into Reg 14: ", string_14)
+        print("Memo FC mode       : ", string_14[-4])
+        print("Polarity           : ", string_14[-3])
+        print("Disable GTX        : ", string_14[-2])
+        print("Enable Descrambler : ", string_14[-1])
+        print('\n')
         register_15 = cmd_interpret.read_config_reg(15)
         string_15   = format(register_15, '016b')
         print("Written into Reg 15: ", string_15)
@@ -143,6 +187,7 @@ def main(options, cmd_interpret):
         print('\n')
     
     if(options.i2c):
+        print("Inside I2C config")
         DAC_Value_List = []
         for i in range(num_boards):
             DAC_Value_List.append(single_pixel_threshold(board_size[i], options.pixel_address[i], options.pixel_threshold[i]))
@@ -153,7 +198,7 @@ def main(options, cmd_interpret):
         userdefinedir_log = "%s_log"%userdefinedir
         ##  Creat a directory named path with date of today
         today = datetime.date.today()
-        todaystr = "../" + today.isoformat() + "_Array_Test_Results"
+        todaystr = "../ETROC-Data/" + today.isoformat() + "_Array_Test_Results"
         try:
             os.mkdir(todaystr)
             print("Directory %s was created!"%todaystr)
@@ -174,6 +219,7 @@ def main(options, cmd_interpret):
     logtime_stampe = time.strftime('%m-%d_%H-%M-%S',time.localtime(time.time()))
     
     if(options.i2c):
+        print("Inside I2C setting")
         for B_num in range(num_boards):
 
             slaveA_addr = slaveA_addr_list[B_num]
@@ -238,11 +284,11 @@ def main(options, cmd_interpret):
             while receive_data.is_alive():
                 # Try to join the child thread back to parent for 0.5 seconds
                 receive_data.join(0.5)
-            while write_data.is_alive():
-                write_data.join(0.5)
             if(options.make_plots or (not options.binary_only)):
                 while translate_data.is_alive():
                     translate_data.join(0.5)
+            while write_data.is_alive():
+                write_data.join(0.5)
             if(options.make_plots):
                 while daq_plotting.is_alive():
                     daq_plotting.join(0.5)
@@ -255,8 +301,8 @@ def main(options, cmd_interpret):
             if(options.make_plots): daq_plotting.alive = False
             # Block until child thread is joined back to the parent
             receive_data.join()
-            write_data.join()
             if(options.make_plots or (not options.binary_only)): translate_data.join()
+            write_data.join()
             if(options.make_plots): daq_plotting.join()
         
         # wait for thread to finish before proceeding)
@@ -339,7 +385,9 @@ if __name__ == "__main__":
     parser.add_option("--do_fc",
                       action="store_true", dest="do_fc", default=False,
                       help="(DEV ONLY) Do Fast Command register setting")
-
+    parser.add_option("--memo_fc",
+                      action="store_true", dest="memo_fc", default=False,
+                      help="(DEV ONLY) Do Fast Command with Memory")
     (options, args) = parser.parse_args()
 
     if(options.pixel_address == None): options.pixel_address = [5, 5, 5, 5]
@@ -408,6 +456,5 @@ if __name__ == "__main__":
     except socket.error:
         print("failed to connect to ip " + options.hostname)
     cmd_interpret = command_interpret(s)					                            # Class instance
-        
     main(options, cmd_interpret)    # execute main function
     s.close()                       # close socket
