@@ -95,6 +95,7 @@ class Write_data(threading.Thread):
                 break
             # Handle the raw (binary) line
             if int(mem_data) == 0: continue
+            if int(mem_data) == 38912: continue
             binary = format(int(mem_data), '032b')
             if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
             else: outfile.write('%s\n'%binary)
@@ -185,7 +186,9 @@ class Translate_data(threading.Thread):
                     if(not self.binary_only): outfile.write("%s\n"%TDC_line)
                     if(TDC_line[9:13]!='DATA'): continue
                     if(self.make_plots): self.plot_queue.put(TDC_line)
-                if(not self.binary_only): file_lines  = file_lines  + (TDC_len-TDC_header_index)
+                if(not self.binary_only): 
+                    # file_lines  = file_lines  + (TDC_len-TDC_header_index)
+                    file_lines  = file_lines  + (TDC_len)
                 total_lines = total_lines + (TDC_len-TDC_header_index)
         print("%s finished!"%self.getName())
 
@@ -366,6 +369,7 @@ def iic_write(mode, slave_addr, wr, reg_addr, data, cmd_interpret):
     cmd_interpret.write_config_reg(4, 0xffff & val)
     cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
     time.sleep(0.01)
+    ## MSB..00001
     cmd_interpret.write_pulse_reg(0x0001)                                     # reset ddr3 data fifo
     time.sleep(0.01)
 
@@ -379,6 +383,7 @@ def iic_read(mode, slave_addr, wr, reg_addr, cmd_interpret):
     val = mode << 24 | slave_addr << 17 |  0 << 16 | reg_addr << 8 | 0x00	  # write device addr and reg addr
     cmd_interpret.write_config_reg(4, 0xffff & val)
     cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+    ## MSB..00001
     time.sleep(0.01)
     cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
 
@@ -386,20 +391,27 @@ def iic_read(mode, slave_addr, wr, reg_addr, cmd_interpret):
     cmd_interpret.write_config_reg(4, 0xffff & val)
     cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
     time.sleep(0.01)
+    ## MSB..00001
     cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
-    time.sleep(0.01)									                      # delay 10ns then to read data
+    time.sleep(0.01)    # delay 10ns then to read data
     return cmd_interpret.read_status_reg(0) & 0xff
 #--------------------------------------------------------------------------#
 ## Enable FPGA Descrambler
-def Enable_FPGA_Descramblber(val, cmd_interpret):
-    if val==1:
-        print("Enable FPGA Descrambler")
-    else:
-        print("Disable FPGA Descrambler")
-    cmd_interpret.write_config_reg(14, 0x0001 & val)                          # write enable
+def Enable_FPGA_Descramblber(cmd_interpret, val=0x0003):
+    # if val==1:
+    #     print("Enable FPGA Descrambler")
+    # else:
+    #     print("Disable FPGA Descrambler")
+    # cmd_interpret.write_config_reg(14, 0x0001 & val)  
+    # 0xWXYZ
+    # Z is a bit 4 bit binary wxyz
+    # z is the enable descrambler
+    # y is disable GTX
+    # x is polarity
+    cmd_interpret.write_config_reg(14, val)
 
 #--------------------------------------------------------------------------#
-## simple readout fucntion
+## simple readout fucntion                          # write enable
 #@param[in]: write_num: BC0 and L1ACC loop number, 0-65535
 def simple_readout(write_num, cmd_interpret):
     cmd_interpret.write_config_reg(15, 0xffff & write_num)                    # write enable
@@ -407,8 +419,9 @@ def simple_readout(write_num, cmd_interpret):
 
 #--------------------------------------------------------------------------#
 ## software clear fifo
+## MSB..00010
 def software_clear_fifo(cmd_interpret):
-    cmd_interpret.write_pulse_reg(0x0002)                                     # trigger pulser_reg[1]
+    cmd_interpret.write_pulse_reg(0x0002)    # trigger pulser_reg[1]
 
 #--------------------------------------------------------------------------#
 ## Register 15
@@ -453,5 +466,12 @@ def register_11(cmd_interpret, key = 0x0000):
 
 #--------------------------------------------------------------------------#
 ## Fast Command Signal Start
+## MSB..00100
 def fc_signal_start(cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0004)
+
+#--------------------------------------------------------------------------#
+## Fast Command Initialize pulse
+## MSB..10000
+def fc_init_pulse(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0010)
