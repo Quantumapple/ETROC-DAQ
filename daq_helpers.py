@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import time
-import visa
+#import visa
 import threading
 import numpy as np
 import matplotlib
+import os
 # matplotlib.use('WebAgg')
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -22,14 +23,142 @@ from translate_data import *
 This script is composed of all the helper functions needed for I2C comms, FPGA, etc
 '''
 #--------------------------------------------------------------------------#
+
+def start_L1A(cmd_interpret):
+    software_clear_fifo(cmd_interpret)
+    ## 4-digit 16 bit hex, Duration is LSB 12 bits
+    ## This tells us how many memory slots to use
+    ## dec = 3564
+    register_11(cmd_interpret, 0x0deb)
+
+    # software_clear_fifo(cmd_interpret)
+    ## 4-digit 16 bit hex, 0xWXYZ
+    ## WX (8 bit) -  Error Mask
+    ## Y - trigSize[1:0],Period,testTrig
+    ## Z - Input command
+    register_12(cmd_interpret, 0x0030)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)
+    fc_init_pulse(cmd_interpret)
+
+    # software_clear_fifo(cmd_interpret)
+    # register_12(cmd_interpret, 0x0032)
+    # cmd_interpret.write_config_reg(10, 0x0001)
+    # cmd_interpret.write_config_reg(9, 0x0001)
+    # fc_init_pulse(cmd_interpret)
+    register_12(cmd_interpret, 0x0035)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0000)
+    fc_init_pulse(cmd_interpret)
+
+    # software_clear_fifo(cmd_interpret)
+    register_12(cmd_interpret, 0x0036)
+    # 1f6 1f6
+    cmd_interpret.write_config_reg(10, 0x01f0)
+    cmd_interpret.write_config_reg(9, 0x01ff)
+    fc_init_pulse(cmd_interpret)
+
+    # software_clear_fifo(cmd_interpret)
+    fc_signal_start(cmd_interpret)
+    # software_clear_fifo(cmd_interpret)
+
+def start_L1A_train(cmd_interpret):
+
+    ## Register 11, needs do_fc option
+    ## 4-digit 16 bit hex, Duration
+    register_11_key = 0x0021
+
+    ## Register 12, needs do_fc option
+    ## 4-digit 16 bit hex, 0xWXYZ
+    ## WX (8 bit) -  Error Mask
+    ## Y - trigSize[1:0],Period,testTrig
+    ## Z - Input command
+    register_12_key = 0x0036
+    register_11(cmd_interpret, key = register_11_key)
+    register_12(cmd_interpret, key = register_12_key)
+    fc_signal_start(cmd_interpret)
+    software_clear_fifo(cmd_interpret) 
+    time.sleep(0.5)
+
+    register_11_key = 0x0020
+    register_12_key = 0x0035
+    register_11(cmd_interpret, key = register_11_key)
+    register_12(cmd_interpret, key = register_12_key)
+    fc_signal_start(cmd_interpret)
+    software_clear_fifo(cmd_interpret) 
+
+def stop_L1A(cmd_interpret):
+    # software_clear_fifo(cmd_interpret)
+    # fc_init_pulse(cmd_interpret)
+
+    # software_clear_fifo(cmd_interpret)
+    register_12(cmd_interpret, 0x0030)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)
+    fc_init_pulse(cmd_interpret)
+
+    # register_12(cmd_interpret, 0x0002)
+    # cmd_interpret.write_config_reg(10, 0x0001)
+    # cmd_interpret.write_config_reg(9, 0x0001)
+    # fc_init_pulse(cmd_interpret)
+
+    # register_12(cmd_interpret, 0x0005)
+    # cmd_interpret.write_config_reg(10, 0x0000)
+    # cmd_interpret.write_config_reg(9, 0x0000)
+    # fc_init_pulse(cmd_interpret)
+
+    # register_12(cmd_interpret, 0x0006)
+    # cmd_interpret.write_config_reg(10, 0x01f6)
+    # cmd_interpret.write_config_reg(9, 0x01f9)
+    # fc_init_pulse(cmd_interpret)
+    # software_clear_fifo(cmd_interpret)
+    fc_signal_start(cmd_interpret)
+    # software_clear_fifo(cmd_interpret)
+
+def stop_L1A_train(cmd_interpret):
+    software_clear_fifo(cmd_interpret)
+
+    register_11_key = 0x0021
+    register_12_key = 0x0006
+    register_11(cmd_interpret, key = register_11_key)
+    register_12(cmd_interpret, key = register_12_key)
+    fc_signal_start(cmd_interpret)
+    software_clear_fifo(cmd_interpret) 
+
+    register_11_key = 0x0020
+    register_12_key = 0x0005
+    register_11(cmd_interpret, key = register_11_key)
+    register_12(cmd_interpret, key = register_12_key)
+    fc_signal_start(cmd_interpret)
+    software_clear_fifo(cmd_interpret) 
+
+def link_reset(cmd_interpret):
+    software_clear_fifo(cmd_interpret) 
+
+
 # define a receive data class
 class Receive_data(threading.Thread):               # threading class
-    def __init__(self, name, queue, cmd_interpret, num_fifo_read, read_stop_event):
+    def __init__(self, name, queue, cmd_interpret, num_fifo_read, read_stop_event, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
         threading.Thread.__init__(self, name=name)
         self.queue = queue
         self.cmd_interpret = cmd_interpret
         self.num_fifo_read = num_fifo_read
         self.read_stop_event = read_stop_event
+        self.use_IPC = use_IPC
+        self.stop_DAQ_event = stop_DAQ_event
+        self.IPC_queue = IPC_queue
+
+        if self.use_IPC and self.IPC_queue is None:
+            self.use_IPC = False
+
+        if not self.use_IPC:
+            self.daq_on = True
+            if self.stop_DAQ_event is not None:
+                self.stop_DAQ_event.set()
+        else:
+            self.daq_on = False
+            self.stop_DAQ_event.clear()
+
     
     def run(self):
         t = threading.current_thread()              # Local reference of THIS thread object
@@ -37,10 +166,39 @@ class Receive_data(threading.Thread):               # threading class
         mem_data = []
         print("{} is reading data and pushing to the queue...".format(self.getName()))
         while True:
-            # max allowed by read_memory is 65535
-            mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
-            for mem_line in mem_data:
-                self.queue.put(mem_line) 
+            if self.use_IPC:
+                try:
+                    message = self.IPC_queue.get(False)
+                    print(f'Message: {message}')
+                    if message == 'start DAQ':
+                        self.daq_on = True
+                    elif message == 'start L1A':
+                        start_L1A(self.cmd_interpret)
+                        self.daq_on = True
+                    elif message == 'stop L1A':
+                        stop_L1A(self.cmd_interpret)
+                        self.daq_on = False
+                    elif message == 'stop L1A train':
+                        stop_L1A_train(self.cmd_interpret)
+                        self.daq_on = False
+                    elif message == 'start L1A train':
+                        start_L1A_train(self.cmd_interpret)
+                        self.daq_on = True
+                    elif message == 'allow threads to exit':
+                        self.stop_DAQ_event.set()
+                    elif message == 'link reset':
+                        link_reset(self.cmd_interpret)
+                    else:
+                        print(f'Unknown message: {message}')
+                except queue.Empty:
+                    pass
+
+            # if self.daq_on:
+            if True:
+                # max allowed by read_memory is 65535
+                mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
+                for mem_line in mem_data:
+                    self.queue.put(mem_line) 
             if not t.alive:
                 print("Read Thread detected alive=False")
                 break  
@@ -52,7 +210,7 @@ class Receive_data(threading.Thread):               # threading class
 #--------------------------------------------------------------------------#
 # define a write data class
 class Write_data(threading.Thread):
-    def __init__(self, name, read_queue, translate_queue, num_file, num_line, time_limit, store_dict, binary_only, compressed_binary, make_plots, read_stop_event):
+    def __init__(self, name, read_queue, translate_queue, num_file, num_line, time_limit, store_dict, binary_only, compressed_binary, make_plots, read_stop_event, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.read_queue = read_queue
         self.translate_queue = translate_queue
@@ -64,6 +222,7 @@ class Write_data(threading.Thread):
         self.compressed_binary = compressed_binary
         self.make_plots = make_plots
         self.read_stop_event = read_stop_event
+        self.stop_DAQ_event = stop_DAQ_event
 
     def run(self):
         t = threading.current_thread()              # Local reference of THIS thread object
@@ -90,12 +249,16 @@ class Write_data(threading.Thread):
             try:
                 mem_data = self.read_queue.get(True, 30)
             except queue.Empty:
+                if not self.stop_DAQ_event.is_set():
+                    continue
                 print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM READ_QUEUE!!!")
                 self.read_stop_event.set()
                 break
             # Handle the raw (binary) line
-            if int(mem_data) == 0: continue
-            if int(mem_data) == 38912: continue
+            if int(mem_data) == 0: continue # Waiting for IPC
+            if int(mem_data) == 38912: continue # got a Filler
+            if int(mem_data) == 9961472: continue # got a Filler
+            if int(mem_data) == 2550136832: continue # got a Filler
             binary = format(int(mem_data), '032b')
             if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
             else: outfile.write('%s\n'%binary)
@@ -112,7 +275,7 @@ class Write_data(threading.Thread):
 
 #--------------------------------------------------------------------------#
 class Translate_data(threading.Thread):
-    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_file, num_line, time_limit, timestamp, store_dict, binary_only, make_plots, board_ID, read_stop_event):
+    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_file, num_line, time_limit, timestamp, store_dict, binary_only, make_plots, board_ID, read_stop_event, compressed_translation, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.translate_queue = translate_queue
         self.plot_queue = plot_queue
@@ -128,6 +291,9 @@ class Translate_data(threading.Thread):
         self.queue_ch = [deque() for i in range(4)]
         self.link_ch  = ["" for i in range(4)]
         self.read_stop_event = read_stop_event
+        self.stop_DAQ_event = stop_DAQ_event
+        self.hitmap = {i:np.zeros((16,16)) for i in range(4)}
+        self.compressed_translation = compressed_translation
 
     def run(self):
         t = threading.current_thread()
@@ -161,10 +327,12 @@ class Translate_data(threading.Thread):
             try:
                 binary = self.translate_queue.get(True, 30)
             except queue.Empty:
+                if not self.stop_DAQ_event.is_set:
+                    continue
                 print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!! THIS SENDS STOP SIGNAL TO ALL THREADS!!!")
                 self.read_stop_event.set()
                 break
-            TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID)
+            TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID, self.hitmap, self.compressed_translation)
             if(write_flag==1):
                 pass
                 # if(not self.binary_only): 
@@ -182,14 +350,14 @@ class Translate_data(threading.Thread):
                             TDC_header_index = j
                         else:
                             print("ERROR! Found more than two headers in data block!!")
+                            sys.exit(1)
                         continue
                     if(not self.binary_only): outfile.write("%s\n"%TDC_line)
                     if(TDC_line[9:13]!='DATA'): continue
                     if(self.make_plots): self.plot_queue.put(TDC_line)
-                if(not self.binary_only): 
-                    # file_lines  = file_lines  + (TDC_len-TDC_header_index)
-                    file_lines  = file_lines  + (TDC_len)
-                total_lines = total_lines + (TDC_len-TDC_header_index)
+                if(TDC_len>0):
+                    if(not self.binary_only): file_lines  = file_lines  + TDC_len - 1
+                    total_lines = total_lines + (TDC_len-1)
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
@@ -369,7 +537,6 @@ def iic_write(mode, slave_addr, wr, reg_addr, data, cmd_interpret):
     cmd_interpret.write_config_reg(4, 0xffff & val)
     cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
     time.sleep(0.01)
-    ## MSB..00001
     cmd_interpret.write_pulse_reg(0x0001)                                     # reset ddr3 data fifo
     time.sleep(0.01)
 
@@ -383,7 +550,6 @@ def iic_read(mode, slave_addr, wr, reg_addr, cmd_interpret):
     val = mode << 24 | slave_addr << 17 |  0 << 16 | reg_addr << 8 | 0x00	  # write device addr and reg addr
     cmd_interpret.write_config_reg(4, 0xffff & val)
     cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
-    ## MSB..00001
     time.sleep(0.01)
     cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
 
@@ -391,18 +557,12 @@ def iic_read(mode, slave_addr, wr, reg_addr, cmd_interpret):
     cmd_interpret.write_config_reg(4, 0xffff & val)
     cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
     time.sleep(0.01)
-    ## MSB..00001
     cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
-    time.sleep(0.01)    # delay 10ns then to read data
+    time.sleep(0.01)									                      # delay 10ns then to read data
     return cmd_interpret.read_status_reg(0) & 0xff
 #--------------------------------------------------------------------------#
 ## Enable FPGA Descrambler
 def Enable_FPGA_Descramblber(cmd_interpret, val=0x0003):
-    # if val==1:
-    #     print("Enable FPGA Descrambler")
-    # else:
-    #     print("Disable FPGA Descrambler")
-    # cmd_interpret.write_config_reg(14, 0x0001 & val)  
     # 0xWXYZ
     # Z is a bit 4 bit binary wxyz
     # z is the enable descrambler
@@ -411,7 +571,7 @@ def Enable_FPGA_Descramblber(cmd_interpret, val=0x0003):
     cmd_interpret.write_config_reg(14, val)
 
 #--------------------------------------------------------------------------#
-## simple readout fucntion                          # write enable
+## simple readout fucntion
 #@param[in]: write_num: BC0 and L1ACC loop number, 0-65535
 def simple_readout(write_num, cmd_interpret):
     cmd_interpret.write_config_reg(15, 0xffff & write_num)                    # write enable
@@ -419,9 +579,8 @@ def simple_readout(write_num, cmd_interpret):
 
 #--------------------------------------------------------------------------#
 ## software clear fifo
-## MSB..00010
 def software_clear_fifo(cmd_interpret):
-    cmd_interpret.write_pulse_reg(0x0002)    # trigger pulser_reg[1]
+    cmd_interpret.write_pulse_reg(0x0002)                                     # trigger pulser_reg[1]
 
 #--------------------------------------------------------------------------#
 ## Register 15
@@ -466,7 +625,6 @@ def register_11(cmd_interpret, key = 0x0000):
 
 #--------------------------------------------------------------------------#
 ## Fast Command Signal Start
-## MSB..00100
 def fc_signal_start(cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0004)
 

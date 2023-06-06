@@ -35,14 +35,14 @@ active_channels_key = 0x0011
 
 ## Register 11, needs do_fc option
 ## 4-digit 16 bit hex, Duration
-register_11_key = 0x0020
+register_11_key = 0x0021
 
 ## Register 12, needs do_fc option
 ## 4-digit 16 bit hex, 0xWXYZ
 ## WX (8 bit) -  Error Mask
 ## Y - trigSize[1:0],Period,testTrig
 ## Z - Input command
-register_12_key = 0x0035
+register_12_key = 0x0006
 
 ## Register 14, needs firmware option
 # 0xWXYZ
@@ -51,7 +51,7 @@ register_12_key = 0x0035
 # y is disable GTX
 # x is polarity
 # w is the memo FC (active high)
-register_14_key = 0x000b
+register_14_key = 0x0003
 
 
 board_size       = [256, 16, 16, 16]

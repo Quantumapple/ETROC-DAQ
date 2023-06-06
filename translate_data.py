@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import sys
 from collections import deque
+import numpy as np
 #========================================================================================#
 '''
 @author: Murtaza Safdari
@@ -23,7 +24,7 @@ def etroc1_translate(line, timestamp):
     return TDC_data, 1
 
 #----------------------------------------------------------------------------------------#
-def etroc2_translate(line, timestamp, queues, links, board_ID):
+def etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compressed_translation):
     TDC_data = []
     pattern_3c5c = '0011110001011100'
     trail_found = False
@@ -99,6 +100,7 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
                 # print(list(queues[channel]))
                 queues[channel].clear()
                 links[channel]==""
+                hitmap[channel] = np.zeros((16,16))
                 return TDC_data, 2
             # Unexpected invalid link state
             else: 
@@ -120,6 +122,7 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
                 # print(list(queues[channel]))
                 queues[channel].clear()
                 links[channel]==""
+                hitmap[channel] = np.zeros((16,16))
                 return TDC_data, 2
             # Unexpected invalid link state
             else: 
@@ -139,6 +142,7 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
                 # print(list(queues[channel]))
                 queues[channel].clear()
                 links[channel]==""
+                hitmap[channel] = np.zeros((16,16))
                 return TDC_data, 2
             # Unexpected invalid link state
             else: 
@@ -156,6 +160,7 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
                 # print(list(queues[channel]))
                 queues[channel].clear()
                 links[channel]==""
+                hitmap[channel] = np.zeros((16,16))
                 return TDC_data, 2
             # Unexpected invalid link state
             else: 
@@ -180,24 +185,36 @@ def etroc2_translate(line, timestamp, queues, links, board_ID):
                 # print(list(queues[channel]))
                 queues[channel].clear()
                 links[channel]==""
+                hitmap[channel] = np.zeros((16,16))
                 return TDC_data, 2
             # Unexpected invalid link state
             else: 
                 print("ERROR! LINKS[CH] in invalid state at DATA")
                 sys.exit(1)
+            # Check for the hitmap's integrity, clear if >1 hit from the same pixel
+            if(hitmap[channel][int(last_element[7:11], base=2),int(last_element[3:7], base=2)]>0):
+                print("Dumped at hitmap")
+                queues[channel].clear()
+                links[channel]==""
+                hitmap[channel] = np.zeros((16,16))
+                return TDC_data, 2
+            else: hitmap[channel][int(last_element[7:11], base=2),int(last_element[3:7], base=2)] += 1
+
         # When the 40 bit word is none of the above, clear queue, reset link, exit function
         else:
             # print("QD at INVALID 40 Word")
-            # queues[channel].clear()
+            queues[channel].clear()
             links[channel]==""
+            hitmap[channel] = np.zeros((16,16))
             return TDC_data, 2
         #-----------------------------------------#
         queues[channel].append(last_line)
         # If we found a trailing line, we can dump the deque into our main queue
         if(trail_found):
-            TDC_data = list(queues[channel])
+            if(not compressed_translation or np.any(hitmap[channel]>0)): TDC_data = list(queues[channel])
             queues[channel].clear()
             links[channel]==""
+            hitmap[channel] = np.zeros((16,16))
         if(len(data)>0): queues[channel].append(data)
 
     return TDC_data, 2
@@ -220,7 +237,7 @@ def control_translate(line, timestamp):
     return TDC_data, 1
 
 #----------------------------------------------------------------------------------------#
-def etroc_translate_binary(line, timestamp, queues, links, board_ID):
+def etroc_translate_binary(line, timestamp, queues, links, board_ID, hitmap, compressed_translation):
     data_type = ''
     if(timestamp==1): data_type = 'etroc1'              ## timestamp 0x0001: Disable Testmode & Disable TimeStamp: OLD DATA
     ########################################## CHECK IF TEST ON AND TIME OFF IS OLD DATA
@@ -230,7 +247,7 @@ def etroc_translate_binary(line, timestamp, queues, links, board_ID):
         elif(line[1]=='1'): data_type = 'etroc2'
 
     if(data_type == 'etroc1'): TDC_data = etroc1_translate(line, timestamp)
-    elif(data_type == 'etroc2'): TDC_data = etroc2_translate(line, timestamp, queues, links, board_ID)
+    elif(data_type == 'etroc2'): TDC_data = etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compressed_translation)
     elif(data_type == 'control'): TDC_data = control_translate(line, timestamp)
 
     return TDC_data

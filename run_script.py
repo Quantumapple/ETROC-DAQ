@@ -4,12 +4,12 @@ import os
 import sys
 import copy
 import time
-import visa
+#import visa
 import struct
 import socket
 import threading
 import datetime
-import heartrate
+#import heartrate
 from queue import Queue
 import numpy as np
 import matplotlib.pyplot as plt
@@ -36,8 +36,26 @@ instrument control and so on.
 port = 1024									# port number
 #--------------------------------------------------------------------------#
 
+def main_process(IPC_queue, options, log_file = None):
+    if log_file is not None:
+        sys.stdout = open(log_file + ".out", "w")
+    print('start main process')
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)	                        # initial socket
+    except socket.error:
+        print("Failed to create socket!")
+        sys.exit()
+    try:
+        s.connect((options.hostname, port))								                        # connect socket
+    except socket.error:
+        print("failed to connect to ip " + options.hostname)
+        sys.exit()
+    cmd_interpret = command_interpret(s)
+    main(options, cmd_interpret, IPC_queue)
+    s.close()
+
 ## main function
-def main(options, cmd_interpret):
+def main(options, cmd_interpret, IPC_queue = None):
 
     num_boards = len(board_type)
     Pixel_board = options.pixel_address
@@ -121,39 +139,7 @@ def main(options, cmd_interpret):
         register_12(cmd_interpret, key = register_12_key)
         fc_signal_start(cmd_interpret)
     if(options.memo_fc):
-        ## 4-digit 16 bit hex, Duration is LSB 12 bits
-        ## This tells us how many memory slots to use
-        ## dec = 3564
-        # register_12(cmd_interpret, 0x0000)
-        # fc_signal_start(cmd_interpret)
-
-        register_11(cmd_interpret, 0x0deb)
-
-        ## 4-digit 16 bit hex, 0xWXYZ
-        ## WX (8 bit) -  Error Mask
-        ## Y - trigSize[1:0],Period,testTrig
-        ## Z - Input command
-        register_12(cmd_interpret, 0x0030)
-        cmd_interpret.write_config_reg(10, 0x0000)
-        cmd_interpret.write_config_reg(9, 0x0deb)
-        fc_init_pulse(cmd_interpret)
-
-        register_12(cmd_interpret, 0x0032)
-        cmd_interpret.write_config_reg(10, 0x0001)
-        cmd_interpret.write_config_reg(9, 0x0001)
-        fc_init_pulse(cmd_interpret)
-
-        register_12(cmd_interpret, 0x0035)
-        cmd_interpret.write_config_reg(10, 0x0000)
-        cmd_interpret.write_config_reg(9, 0x0000)
-        fc_init_pulse(cmd_interpret)
-
-        register_12(cmd_interpret, 0x0036)
-        cmd_interpret.write_config_reg(10, 0x01f6)
-        cmd_interpret.write_config_reg(9, 0x01f9)
-        fc_init_pulse(cmd_interpret)
-
-        fc_signal_start(cmd_interpret)
+        start_L1A(cmd_interpret)
         
 
     if(options.verbose):
@@ -265,13 +251,17 @@ def main(options, cmd_interpret):
         translate_queue = Queue() 
         plot_queue = Queue()
         read_stop_event = threading.Event()     # This is how we stop the read thread
+        stop_DAQ_event = threading.Event()     # This is how we notify the Write thread that we are done taking data
         receive_data = Receive_data('Receive_data', read_queue, cmd_interpret,
-        options.num_fifo_read, read_stop_event)
-        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_file, options.num_line, options.time_limit, store_dict, options.binary_only, options.compressed_binary, options.make_plots, read_stop_event)
+                                    options.num_fifo_read, read_stop_event, options.useIPC, stop_DAQ_event, IPC_queue)
+        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_file, options.num_line, options.time_limit, 
+                                store_dict, options.binary_only, options.compressed_binary, options.make_plots, read_stop_event, stop_DAQ_event)
         if(options.make_plots or (not options.binary_only)):
-            translate_data = Translate_data('Translate_data', translate_queue, plot_queue, cmd_interpret, options.num_file, options.num_line, options.time_limit, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, read_stop_event)
+            translate_data = Translate_data('Translate_data', translate_queue, plot_queue, cmd_interpret, options.num_file, options.num_line, 
+                                            options.time_limit, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, read_stop_event, options.compressed_translation, stop_DAQ_event)
         if(options.make_plots):
-            daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time, read_stop_event)
+            daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, 
+                                        board_type, board_size, options.plot_queue_time, read_stop_event)
 
         # read_write_data.start()
         try:
@@ -309,10 +299,12 @@ def main(options, cmd_interpret):
         # read_write_data.join()
 #--------------------------------------------------------------------------#
 ## if statement
-if __name__ == "__main__":
 
+def getOptionParser():
+    
     def int_list_callback(option, opt, value, parser):
         setattr(parser.values, option.dest, list(map(int, value.split(','))))
+
     parser = OptionParser()
     parser.add_option("--hostname", dest="hostname", action="store", type="string",
                       help="FPGA IP Address", default="192.168.2.7")
@@ -341,8 +333,11 @@ if __name__ == "__main__":
     parser.add_option("-c", "--compressed_binary",
                       action="store_true", dest="compressed_binary", default=False,
                       help="Save FPGA binary data (raw output) in int format")
+    parser.add_option("--compressed_translation",
+                      action="store_true", dest="compressed_translation", default=False,
+                      help="Save only FPGA translated data frames with DATA")
     parser.add_option("-s", "--timestamp", type="int",
-                      action="store", dest="timestamp", default=0x0000,
+                      action="store", dest="timestamp", default=0x000C,
                       help="Set timestamp binary, see daq_helpers for more info")
     parser.add_option("-v", "--verbose",
                       action="store_true", dest="verbose", default=False,
@@ -364,6 +359,9 @@ if __name__ == "__main__":
     parser.add_option("--nodaq",
                       action="store_true", dest="nodaq", default=False,
                       help="Switch off DAQ via the FPGA")
+    parser.add_option("--useIPC",
+                      action="store_true", dest="useIPC", default=False,
+                      help="Use Inter Process Communication to control L1A enable/disable")
     parser.add_option("--firmware",
                       action="store_true", dest="firmware", default=False,
                       help="Configure FPGA firmware settings")
@@ -388,6 +386,11 @@ if __name__ == "__main__":
     parser.add_option("--memo_fc",
                       action="store_true", dest="memo_fc", default=False,
                       help="(DEV ONLY) Do Fast Command with Memory")
+    return parser
+
+if __name__ == "__main__":
+
+    parser = getOptionParser()
     (options, args) = parser.parse_args()
 
     if(options.pixel_address == None): options.pixel_address = [5, 5, 5, 5]
@@ -396,6 +399,11 @@ if __name__ == "__main__":
     if(options.num_fifo_read>65536):                                                # See command_interpret.py read_memory()
         print("Max Number of lines read by fifo capped at 65536, you entered ",options.num_fifo_read,", setting to 65536")
         options.num_fifo_read = 65536
+        
+    import platform
+    system = platform.system()
+    if system == 'Windows' or system == '':
+        options.useIPC = False
 
     if(options.verbose):
         print("Verbose Output: ", options.verbose)
@@ -405,6 +413,7 @@ if __name__ == "__main__":
         print("FPGA IP Address: ", options.hostname)
         print("Config ETROC boards over I2C: ", options.i2c)
         print("Switch off DAQ via the FPGA?: ", options.nodaq)
+        print("Use IPC to control the L1A: ", options.useIPC)
         print("Configure FPGA firmware settings?: ", options.firmware)
         print("Number of files created by DAQ script: ", options.num_file)
         print("Number of lines per file created by DAQ script: ", options.num_line)
@@ -446,15 +455,4 @@ if __name__ == "__main__":
         print("ERROR! Can't make plots without translating data!")
         sys.exit(1)
     
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)	                        # initial socket
-    except socket.error:
-        print("Failed to create socket!")
-        sys.exit()
-    try:
-        s.connect((options.hostname, port))								                        # connect socket
-    except socket.error:
-        print("failed to connect to ip " + options.hostname)
-    cmd_interpret = command_interpret(s)					                            # Class instance
-    main(options, cmd_interpret)    # execute main function
-    s.close()                       # close socket
+    main_process(None, options)
