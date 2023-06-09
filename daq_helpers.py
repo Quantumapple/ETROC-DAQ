@@ -156,7 +156,7 @@ class Receive_data(threading.Thread):               # threading class
             if self.stop_DAQ_event is not None:
                 self.stop_DAQ_event.set()
         else:
-            self.daq_on = False
+            self.daq_on = True
             self.stop_DAQ_event.clear()
 
     
@@ -172,18 +172,16 @@ class Receive_data(threading.Thread):               # threading class
                     print(f'Message: {message}')
                     if message == 'start DAQ':
                         self.daq_on = True
+                    elif message == 'stop DAQ':
+                        self.daq_on = False
                     elif message == 'start L1A':
                         start_L1A(self.cmd_interpret)
-                        self.daq_on = True
                     elif message == 'stop L1A':
                         stop_L1A(self.cmd_interpret)
-                        self.daq_on = False
                     elif message == 'stop L1A train':
                         stop_L1A_train(self.cmd_interpret)
-                        self.daq_on = False
                     elif message == 'start L1A train':
                         start_L1A_train(self.cmd_interpret)
-                        self.daq_on = True
                     elif message == 'allow threads to exit':
                         self.stop_DAQ_event.set()
                     elif message == 'link reset':
@@ -193,8 +191,8 @@ class Receive_data(threading.Thread):               # threading class
                 except queue.Empty:
                     pass
 
-            # if self.daq_on:
-            if True:
+            if self.daq_on:
+            # if True:
                 # max allowed by read_memory is 65535
                 mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
                 for mem_line in mem_data:
