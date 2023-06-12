@@ -25,11 +25,14 @@ This script is composed of all the helper functions needed for I2C comms, FPGA, 
 #--------------------------------------------------------------------------#
 
 def start_L1A(cmd_interpret):
-    software_clear_fifo(cmd_interpret)
+    # software_clear_fifo(cmd_interpret)
+    # fc_init_pulse(cmd_interpret)
     ## 4-digit 16 bit hex, Duration is LSB 12 bits
     ## This tells us how many memory slots to use
     ## dec = 3564
     register_11(cmd_interpret, 0x0deb)
+
+    time.sleep(0.01)
 
     # software_clear_fifo(cmd_interpret)
     ## 4-digit 16 bit hex, 0xWXYZ
@@ -41,26 +44,84 @@ def start_L1A(cmd_interpret):
     cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
 
+    time.sleep(0.01)
+
     # software_clear_fifo(cmd_interpret)
-    # register_12(cmd_interpret, 0x0032)
-    # cmd_interpret.write_config_reg(10, 0x0001)
-    # cmd_interpret.write_config_reg(9, 0x0001)
-    # fc_init_pulse(cmd_interpret)
-    register_12(cmd_interpret, 0x0035)
+    register_12(cmd_interpret, 0x0032)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
     fc_init_pulse(cmd_interpret)
 
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0035)
+    cmd_interpret.write_config_reg(10, 0x0001)
+    cmd_interpret.write_config_reg(9, 0x0001)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
     # software_clear_fifo(cmd_interpret)
     register_12(cmd_interpret, 0x0036)
     # 1f6 1f6
-    cmd_interpret.write_config_reg(10, 0x01f0)
-    cmd_interpret.write_config_reg(9, 0x01ff)
+    cmd_interpret.write_config_reg(10, 0x01f9)
+    cmd_interpret.write_config_reg(9, 0x01f9)
     fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
 
     # software_clear_fifo(cmd_interpret)
     fc_signal_start(cmd_interpret)
     # software_clear_fifo(cmd_interpret)
+
+    time.sleep(0.01)
+
+def start_L1A_1MHz(cmd_interpret):
+    register_11(cmd_interpret, 0x0de7)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0030)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0de7)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+    
+    register_12(cmd_interpret, 0x0032)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0000)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    for index in range(89):
+        # register_12(cmd_interpret, 0x0032)
+        # cmd_interpret.write_config_reg(10, 0x0000 + index*40)
+        # cmd_interpret.write_config_reg(9, 0x0000 + index*40)
+        # fc_init_pulse(cmd_interpret)
+
+        # time.sleep(0.01)
+
+        register_12(cmd_interpret, 0x0035)
+        cmd_interpret.write_config_reg(10, 0x0001 + index*40)
+        cmd_interpret.write_config_reg(9, 0x0001 + index*40)
+        fc_init_pulse(cmd_interpret)
+
+        time.sleep(0.01)
+
+        register_12(cmd_interpret, 0x0036)
+        cmd_interpret.write_config_reg(10, 0x019 + index*40)
+        cmd_interpret.write_config_reg(9, 0x019 + index*40)
+        fc_init_pulse(cmd_interpret)
+
+        time.sleep(0.01)
+
+    # software_clear_fifo(cmd_interpret)
+    fc_signal_start(cmd_interpret)
+    # software_clear_fifo(cmd_interpret)
+
+    time.sleep(0.01)
 
 def start_L1A_train(cmd_interpret):
 
@@ -97,6 +158,8 @@ def stop_L1A(cmd_interpret):
     cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
 
+    time.sleep(0.01)
+
     # register_12(cmd_interpret, 0x0002)
     # cmd_interpret.write_config_reg(10, 0x0001)
     # cmd_interpret.write_config_reg(9, 0x0001)
@@ -114,6 +177,28 @@ def stop_L1A(cmd_interpret):
     # software_clear_fifo(cmd_interpret)
     fc_signal_start(cmd_interpret)
     # software_clear_fifo(cmd_interpret)
+
+    time.sleep(0.01)
+
+    software_clear_fifo(cmd_interpret)
+
+    time.sleep(0.01)
+
+def stop_L1A_1MHz(cmd_interpret):
+    register_12(cmd_interpret, 0x0030)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0de7)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)
+
+    time.sleep(0.01)
+
+    software_clear_fifo(cmd_interpret)
+
+    time.sleep(0.01)
 
 def stop_L1A_train(cmd_interpret):
     software_clear_fifo(cmd_interpret)
@@ -176,8 +261,12 @@ class Receive_data(threading.Thread):               # threading class
                         self.daq_on = False
                     elif message == 'start L1A':
                         start_L1A(self.cmd_interpret)
+                    elif message == 'start L1A 1MHz':
+                        start_L1A_1MHz(self.cmd_interpret)
                     elif message == 'stop L1A':
                         stop_L1A(self.cmd_interpret)
+                    elif message == 'stop L1A 1MHz':
+                        stop_L1A_1MHz(self.cmd_interpret)
                     elif message == 'stop L1A train':
                         stop_L1A_train(self.cmd_interpret)
                     elif message == 'start L1A train':

@@ -51,7 +51,7 @@ register_12_key = 0x0006
 # y is disable GTX
 # x is polarity
 # w is the memo FC (active high)
-register_14_key = 0x0003
+register_14_key = 0x000b
 
 
 board_size       = [256, 16, 16, 16]
