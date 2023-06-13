@@ -320,6 +320,7 @@ class Write_data(threading.Thread):
         file_counter = 0
         outfile = open("./%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
         print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
+        retry_count = 0
         while (total_lines<=self.num_file*self.num_line) if (self.time_limit<0) else (time.time()-total_start_time<=self.time_limit):
             if not t.alive:
                 print("Write Thread detected alive=False")
@@ -334,9 +335,14 @@ class Write_data(threading.Thread):
             mem_data = ""
             # Attempt to pop off the read_queue for 30 secs, fail if nothing found
             try:
-                mem_data = self.read_queue.get(True, 30)
+                mem_data = self.read_queue.get(True, 1)
+                retry_count = 0
             except queue.Empty:
                 if not self.stop_DAQ_event.is_set():
+                    retry_count = 0
+                    continue
+                retry_count += 1
+                if retry_count < 30:
                     continue
                 print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM READ_QUEUE!!!")
                 self.read_stop_event.set()
@@ -394,6 +400,7 @@ class Translate_data(threading.Thread):
             print("{} is reading queue and translating file {}...".format(self.getName(), file_counter))
         else:
             print("{} is reading queue and translating...".format(self.getName()))
+        retry_count = 0
         while True:
             if not t.alive:
                 print("Translate Thread detected alive=False")
@@ -412,9 +419,14 @@ class Translate_data(threading.Thread):
             binary = ""
             # Attempt to pop off the translate_queue for 30 secs, fail if nothing found
             try:
-                binary = self.translate_queue.get(True, 30)
+                binary = self.translate_queue.get(True, 1)
+                retry_count = 0
             except queue.Empty:
                 if not self.stop_DAQ_event.is_set:
+                    retry_count = 0
+                    continue
+                retry_count += 1
+                if retry_count < 30:
                     continue
                 print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!! THIS SENDS STOP SIGNAL TO ALL THREADS!!!")
                 self.read_stop_event.set()
