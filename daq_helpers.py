@@ -64,8 +64,8 @@ def start_L1A(cmd_interpret):
     # software_clear_fifo(cmd_interpret)
     register_12(cmd_interpret, 0x0036)
     # 1f6 1f6
-    cmd_interpret.write_config_reg(10, 0x01f9)
-    cmd_interpret.write_config_reg(9, 0x01f9)
+    cmd_interpret.write_config_reg(10, 0x01f7)
+    cmd_interpret.write_config_reg(9, 0x01f7)
     fc_init_pulse(cmd_interpret)
 
     time.sleep(0.01)
@@ -649,12 +649,13 @@ def iic_read(mode, slave_addr, wr, reg_addr, cmd_interpret):
     return cmd_interpret.read_status_reg(0) & 0xff
 #--------------------------------------------------------------------------#
 ## Enable FPGA Descrambler
-def Enable_FPGA_Descramblber(cmd_interpret, val=0x0003):
+def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
     # 0xWXYZ
     # Z is a bit 4 bit binary wxyz
     # z is the enable descrambler
     # y is disable GTX
     # x is polarity
+#    w is the memo FC (active high)
     cmd_interpret.write_config_reg(14, val)
 
 #--------------------------------------------------------------------------#
@@ -691,7 +692,7 @@ def active_channels(cmd_interpret, key = 0x0003):
 ## 0011: Disable Testmode & Disable TimeStamp                  ##BUGGED as of 03-04-2023
 ## Note that the input needs to be a 4-digit 16 bit hex, 0x000(WXYZ)
 def timestamp(cmd_interpret, key=0x0000):
-    cmd_interpret.write_config_reg(13, key) 
+    cmd_interpret.write_config_reg(13, key)
 
 #--------------------------------------------------------------------------#
 ## Register 12

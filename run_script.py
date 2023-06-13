@@ -69,7 +69,7 @@ def main(options, cmd_interpret, IPC_queue = None):
             print("Timestamp: ", options.timestamp)
             timestamp(cmd_interpret, key = options.timestamp)
         # Enable_FPGA_Descramblber(1, cmd_interpret)
-        Enable_FPGA_Descramblber(cmd_interpret, register_14_key)
+        Enable_FPGA_Descramblber(cmd_interpret, options.polarity)
 
     # if(options.reset_pulse_register):
     #     print("\n", "Resetting Pulse Register 0x0002")
@@ -339,6 +339,9 @@ def getOptionParser():
     parser.add_option("-s", "--timestamp", type="int",
                       action="store", dest="timestamp", default=0x000C,
                       help="Set timestamp binary, see daq_helpers for more info")
+    parser.add_option("--polarity", type="int",
+                      action="store", dest="polarity", default=0x000f,
+                      help="Set fc polarity, see daq_helpers for more info")
     parser.add_option("-v", "--verbose",
                       action="store_true", dest="verbose", default=False,
                       help="Print status messages to stdout")
