@@ -340,7 +340,7 @@ def getOptionParser():
                       action="store", dest="timestamp", default=0x000C,
                       help="Set timestamp binary, see daq_helpers for more info")
     parser.add_option("--polarity", type="int",
-                      action="store", dest="polarity", default=0x000f,
+                      action="store", dest="polarity", default=0x000b,
                       help="Set fc polarity, see daq_helpers for more info")
     parser.add_option("-v", "--verbose",
                       action="store_true", dest="verbose", default=False,
