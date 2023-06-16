@@ -63,9 +63,9 @@ def start_L1A(cmd_interpret):
 
     # software_clear_fifo(cmd_interpret)
     register_12(cmd_interpret, 0x0036)
-    # 1f6 1f6
-    cmd_interpret.write_config_reg(10, 0x01f7)
-    cmd_interpret.write_config_reg(9, 0x01f7)
+    # 1f7
+    cmd_interpret.write_config_reg(10, 0x01f0)
+    cmd_interpret.write_config_reg(9, 0x01ff)
     fc_init_pulse(cmd_interpret)
 
     time.sleep(0.01)
@@ -113,6 +113,14 @@ def start_L1A_1MHz(cmd_interpret):
         register_12(cmd_interpret, 0x0036)
         cmd_interpret.write_config_reg(10, 0x019 + index*40)
         cmd_interpret.write_config_reg(9, 0x019 + index*40)
+        fc_init_pulse(cmd_interpret)
+
+        time.sleep(0.01)
+
+        register_12(cmd_interpret, 0x0036)
+        cmd_interpret.write_config_reg(10, 0x01f + index*40)
+        cmd_interpret.write_config_reg(9, 0x01f + index*40)
+        # cmd_interpret.write_config_reg(9, 0x025 + index*40)
         fc_init_pulse(cmd_interpret)
 
         time.sleep(0.01)

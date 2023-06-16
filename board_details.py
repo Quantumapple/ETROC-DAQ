@@ -54,6 +54,7 @@ register_12_key = 0x0006
 register_14_key = 0x000b
 
 
+
 board_size       = [256, 16, 16, 16]
 
 board_name       = ["F28", "F29", "F30", "F47"]
