@@ -22,16 +22,20 @@ Any inserted jumpers will flip the bit
 
 '''
 
+#ETROC1 Only
 slaveA_addr_list = [0x03,  0x02,  0x01]
 slaveB_addr_list = [0x7f,  0x7e,  0x7d]
 #slaveA_addr_list = [0x03,  0x02,  0x01, 0x00]
 #slaveB_addr_list = [0x7f,  0x7e,  0x7d, 0x7c]
 
 # Use this to control how many boards are actually attempted for connection
-board_type       = [2, 1, 1, 1]            # ETROC version number
+# ETROC version number
+board_type       = [2, 1, 1, 1]
 
 ## Register 15, needs firmware option
 active_channels_key = 0x0011
+
+# register_11_key and register_12_key are useful for do_fc only
 
 ## Register 11, needs do_fc option
 ## 4-digit 16 bit hex, Duration

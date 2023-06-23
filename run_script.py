@@ -140,7 +140,10 @@ def main(options, cmd_interpret, IPC_queue = None):
         fc_signal_start(cmd_interpret)
     if(options.memo_fc):
         start_L1A(cmd_interpret)
-        
+    if(options.memo_fc_start_onetime_ws):
+        start_onetime_L1A_WS(cmd_interpret)
+    if(options.memo_fc_start_periodic_ws):
+        start_periodic_L1A_WS(cmd_interpret)
 
     if(options.verbose):
         read_register_11 = cmd_interpret.read_config_reg(11)
@@ -159,7 +162,7 @@ def main(options, cmd_interpret, IPC_queue = None):
         register_14 = cmd_interpret.read_config_reg(14)
         string_14   = format(register_14, '016b')
         print("Written into Reg 14: ", string_14)
-        print("Memo FC mode       : ", string_14[-4])
+        print("Enable Memo FC mode: ", string_14[-4])
         print("Polarity           : ", string_14[-3])
         print("Disable GTX        : ", string_14[-2])
         print("Enable Descrambler : ", string_14[-1])
@@ -252,16 +255,12 @@ def main(options, cmd_interpret, IPC_queue = None):
         plot_queue = Queue()
         read_stop_event = threading.Event()     # This is how we stop the read thread
         stop_DAQ_event = threading.Event()     # This is how we notify the Write thread that we are done taking data
-        receive_data = Receive_data('Receive_data', read_queue, cmd_interpret,
-                                    options.num_fifo_read, read_stop_event, options.useIPC, stop_DAQ_event, IPC_queue)
-        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_file, options.num_line, options.time_limit, 
-                                store_dict, options.binary_only, options.compressed_binary, options.make_plots, read_stop_event, stop_DAQ_event)
+        receive_data = Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_stop_event, options.useIPC, stop_DAQ_event, IPC_queue)
+        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_file, options.num_line, options.time_limit, store_dict, options.binary_only, options.compressed_binary, options.skip_binary, options.make_plots, read_stop_event, stop_DAQ_event)
         if(options.make_plots or (not options.binary_only)):
-            translate_data = Translate_data('Translate_data', translate_queue, plot_queue, cmd_interpret, options.num_file, options.num_line, 
-                                            options.time_limit, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, read_stop_event, options.compressed_translation, stop_DAQ_event)
+            translate_data = Translate_data('Translate_data', translate_queue, plot_queue, cmd_interpret, options.num_file, options.num_line,  options.time_limit, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, read_stop_event, options.compressed_translation, stop_DAQ_event)
         if(options.make_plots):
-            daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, 
-                                        board_type, board_size, options.plot_queue_time, read_stop_event)
+            daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time, read_stop_event)
 
         # read_write_data.start()
         try:
@@ -306,89 +305,36 @@ def getOptionParser():
         setattr(parser.values, option.dest, list(map(int, value.split(','))))
 
     parser = OptionParser()
-    parser.add_option("--hostname", dest="hostname", action="store", type="string",
-                      help="FPGA IP Address", default="192.168.2.7")
-    parser.add_option("-n", "--num_file", dest="num_file", action="store", type="int",
-                      help="Number of files created by DAQ script", default=1)
-    parser.add_option("-l", "--num_line", dest="num_line", action="store", type="int",
-                      help="Number of lines per file created by DAQ script", default=50000)
-    parser.add_option("-r", "--num_fifo_read", dest="num_fifo_read", action="store", type="int",
-                      help="Number of lines read per call of fifo readout", default=50000)
-    parser.add_option("-t", "--time_limit", dest="time_limit", action="store", type="int",
-                      help="Number of seconds to run this code", default=-1)
-    parser.add_option("-o", "--output_directory", dest="output_directory", action="store", type="string",
-                      help="User defined output directory", default="unnamed_output_directory")
-    parser.add_option("-a", "--pixel_address", dest="pixel_address", action="callback", type="string",
-                      help="Single pixel address under test for each board", callback=int_list_callback)
-    parser.add_option("--pixel_threshold", dest="pixel_threshold", action="callback", type="string",
-                      help="Single pixel threshold for pixels under test for each board", callback=int_list_callback)
-    parser.add_option("-q", "--pixel_charge", dest="pixel_charge", action="callback", type="string",
-                      help="Single pixel charge to be injected (fC) for pixels under test for each board", callback=int_list_callback)
-    parser.add_option("-i", "--charge_injection",
-                      action="store_true", dest="charge_injection", default=False,
-                      help="Flag that enables Qinj")
-    parser.add_option("-b", "--binary_only",
-                      action="store_true", dest="binary_only", default=False,
-                      help="Save only the untranslated FPGA binary data (raw output)")
-    parser.add_option("-c", "--compressed_binary",
-                      action="store_true", dest="compressed_binary", default=False,
-                      help="Save FPGA binary data (raw output) in int format")
-    parser.add_option("--compressed_translation",
-                      action="store_true", dest="compressed_translation", default=False,
-                      help="Save only FPGA translated data frames with DATA")
-    parser.add_option("-s", "--timestamp", type="int",
-                      action="store", dest="timestamp", default=0x000C,
-                      help="Set timestamp binary, see daq_helpers for more info")
-    parser.add_option("--polarity", type="int",
-                      action="store", dest="polarity", default=0x000b,
-                      help="Set fc polarity, see daq_helpers for more info")
-    parser.add_option("-v", "--verbose",
-                      action="store_true", dest="verbose", default=False,
-                      help="Print status messages to stdout")
-    parser.add_option("-w", "--overwrite",
-                      action="store_true", dest="overwrite", default=False,
-                      help="Overwrite previously saved files")
-    parser.add_option("-p", "--make_plots",
-                      action="store_true", dest="make_plots", default=False,
-                      help="Enable plotting of real time hits")
-    parser.add_option("--plot_queue_time", dest="plot_queue_time", action="store", type="float",
-                      help="Time (s) used to pop lines off the queue for plotting", default=0.1)
-    parser.add_option("--old_data_format",
-                      action="store_true", dest="old_data_format", default=False,
-                      help="(Dev Only) Set if Data is in old format for ETROC1")
-    parser.add_option("--i2c",
-                      action="store_true", dest="i2c", default=False,
-                      help="Config ETROC boards over I2C")
-    parser.add_option("--nodaq",
-                      action="store_true", dest="nodaq", default=False,
-                      help="Switch off DAQ via the FPGA")
-    parser.add_option("--useIPC",
-                      action="store_true", dest="useIPC", default=False,
-                      help="Use Inter Process Communication to control L1A enable/disable")
-    parser.add_option("--firmware",
-                      action="store_true", dest="firmware", default=False,
-                      help="Configure FPGA firmware settings")
-    # parser.add_option("--reset_pulse_register", type="int",
-    #                   action="store", dest="reset_pulse_register", default=0,
-    #                   help="(DEV ONLY) Reset Pulse Register")
-    parser.add_option("--inspect_serial_output",
-                      action="store_true", dest="inspect_serial_output", default=False,
-                      help="(DEV ONLY) Decode the register binary values for serial port inspection")
-    # parser.add_option("--register_11", type="int",
-    #                   action="store", dest="register_11", default=0x0000,
-    #                   help="(DEV ONLY) Set timestamp binary, see daq_helpers for more info")
-    # parser.add_option("--register_12", type="int",
-    #                   action="store", dest="register_12", default=0x0000,
-    #                   help="(DEV ONLY) Set timestamp binary, see daq_helpers for more info")
-    # parser.add_option("--fc_signal_start", type="int",
-    #                   action="store", dest="fc_signal_start", default=0x0000,
-    #                   help="(DEV ONLY) Set timestamp binary, see daq_helpers for more info")
-    parser.add_option("--do_fc",
-                      action="store_true", dest="do_fc", default=False,
-                      help="(DEV ONLY) Do Fast Command register setting")
-    parser.add_option("--memo_fc",
-                      action="store_true", dest="memo_fc", default=False,
-                      help="(DEV ONLY) Do Fast Command with Memory")
+    parser.add_option("--hostname", dest="hostname", action="store", type="string", help="FPGA IP Address", default="192.168.2.7")
+    parser.add_option("-n", "--num_file", dest="num_file", action="store", type="int", help="Number of files created by DAQ script", default=1)
+    parser.add_option("-l", "--num_line", dest="num_line", action="store", type="int", help="Number of lines per file created by DAQ script", default=50000)
+    parser.add_option("-r", "--num_fifo_read", dest="num_fifo_read", action="store", type="int", help="Number of lines read per call of fifo readout", default=50000)
+    parser.add_option("-t", "--time_limit", dest="time_limit", action="store", type="int", help="Number of seconds to run this code", default=-1)
+    parser.add_option("-o", "--output_directory", dest="output_directory", action="store", type="string", help="User defined output directory", default="unnamed_output_directory")
+    parser.add_option("-a", "--pixel_address", dest="pixel_address", action="callback", type="string", help="Single pixel address under test for each board", callback=int_list_callback)
+    parser.add_option("--pixel_threshold", dest="pixel_threshold", action="callback", type="string", help="Single pixel threshold for pixels under test for each board", callback=int_list_callback)
+    parser.add_option("-q", "--pixel_charge", dest="pixel_charge", action="callback", type="string", help="Single pixel charge to be injected (fC) for pixels under test for each board", callback=int_list_callback)
+    parser.add_option("-i", "--charge_injection",action="store_true", dest="charge_injection", default=False, help="Flag that enables Qinj")
+    parser.add_option("-b", "--binary_only",action="store_true", dest="binary_only", default=False, help="Save only the untranslated FPGA binary data (raw output)")
+    parser.add_option("-c", "--compressed_binary",action="store_true", dest="compressed_binary", default=False, help="Save FPGA binary data (raw output) in int format")
+    parser.add_option("--skip_binary",action="store_true", dest="skip_binary", default=False, help="DO NOT save (raw) binary outputsto files")
+    parser.add_option("--compressed_translation",action="store_true", dest="compressed_translation", default=False, help="Save only FPGA translated data frames with DATA")
+    parser.add_option("-s", "--timestamp", type="int",action="store", dest="timestamp", default=0x000C, help="Set timestamp binary, see daq_helpers for more info")
+    parser.add_option("--polarity", type="int",action="store", dest="polarity", default=0x000b, help="Set fc polarity, see daq_helpers for more info")
+    parser.add_option("-v", "--verbose",action="store_true", dest="verbose", default=False, help="Print status messages to stdout")
+    parser.add_option("-w", "--overwrite",action="store_true", dest="overwrite", default=False, help="Overwrite previously saved files")
+    parser.add_option("-p", "--make_plots",action="store_true", dest="make_plots", default=False, help="Enable plotting of real time hits")
+    parser.add_option("--plot_queue_time", dest="plot_queue_time", action="store", type="float", help="Time (s) used to pop lines off the queue for plotting", default=0.1)
+    parser.add_option("--old_data_format",action="store_true", dest="old_data_format", default=False, help="(Dev Only) Set if Data is in old format for ETROC1")
+    parser.add_option("--i2c",action="store_true", dest="i2c", default=False, help="Config ETROC boards over I2C")
+    parser.add_option("--nodaq",action="store_true", dest="nodaq", default=False, help="Switch off DAQ via the FPGA")
+    parser.add_option("--useIPC",action="store_true", dest="useIPC", default=False, help="Use Inter Process Communication to control L1A enable/disable")
+    parser.add_option("--firmware",action="store_true", dest="firmware", default=False, help="Configure FPGA firmware settings")
+    parser.add_option("--inspect_serial_output",action="store_true", dest="inspect_serial_output", default=False, help="(DEV ONLY) Decode the register binary values for serial port inspection with test pattern mode data")
+    parser.add_option("--do_fc",action="store_true", dest="do_fc", default=False, help="(DEV ONLY) Do Fast Command register setting in frequency train mode")
+    parser.add_option("--memo_fc",action="store_true", dest="memo_fc", default=False, help="(DEV ONLY) Do Fast Command with Memory")
+    parser.add_option("--memo_fc_start_periodic_ws",action="store_true", dest="memo_fc_start_periodic_ws", default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_periodic_L1A_WS() from daq_helpers.py")
+    parser.add_option("--memo_fc_start_onetime_ws", action="store_true", dest="memo_fc_start_onetime_ws" , default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_onetime_L1A_WS() from daq_helpers.py")
     return parser
 
 if __name__ == "__main__":
@@ -399,7 +345,7 @@ if __name__ == "__main__":
     if(options.pixel_address == None): options.pixel_address = [5, 5, 5, 5]
     if(options.pixel_threshold == None): options.pixel_threshold = [552, 560, 560, 560]
     if(options.pixel_charge == None): options.pixel_charge = [30, 30, 30, 30]
-    if(options.num_fifo_read>65536):                                                # See command_interpret.py read_memory()
+    if(options.num_fifo_read>65536):   # See command_interpret.py read_memory()
         print("Max Number of lines read by fifo capped at 65536, you entered ",options.num_fifo_read,", setting to 65536")
         options.num_fifo_read = 65536
         
@@ -413,27 +359,29 @@ if __name__ == "__main__":
         print("\n")
         print("-------------------------------------------")
         print("--------Set of inputs from the USER--------")
+        print("Overwrite previously saved files: ", options.overwrite)
         print("FPGA IP Address: ", options.hostname)
-        print("Config ETROC boards over I2C: ", options.i2c)
-        print("Switch off DAQ via the FPGA?: ", options.nodaq)
-        print("Use IPC to control the L1A: ", options.useIPC)
-        print("Configure FPGA firmware settings?: ", options.firmware)
         print("Number of files created by DAQ script: ", options.num_file)
         print("Number of lines per file created by DAQ script: ", options.num_line)
         print("Number of lines read per call of fifo readout: ", options.num_fifo_read)
         print("Number of seconds to run this code (>0 means effective): ", options.time_limit)
         print("User defined Output Directory: ", options.output_directory)
-        print("Single pixel address under test for each board: ", options.pixel_address)
-        print("Single pixel threshold for pixels under test for each board: ", options.pixel_threshold)
-        print("Single pixel charge to be injected (fC) for pixels under test for each board: ", options.pixel_charge)
-        print("Flag that enables Qinj: ", options.charge_injection)
+        print("(ETROC1) Single pixel address under test for each board: ", options.pixel_address)
+        print("(ETROC1) Single pixel threshold for pixels under test for each board: ", options.pixel_threshold)
+        print("(ETROC1) Single pixel charge to be injected (fC) for pixels under test for each board: ", options.pixel_charge)
+        print("(ETROC1) Flag that enables Qinj: ", options.charge_injection)
         print("Save only the untranslated FPGA binary data (raw output): ", options.binary_only)
         print("Save FPGA binary data (raw output) in int format: ", options.compressed_binary)
-        print("Set timestamp binary, see daq_helpers for more info: ", options.timestamp)
-        print("Set timestamp binary, see daq_helpers for more info (explicit hex string): ", "0x{:04x}".format(options.timestamp))
-        print("Overwrite previously saved files: ", options.overwrite)
+        print("Save only FPGA translated data frames with DATA: ", options.compressed_translation)
+        print("DO NOT save binary data (raw output): ", options.skip_binary)
+        print("Set timestamp binary (Reg 13), see daq_helpers.py -> timestamp() for more info: ", "0x{:04x}".format(options.timestamp))
+        print("Set polarity binary (Reg 14), see daq_helpers.py -> Enable_FPGA_Descramblber() for more info: ", "0x{:04x}".format(options.polarity))
         print("Enable plotting of real time hits: ", options.make_plots)
         print("Time (s) used to pop lines off the queue for plotting: ", options.plot_queue_time)
+        print("Config (ETROC1) boards over I2C: ", options.i2c)
+        print("Switch off DAQ via the FPGA?: ", options.nodaq)
+        print("Use IPC to control the L1A: ", options.useIPC)
+        print("Configure FPGA firmware settings?: ", options.firmware)
         print("--------End of inputs from the USER--------")
         print("-------------------------------------------")
         print("\n")
@@ -442,14 +390,8 @@ if __name__ == "__main__":
         print("ETROC Board Type: ",   board_type)
         print("ETROC Board Size: ",   board_size)
         print("ETROC Board Name: ",   board_name)
-        print("ETROC Chip ID: ",      board_ID)
-        print("I2C A Address List: ", slaveA_addr_list)
-        print("I2C B Address List: ", slaveB_addr_list)
-        print("Load Capacitance of the preamp first stage: ", CLSel_board)
-        print("Feedback resistance seleciton: ", RfSel_board)
-        print("Bias current selection of the input transistor in the preamp: ", IBSel_board)
-        print("Set active channel binary, see daq_helpers for more info: ", active_channels_key)
-        print("Set active channel binary, see daq_helpers for more info (explicit hex string): ", "0x{:04x}".format(active_channels_key))
+        print("ETROC Chip ID: ",      board_ID) 
+        print("Set active channel binary (Reg 15), see daq_helpers.py -> active_channels() for more info: ", "0x{:04x}".format(active_channels_key))
         print("-------------------------------------------")
         print("-------------------------------------------")
         print("\n")

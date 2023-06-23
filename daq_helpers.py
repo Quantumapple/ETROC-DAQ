@@ -23,22 +23,97 @@ from translate_data import *
 This script is composed of all the helper functions needed for I2C comms, FPGA, etc
 '''
 #--------------------------------------------------------------------------#
-
-def start_L1A(cmd_interpret):
-    # software_clear_fifo(cmd_interpret)
-    # fc_init_pulse(cmd_interpret)
+def start_periodic_L1A_WS(cmd_interpret):
     ## 4-digit 16 bit hex, Duration is LSB 12 bits
     ## This tells us how many memory slots to use
+    register_11(cmd_interpret, 0x0deb)
+
+    time.sleep(0.01)
+
+    ## 4-digit 16 bit hex, 0xWXYZ
+    ## WX (8 bit) -  Error Mask
+    ## Y - trigSize[1:0],Period,testTrig
+    ## Z - Input command
+    register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0032)          # This is periodic BC Reset FC
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0000)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0035)          # This is periodic Qinj FC
+    cmd_interpret.write_config_reg(10, 0x0001)
+    cmd_interpret.write_config_reg(9, 0x0001)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0036)          # This is periodic L1A FC
+    cmd_interpret.write_config_reg(10, 0x01f0)
+    cmd_interpret.write_config_reg(9, 0x01ff)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
+
+    time.sleep(0.01)
+    
+def start_onetime_L1A_WS(cmd_interpret):
+    ## 4-digit 16 bit hex, Duration is LSB 12 bits
+    ## This tells us how many memory slots to use
+    register_11(cmd_interpret, 0x0deb)
+
+    time.sleep(0.01)
+
+    ## 4-digit 16 bit hex, 0xWXYZ
+    ## WX (8 bit) -  Error Mask
+    ## Y - trigSize[1:0],Period,testTrig
+    ## Z - Input command
+    register_12(cmd_interpret, 0x0000)          # This is onetime Idle FC
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0002)          # This is onetime BC Reset FC
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0000)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0005)          # This is onetime Qinj FC
+    cmd_interpret.write_config_reg(10, 0x0001)
+    cmd_interpret.write_config_reg(9, 0x0001)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0006)          # This is onetime L1A FC
+    cmd_interpret.write_config_reg(10, 0x01f0)
+    cmd_interpret.write_config_reg(9, 0x01ff)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
+
+    time.sleep(0.01)
+def start_L1A(cmd_interpret):
     ## dec = 3564
     register_11(cmd_interpret, 0x0deb)
 
     time.sleep(0.01)
 
-    # software_clear_fifo(cmd_interpret)
-    ## 4-digit 16 bit hex, 0xWXYZ
-    ## WX (8 bit) -  Error Mask
-    ## Y - trigSize[1:0],Period,testTrig
-    ## Z - Input command
     register_12(cmd_interpret, 0x0030)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0deb)
@@ -46,7 +121,6 @@ def start_L1A(cmd_interpret):
 
     time.sleep(0.01)
 
-    # software_clear_fifo(cmd_interpret)
     register_12(cmd_interpret, 0x0032)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
@@ -61,7 +135,6 @@ def start_L1A(cmd_interpret):
 
     time.sleep(0.01)
 
-    # software_clear_fifo(cmd_interpret)
     register_12(cmd_interpret, 0x0036)
     # 1f7
     cmd_interpret.write_config_reg(10, 0x01f0)
@@ -70,9 +143,7 @@ def start_L1A(cmd_interpret):
 
     time.sleep(0.01)
 
-    # software_clear_fifo(cmd_interpret)
     fc_signal_start(cmd_interpret)
-    # software_clear_fifo(cmd_interpret)
 
     time.sleep(0.01)
 
@@ -96,13 +167,6 @@ def start_L1A_1MHz(cmd_interpret):
     time.sleep(0.01)
 
     for index in range(89):
-        # register_12(cmd_interpret, 0x0032)
-        # cmd_interpret.write_config_reg(10, 0x0000 + index*40)
-        # cmd_interpret.write_config_reg(9, 0x0000 + index*40)
-        # fc_init_pulse(cmd_interpret)
-
-        # time.sleep(0.01)
-
         register_12(cmd_interpret, 0x0035)
         cmd_interpret.write_config_reg(10, 0x0001 + index*40)
         cmd_interpret.write_config_reg(9, 0x0001 + index*40)
@@ -120,14 +184,49 @@ def start_L1A_1MHz(cmd_interpret):
         register_12(cmd_interpret, 0x0036)
         cmd_interpret.write_config_reg(10, 0x01f + index*40)
         cmd_interpret.write_config_reg(9, 0x01f + index*40)
-        # cmd_interpret.write_config_reg(9, 0x025 + index*40)
         fc_init_pulse(cmd_interpret)
 
         time.sleep(0.01)
 
-    # software_clear_fifo(cmd_interpret)
     fc_signal_start(cmd_interpret)
-    # software_clear_fifo(cmd_interpret)
+
+    time.sleep(0.01)
+
+def start_L1A_1MHz_clean(cmd_interpret):
+    register_11(cmd_interpret, 0x0de7)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0030)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0de7)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+    
+    register_12(cmd_interpret, 0x0032)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0000)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    for index in range(89):
+        register_12(cmd_interpret, 0x0035)
+        cmd_interpret.write_config_reg(10, 0x0001 + index*40)
+        cmd_interpret.write_config_reg(9, 0x0001 + index*40)
+        fc_init_pulse(cmd_interpret)
+
+        time.sleep(0.01)
+
+        register_12(cmd_interpret, 0x0036)
+        cmd_interpret.write_config_reg(10, 0x019 + index*40)
+        cmd_interpret.write_config_reg(9, 0x019 + index*40)
+        fc_init_pulse(cmd_interpret)
+
+        time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)
 
     time.sleep(0.01)
 
@@ -156,11 +255,38 @@ def start_L1A_train(cmd_interpret):
     fc_signal_start(cmd_interpret)
     software_clear_fifo(cmd_interpret) 
 
-def stop_L1A(cmd_interpret):
-    # software_clear_fifo(cmd_interpret)
-    # fc_init_pulse(cmd_interpret)
+def start_L1A_1MHz_noQinj(cmd_interpret):
+    register_11(cmd_interpret, 0x0de7)
 
-    # software_clear_fifo(cmd_interpret)
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0030)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0de7)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+    
+    register_12(cmd_interpret, 0x0032)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0000)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    for index in range(89):
+
+        register_12(cmd_interpret, 0x0036)
+        cmd_interpret.write_config_reg(10, 0x019 + index*40)
+        cmd_interpret.write_config_reg(9, 0x019 + index*40)
+        fc_init_pulse(cmd_interpret)
+        time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)
+    time.sleep(0.01)
+
+
+def stop_L1A(cmd_interpret):
     register_12(cmd_interpret, 0x0030)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0deb)
@@ -168,23 +294,7 @@ def stop_L1A(cmd_interpret):
 
     time.sleep(0.01)
 
-    # register_12(cmd_interpret, 0x0002)
-    # cmd_interpret.write_config_reg(10, 0x0001)
-    # cmd_interpret.write_config_reg(9, 0x0001)
-    # fc_init_pulse(cmd_interpret)
-
-    # register_12(cmd_interpret, 0x0005)
-    # cmd_interpret.write_config_reg(10, 0x0000)
-    # cmd_interpret.write_config_reg(9, 0x0000)
-    # fc_init_pulse(cmd_interpret)
-
-    # register_12(cmd_interpret, 0x0006)
-    # cmd_interpret.write_config_reg(10, 0x01f6)
-    # cmd_interpret.write_config_reg(9, 0x01f9)
-    # fc_init_pulse(cmd_interpret)
-    # software_clear_fifo(cmd_interpret)
     fc_signal_start(cmd_interpret)
-    # software_clear_fifo(cmd_interpret)
 
     time.sleep(0.01)
 
@@ -271,6 +381,10 @@ class Receive_data(threading.Thread):               # threading class
                         start_L1A(self.cmd_interpret)
                     elif message == 'start L1A 1MHz':
                         start_L1A_1MHz(self.cmd_interpret)
+                    elif message == 'start L1A 1MHz noQinj':
+                        start_L1A_1MHz_noQinj(self.cmd_interpret)
+                    elif message == 'start L1A 1MHz clean':
+                        start_L1A_1MHz_clean(self.cmd_interpret)
                     elif message == 'stop L1A':
                         stop_L1A(self.cmd_interpret)
                     elif message == 'stop L1A 1MHz':
@@ -289,7 +403,6 @@ class Receive_data(threading.Thread):               # threading class
                     pass
 
             if self.daq_on:
-            # if True:
                 # max allowed by read_memory is 65535
                 mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
                 for mem_line in mem_data:
@@ -305,7 +418,7 @@ class Receive_data(threading.Thread):               # threading class
 #--------------------------------------------------------------------------#
 # define a write data class
 class Write_data(threading.Thread):
-    def __init__(self, name, read_queue, translate_queue, num_file, num_line, time_limit, store_dict, binary_only, compressed_binary, make_plots, read_stop_event, stop_DAQ_event = None):
+    def __init__(self, name, read_queue, translate_queue, num_file, num_line, time_limit, store_dict, binary_only, compressed_binary, skip_binary, make_plots, read_stop_event, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.read_queue = read_queue
         self.translate_queue = translate_queue
@@ -315,6 +428,7 @@ class Write_data(threading.Thread):
         self.store_dict = store_dict
         self.binary_only = binary_only
         self.compressed_binary = compressed_binary
+        self.skip_binary = skip_binary
         self.make_plots = make_plots
         self.read_stop_event = read_stop_event
         self.stop_DAQ_event = stop_DAQ_event
@@ -326,20 +440,26 @@ class Write_data(threading.Thread):
         total_start_time = time.time()
         file_lines = 0
         file_counter = 0
-        outfile = open("./%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
-        print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
+        if (not self.skip_binary):
+            outfile = open("./%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
+            print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
+        else:
+            print("{} is reading queue and pushing binary onwards...".format(self.getName()))
         retry_count = 0
         while (total_lines<=self.num_file*self.num_line) if (self.time_limit<0) else (time.time()-total_start_time<=self.time_limit):
             if not t.alive:
                 print("Write Thread detected alive=False")
                 outfile.close()
                 break 
-            if(file_lines>self.num_line):
+            if(file_lines>self.num_line and (not self.skip_binary)):
                 outfile.close()
                 file_lines=0
                 file_counter = file_counter + 1
                 outfile = open("./%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
                 print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
+            else:
+                file_lines=0
+                file_counter = file_counter + 1
             mem_data = ""
             # Attempt to pop off the read_queue for 30 secs, fail if nothing found
             try:
@@ -361,8 +481,9 @@ class Write_data(threading.Thread):
             if int(mem_data) == 9961472: continue # got a Filler
             if int(mem_data) == 2550136832: continue # got a Filler
             binary = format(int(mem_data), '032b')
-            if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
-            else: outfile.write('%s\n'%binary)
+            if(not self.skip_binary):
+                if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
+                else: outfile.write('%s\n'%binary)
             # Increment line counters
             file_lines = file_lines + 1
             total_lines = total_lines + 1
