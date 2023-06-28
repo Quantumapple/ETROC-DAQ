@@ -305,7 +305,7 @@ def getOptionParser():
         setattr(parser.values, option.dest, list(map(int, value.split(','))))
 
     parser = OptionParser()
-    parser.add_option("--hostname", dest="hostname", action="store", type="string", help="FPGA IP Address", default="192.168.2.7")
+    parser.add_option("--hostname", dest="hostname", action="store", type="string", help="FPGA IP Address", default="192.168.2.3")
     parser.add_option("-n", "--num_file", dest="num_file", action="store", type="int", help="Number of files created by DAQ script", default=1)
     parser.add_option("-l", "--num_line", dest="num_line", action="store", type="int", help="Number of lines per file created by DAQ script", default=50000)
     parser.add_option("-r", "--num_fifo_read", dest="num_fifo_read", action="store", type="int", help="Number of lines read per call of fifo readout", default=50000)

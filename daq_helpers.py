@@ -175,18 +175,18 @@ def start_L1A_1MHz(cmd_interpret):
         time.sleep(0.01)
 
         register_12(cmd_interpret, 0x0036)
-        cmd_interpret.write_config_reg(10, 0x019 + index*40)
-        cmd_interpret.write_config_reg(9, 0x019 + index*40)
+        cmd_interpret.write_config_reg(10, 0x017 + index*40)
+        cmd_interpret.write_config_reg(9, 0x01b + index*40)
         fc_init_pulse(cmd_interpret)
 
         time.sleep(0.01)
 
-        register_12(cmd_interpret, 0x0036)
-        cmd_interpret.write_config_reg(10, 0x01f + index*40)
-        cmd_interpret.write_config_reg(9, 0x01f + index*40)
-        fc_init_pulse(cmd_interpret)
+        # register_12(cmd_interpret, 0x0036)
+        # cmd_interpret.write_config_reg(10, 0x01f + index*40)
+        # cmd_interpret.write_config_reg(9, 0x01f + index*40)
+        # fc_init_pulse(cmd_interpret)
 
-        time.sleep(0.01)
+        # time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
 
@@ -457,7 +457,7 @@ class Write_data(threading.Thread):
                 file_counter = file_counter + 1
                 outfile = open("./%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
                 print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
-            else:
+            elif(file_lines>self.num_line):
                 file_lines=0
                 file_counter = file_counter + 1
             mem_data = ""
@@ -580,7 +580,14 @@ class Translate_data(threading.Thread):
                             print("ERROR! Found more than two headers in data block!!")
                             sys.exit(1)
                         continue
-                    if(not self.binary_only): outfile.write("%s\n"%TDC_line)
+                    if(not self.binary_only): 
+                        if(self.compressed_translation):
+                            if(TDC_header_index<0):
+                                pass
+                            else:
+                                outfile.write("%s\n"%TDC_line)
+                        else:
+                            outfile.write("%s\n"%TDC_line)
                     if(TDC_line[9:13]!='DATA'): continue
                     if(self.make_plots): self.plot_queue.put(TDC_line)
                 if(TDC_len>0):
