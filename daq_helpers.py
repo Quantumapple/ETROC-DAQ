@@ -24,45 +24,82 @@ This script is composed of all the helper functions needed for I2C comms, FPGA, 
 '''
 #--------------------------------------------------------------------------#
 def start_periodic_L1A_WS(cmd_interpret):
-    ## 4-digit 16 bit hex, Duration is LSB 12 bits
-    ## This tells us how many memory slots to use
-    register_11(cmd_interpret, 0x0deb)
+    # ## 4-digit 16 bit hex, Duration is LSB 12 bits
+    # ## This tells us how many memory slots to use
+    # register_11(cmd_interpret, 0x0deb)
+
+    # time.sleep(0.01)
+
+    # ## 4-digit 16 bit hex, 0xWXYZ
+    # ## WX (8 bit) -  Error Mask
+    # ## Y - trigSize[1:0],Period,testTrig
+    # ## Z - Input command
+    # register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
+    # cmd_interpret.write_config_reg(10, 0x0000)
+    # cmd_interpret.write_config_reg(9, 0x0deb)
+    # fc_init_pulse(cmd_interpret)
+
+    # time.sleep(0.01)
+
+    # register_12(cmd_interpret, 0x0032)          # This is periodic BC Reset FC
+    # cmd_interpret.write_config_reg(10, 0x0000)
+    # cmd_interpret.write_config_reg(9, 0x0000)
+    # fc_init_pulse(cmd_interpret)
+
+    # time.sleep(0.01)
+
+    # register_12(cmd_interpret, 0x0035)          # This is periodic Qinj FC
+    # cmd_interpret.write_config_reg(10, 0x0001)
+    # cmd_interpret.write_config_reg(9, 0x0001)
+    # fc_init_pulse(cmd_interpret)
+
+    # time.sleep(0.01)
+
+    # register_12(cmd_interpret, 0x0036)          # This is periodic L1A FC
+    # cmd_interpret.write_config_reg(10, 0x01f0)
+    # cmd_interpret.write_config_reg(9, 0x01ff)
+    # fc_init_pulse(cmd_interpret)
+
+    # time.sleep(0.01)
+
+    # fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
+
+    # time.sleep(0.01)
+
+    register_11(cmd_interpret, 0x0de7)
 
     time.sleep(0.01)
 
-    ## 4-digit 16 bit hex, 0xWXYZ
-    ## WX (8 bit) -  Error Mask
-    ## Y - trigSize[1:0],Period,testTrig
-    ## Z - Input command
-    register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
+    register_12(cmd_interpret, 0x0030)
     cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
+    cmd_interpret.write_config_reg(9, 0x0de7)
     fc_init_pulse(cmd_interpret)
 
     time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0032)          # This is periodic BC Reset FC
+    
+    register_12(cmd_interpret, 0x0032)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
     fc_init_pulse(cmd_interpret)
 
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0035)          # This is periodic Qinj FC
-    cmd_interpret.write_config_reg(10, 0x0001)
-    cmd_interpret.write_config_reg(9, 0x0001)
-    fc_init_pulse(cmd_interpret)
+    for index in range(89):
+        register_12(cmd_interpret, 0x0035)
+        cmd_interpret.write_config_reg(10, 0x0001 + index*40)
+        cmd_interpret.write_config_reg(9, 0x0001 + index*40)
+        fc_init_pulse(cmd_interpret)
 
-    time.sleep(0.01)
+        time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0036)          # This is periodic L1A FC
-    cmd_interpret.write_config_reg(10, 0x01f0)
-    cmd_interpret.write_config_reg(9, 0x01ff)
-    fc_init_pulse(cmd_interpret)
+        register_12(cmd_interpret, 0x0036)
+        cmd_interpret.write_config_reg(10, 0x019 + index*40)
+        cmd_interpret.write_config_reg(9, 0x019 + index*40)
+        fc_init_pulse(cmd_interpret)
 
-    time.sleep(0.01)
+        time.sleep(0.01)
 
-    fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
+    fc_signal_start(cmd_interpret)
 
     time.sleep(0.01)
     
