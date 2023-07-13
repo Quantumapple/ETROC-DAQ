@@ -254,13 +254,19 @@ def main(options, cmd_interpret, IPC_queue = None):
         read_queue = Queue()
         translate_queue = Queue() 
         plot_queue = Queue()
-        read_stop_event = threading.Event()     # This is how we stop the read thread
-        stop_DAQ_event = threading.Event()     # This is how we notify the Write thread that we are done taking data
-        receive_data = Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_stop_event, options.useIPC, stop_DAQ_event, IPC_queue)
-        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_file, options.num_line, options.time_limit, store_dict, options.binary_only, options.compressed_binary, options.skip_binary, options.make_plots, read_stop_event, stop_DAQ_event)
+        read_stop_event = threading.Event()    # This is how we stop the read thread
+        write_stop_event = threading.Event()   # This is how we stop the write thread
+        translate_stop_event = None            # This is how we stop the translate thread (if translate enabled) (set down below...)
+        plotting_stop_event = None             # This is how we stop the plotting thread (if plotting enabled) (set down below...)
+        stop_DAQ_event = threading.Event()     # This is how we notify the Read thread that we are done taking data
+                                               # Kill order is read, write, translate
+        receive_data = Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_stop_event, write_stop_event, translate_stop_event, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
+        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_file, options.num_line, options.time_limit, store_dict, options.binary_only, options.compressed_binary, options.skip_binary, options.make_plots, read_stop_event, write_stop_event, translate_stop_event, stop_DAQ_event)
         if(options.make_plots or (not options.binary_only)):
-            translate_data = Translate_data('Translate_data', translate_queue, plot_queue, cmd_interpret, options.num_file, options.num_line,  options.time_limit, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, read_stop_event, options.compressed_translation, stop_DAQ_event)
+            translate_stop_event = threading.Event()
+            translate_data = Translate_data('Translate_data', translate_queue, plot_queue, cmd_interpret, options.num_file, options.num_line,  options.time_limit, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, read_stop_event, write_stop_event, translate_stop_event, options.compressed_translation, stop_DAQ_event)
         if(options.make_plots):
+            plotting_stop_event = threading.Event()
             daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time, read_stop_event)
 
         # read_write_data.start()

@@ -173,11 +173,11 @@ def start_L1A_trigger_bit(cmd_interpret):
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
     
-    # register_12(cmd_interpret, 0x0072)
-    # cmd_interpret.write_config_reg(10, 0x0000)
-    # cmd_interpret.write_config_reg(9, 0x0000)
-    # fc_init_pulse(cmd_interpret)
-    # time.sleep(0.01)
+    register_12(cmd_interpret, 0x0072)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0000)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0075)
     cmd_interpret.write_config_reg(10, 0x0005)
@@ -295,12 +295,14 @@ def link_reset(cmd_interpret):
 
 # define a receive data class
 class Receive_data(threading.Thread):               # threading class
-    def __init__(self, name, queue, cmd_interpret, num_fifo_read, read_stop_event, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
+    def __init__(self, name, queue, cmd_interpret, num_fifo_read, read_stop_event, write_stop_event, translate_stop_event, plotting_stop_event, time_limit, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
         threading.Thread.__init__(self, name=name)
         self.queue = queue
         self.cmd_interpret = cmd_interpret
         self.num_fifo_read = num_fifo_read
         self.read_stop_event = read_stop_event
+        self.write_stop_event = write_stop_event
+        self.time_limit = time_limit
         self.use_IPC = use_IPC
         self.stop_DAQ_event = stop_DAQ_event
         self.IPC_queue = IPC_queue
@@ -321,8 +323,9 @@ class Receive_data(threading.Thread):               # threading class
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
         mem_data = []
+        total_start_time = time.time()
         print("{} is reading data and pushing to the queue...".format(self.getName()))
-        while True:
+        while ((time.time()-total_start_time<=self.time_limit)):
             if self.use_IPC:
                 try:
                     message = self.IPC_queue.get(False)
@@ -374,8 +377,18 @@ class Receive_data(threading.Thread):               # threading class
                 print("Read Thread detected alive=False")
                 break  
             if self.read_stop_event.is_set():
-                print("Read Thread received STOP signal from Write Thread")
-                break
+                print("Read Thread received STOP signal")
+                if self.write_stop_event.is_set():
+                    print("Stopping Read Thread")
+                    break
+                else:
+                    print("Sending stop signal to Write Thread")
+                    self.write_stop_event.set()
+        else:
+            print("Read Thread gracefully sending STOP signal to other threads") 
+            self.read_stop_event.set()
+            print("Sending stop signal to Write Thread")
+            self.write_stop_event.set()
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
@@ -453,6 +466,9 @@ class Write_data(threading.Thread):
             # Perform translation related activities if requested
             if(self.make_plots or (not self.binary_only)):
                 self.translate_queue.put(binary)
+            if self.write_stop_event.is_set():
+                print("Write Thread received STOP signal from Read Thread")
+                break
         else:
             print("Write Thread gracefully sending STOP signal to other threads") 
             self.read_stop_event.set()
@@ -460,7 +476,7 @@ class Write_data(threading.Thread):
 
 #--------------------------------------------------------------------------#
 class Translate_data(threading.Thread):
-    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_file, num_line, time_limit, timestamp, store_dict, binary_only, make_plots, board_ID, read_stop_event, compressed_translation, stop_DAQ_event = None):
+    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_file, num_line, time_limit, timestamp, store_dict, binary_only, make_plots, board_ID, read_stop_event, translate_stop_event, compressed_translation, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.translate_queue = translate_queue
         self.plot_queue = plot_queue
@@ -475,7 +491,7 @@ class Translate_data(threading.Thread):
         self.board_ID = board_ID
         self.queue_ch = [deque() for i in range(4)]
         self.link_ch  = ["" for i in range(4)]
-        self.read_stop_event = read_stop_event
+        self.translate_stop_event = translate_stop_event
         self.stop_DAQ_event = stop_DAQ_event
         self.hitmap = {i:np.zeros((16,16)) for i in range(4)}
         self.compressed_translation = compressed_translation
@@ -498,7 +514,7 @@ class Translate_data(threading.Thread):
                 print("Translate Thread detected alive=False")
                 if(not self.binary_only): outfile.close()
                 break 
-            if self.read_stop_event.is_set():
+            if self.translate_stop_event.is_set():
                 print("Translate Thread received STOP signal from Write Thread")
                 if(not self.binary_only): outfile.close()
                 break
@@ -522,7 +538,7 @@ class Translate_data(threading.Thread):
                     continue
                 print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!! THIS SENDS STOP SIGNAL TO ALL THREADS!!!")
                 self.read_stop_event.set()
-                break
+                # break
             TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID, self.hitmap, self.compressed_translation)
             if(write_flag==1):
                 pass
