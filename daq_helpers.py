@@ -24,90 +24,46 @@ This script is composed of all the helper functions needed for I2C comms, FPGA, 
 '''
 #--------------------------------------------------------------------------#
 def start_periodic_L1A_WS(cmd_interpret):
-    # ## 4-digit 16 bit hex, Duration is LSB 12 bits
-    # ## This tells us how many memory slots to use
-    # register_11(cmd_interpret, 0x0deb)
-
-    # time.sleep(0.01)
-
-    # ## 4-digit 16 bit hex, 0xWXYZ
-    # ## WX (8 bit) -  Error Mask
-    # ## Y - trigSize[1:0],Period,testTrig
-    # ## Z - Input command
-    # register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
-    # cmd_interpret.write_config_reg(10, 0x0000)
-    # cmd_interpret.write_config_reg(9, 0x0deb)
-    # fc_init_pulse(cmd_interpret)
-
-    # time.sleep(0.01)
-
-    # register_12(cmd_interpret, 0x0032)          # This is periodic BC Reset FC
-    # cmd_interpret.write_config_reg(10, 0x0000)
-    # cmd_interpret.write_config_reg(9, 0x0000)
-    # fc_init_pulse(cmd_interpret)
-
-    # time.sleep(0.01)
-
-    # register_12(cmd_interpret, 0x0035)          # This is periodic Qinj FC
-    # cmd_interpret.write_config_reg(10, 0x0001)
-    # cmd_interpret.write_config_reg(9, 0x0001)
-    # fc_init_pulse(cmd_interpret)
-
-    # time.sleep(0.01)
-
-    # register_12(cmd_interpret, 0x0036)          # This is periodic L1A FC
-    # cmd_interpret.write_config_reg(10, 0x01f0)
-    # cmd_interpret.write_config_reg(9, 0x01ff)
-    # fc_init_pulse(cmd_interpret)
-
-    # time.sleep(0.01)
-
-    # fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
-
-    # time.sleep(0.01)
-
-    register_11(cmd_interpret, 0x0de7)
-
+    ## 4-digit 16 bit hex, Duration is LSB 12 bits
+    ## This tells us how many memory slots to use
+    register_11(cmd_interpret, 0x0deb)
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0030)
+    ## 4-digit 16 bit hex, 0xWXYZ
+    ## WX (8 bit) -  Error Mask
+    ## Y - trigSize[1:0],Period,testTrig
+    ## Z - Input command
+    register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
     cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0de7)
+    cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
-    
-    register_12(cmd_interpret, 0x0032)
+
+    register_12(cmd_interpret, 0x0032)          # This is periodic BC Reset FC
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
-    for index in range(89):
-        register_12(cmd_interpret, 0x0035)
-        cmd_interpret.write_config_reg(10, 0x0001 + index*40)
-        cmd_interpret.write_config_reg(9, 0x0001 + index*40)
-        fc_init_pulse(cmd_interpret)
+    register_12(cmd_interpret, 0x0035)          # This is periodic Qinj FC
+    cmd_interpret.write_config_reg(10, 0x0001)
+    cmd_interpret.write_config_reg(9, 0x0001)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
 
-        time.sleep(0.01)
+    register_12(cmd_interpret, 0x0036)          # This is periodic L1A FC
+    cmd_interpret.write_config_reg(10, 0x01f0)
+    cmd_interpret.write_config_reg(9, 0x01ff)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
 
-        register_12(cmd_interpret, 0x0036)
-        cmd_interpret.write_config_reg(10, 0x019 + index*40)
-        cmd_interpret.write_config_reg(9, 0x019 + index*40)
-        fc_init_pulse(cmd_interpret)
-
-        time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-
+    fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
     time.sleep(0.01)
     
 def start_onetime_L1A_WS(cmd_interpret):
     ## 4-digit 16 bit hex, Duration is LSB 12 bits
     ## This tells us how many memory slots to use
     register_11(cmd_interpret, 0x0deb)
-
     time.sleep(0.01)
 
     ## 4-digit 16 bit hex, 0xWXYZ
@@ -118,33 +74,29 @@ def start_onetime_L1A_WS(cmd_interpret):
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0002)          # This is onetime BC Reset FC
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0005)          # This is onetime Qinj FC
     cmd_interpret.write_config_reg(10, 0x0001)
     cmd_interpret.write_config_reg(9, 0x0001)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0006)          # This is onetime L1A FC
     cmd_interpret.write_config_reg(10, 0x01f0)
     cmd_interpret.write_config_reg(9, 0x01ff)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
-
     time.sleep(0.01)
+
 def start_L1A(cmd_interpret):
     ## dec = 3564
     register_11(cmd_interpret, 0x0deb)
@@ -155,52 +107,43 @@ def start_L1A(cmd_interpret):
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0032)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0035)
     cmd_interpret.write_config_reg(10, 0x0001)
     cmd_interpret.write_config_reg(9, 0x0001)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0036)
-    # 1f7
-    cmd_interpret.write_config_reg(10, 0x01f0)
-    cmd_interpret.write_config_reg(9, 0x01ff)
+    cmd_interpret.write_config_reg(10, 0x01f9)
+    cmd_interpret.write_config_reg(9, 0x01f9)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
-
     time.sleep(0.01)
 
 def start_L1A_1MHz(cmd_interpret):
     register_11(cmd_interpret, 0x0de7)
-
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0030)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0de7)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
     
     register_12(cmd_interpret, 0x0032)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
     for index in range(89):
@@ -208,60 +151,45 @@ def start_L1A_1MHz(cmd_interpret):
         cmd_interpret.write_config_reg(10, 0x0001 + index*40)
         cmd_interpret.write_config_reg(9, 0x0001 + index*40)
         fc_init_pulse(cmd_interpret)
-
-        time.sleep(0.01)
-
-        register_12(cmd_interpret, 0x0036)
-        cmd_interpret.write_config_reg(10, 0x017 + index*40)
-        cmd_interpret.write_config_reg(9, 0x01b + index*40)
-        fc_init_pulse(cmd_interpret)
-
-        time.sleep(0.01)
-
-        # register_12(cmd_interpret, 0x0036)
-        # cmd_interpret.write_config_reg(10, 0x01f + index*40)
-        # cmd_interpret.write_config_reg(9, 0x01f + index*40)
-        # fc_init_pulse(cmd_interpret)
-
-        # time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-
-    time.sleep(0.01)
-
-def start_L1A_1MHz_clean(cmd_interpret):
-    register_11(cmd_interpret, 0x0de7)
-
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0030)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0de7)
-    fc_init_pulse(cmd_interpret)
-
-    time.sleep(0.01)
-    
-    register_12(cmd_interpret, 0x0032)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
-    fc_init_pulse(cmd_interpret)
-
-    time.sleep(0.01)
-
-    for index in range(89):
-        register_12(cmd_interpret, 0x0035)
-        cmd_interpret.write_config_reg(10, 0x0001 + index*40)
-        cmd_interpret.write_config_reg(9, 0x0001 + index*40)
-        fc_init_pulse(cmd_interpret)
-
         time.sleep(0.01)
 
         register_12(cmd_interpret, 0x0036)
         cmd_interpret.write_config_reg(10, 0x019 + index*40)
         cmd_interpret.write_config_reg(9, 0x019 + index*40)
         fc_init_pulse(cmd_interpret)
-
         time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)
+    time.sleep(0.01)
+
+def start_L1A_trigger_bit(cmd_interpret):
+    register_11(cmd_interpret, 0x0deb)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0070)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+    
+    # register_12(cmd_interpret, 0x0072)
+    # cmd_interpret.write_config_reg(10, 0x0000)
+    # cmd_interpret.write_config_reg(9, 0x0000)
+    # fc_init_pulse(cmd_interpret)
+    # time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0075)
+    cmd_interpret.write_config_reg(10, 0x0005)
+    cmd_interpret.write_config_reg(9, 0x0005)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    # register_12(cmd_interpret, 0x0076)
+    # cmd_interpret.write_config_reg(10, 0x01f9)
+    # cmd_interpret.write_config_reg(9, 0x01f9)
+    # fc_init_pulse(cmd_interpret)
+    # time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
 
@@ -292,51 +220,30 @@ def start_L1A_train(cmd_interpret):
     fc_signal_start(cmd_interpret)
     software_clear_fifo(cmd_interpret) 
 
-def start_L1A_1MHz_noQinj(cmd_interpret):
-    register_11(cmd_interpret, 0x0de7)
-
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0030)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0de7)
-    fc_init_pulse(cmd_interpret)
-
-    time.sleep(0.01)
-    
-    register_12(cmd_interpret, 0x0032)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
-    fc_init_pulse(cmd_interpret)
-
-    time.sleep(0.01)
-
-    for index in range(89):
-
-        register_12(cmd_interpret, 0x0036)
-        cmd_interpret.write_config_reg(10, 0x019 + index*40)
-        cmd_interpret.write_config_reg(9, 0x019 + index*40)
-        fc_init_pulse(cmd_interpret)
-        time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-    time.sleep(0.01)
-
-
 def stop_L1A(cmd_interpret):
     register_12(cmd_interpret, 0x0030)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
-
     time.sleep(0.01)
 
     software_clear_fifo(cmd_interpret)
+    time.sleep(0.01)
 
+def stop_L1A_trigger_bit(cmd_interpret):
+    register_12(cmd_interpret, 0x0070)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)
+    time.sleep(0.01)
+
+    software_clear_fifo(cmd_interpret)
     time.sleep(0.01)
 
 def stop_L1A_1MHz(cmd_interpret):
@@ -344,15 +251,25 @@ def stop_L1A_1MHz(cmd_interpret):
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0de7)
     fc_init_pulse(cmd_interpret)
-
     time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
-
     time.sleep(0.01)
 
     software_clear_fifo(cmd_interpret)
+    time.sleep(0.01)
 
+def stop_L1A_1MHz_trigger_bit(cmd_interpret):
+    register_12(cmd_interpret, 0x0070)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0de7)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)
+    time.sleep(0.01)
+
+    software_clear_fifo(cmd_interpret)
     time.sleep(0.01)
 
 def stop_L1A_train(cmd_interpret):
@@ -418,14 +335,18 @@ class Receive_data(threading.Thread):               # threading class
                         start_L1A(self.cmd_interpret)
                     elif message == 'start L1A 1MHz':
                         start_L1A_1MHz(self.cmd_interpret)
-                    elif message == 'start L1A 1MHz noQinj':
-                        start_L1A_1MHz_noQinj(self.cmd_interpret)
-                    elif message == 'start L1A 1MHz clean':
-                        start_L1A_1MHz_clean(self.cmd_interpret)
+                    elif message == 'start L1A trigger bit':
+                        start_L1A_trigger_bit(self.cmd_interpret)
+                    # elif message == 'start L1A 1MHz trigger bit':
+                    #     start_L1A_1MHz_trigger_bit(self.cmd_interpret)
                     elif message == 'stop L1A':
                         stop_L1A(self.cmd_interpret)
                     elif message == 'stop L1A 1MHz':
                         stop_L1A_1MHz(self.cmd_interpret)
+                    elif message == 'stop L1A trigger bit':
+                        stop_L1A_trigger_bit(self.cmd_interpret)
+                    elif message == 'stop L1A 1MHz trigger bit':
+                        stop_L1A_1MHz_trigger_bit(self.cmd_interpret)
                     elif message == 'stop L1A train':
                         stop_L1A_train(self.cmd_interpret)
                     elif message == 'start L1A train':
@@ -434,6 +355,11 @@ class Receive_data(threading.Thread):               # threading class
                         self.stop_DAQ_event.set()
                     elif message == 'link reset':
                         link_reset(self.cmd_interpret)
+                    ## Special if condition for delay change during the DAQ
+                    ## Example: change delay 0x0421
+                    ##   becomes: change delay 1057
+                    elif ' '.join(message.split(' ')[:2]) == 'change delay':
+                        triggerBitDelay(self.cmd_interpret, int(message.split(' ')[2], base=16))
                     else:
                         print(f'Unknown message: {message}')
                 except queue.Empty:
@@ -895,6 +821,14 @@ def register_12(cmd_interpret, key = 0x0000):
 ## YZ (8 bit) - Error Mask
 def register_11(cmd_interpret, key = 0x0000): 
     cmd_interpret.write_config_reg(11, key)
+
+#--------------------------------------------------------------------------#
+## Register 8
+## 4-digit 16 bit hex
+## LSB 10 bits are delay, LSB 11th bit is delay enabled
+## 0000||0100||0000||0000 = 0x0400: shift of one clock cycle
+def triggerBitDelay(cmd_interpret, key = 0x0400): 
+    cmd_interpret.write_config_reg(8, key)
 
 #--------------------------------------------------------------------------#
 ## Fast Command Signal Start
