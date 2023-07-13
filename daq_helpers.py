@@ -302,6 +302,7 @@ class Receive_data(threading.Thread):               # threading class
         self.num_fifo_read = num_fifo_read
         self.read_stop_event = read_stop_event
         self.write_stop_event = write_stop_event
+        self.translate_stop_event = translate_stop_event
         self.time_limit = time_limit
         self.use_IPC = use_IPC
         self.stop_DAQ_event = stop_DAQ_event
