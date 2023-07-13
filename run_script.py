@@ -68,6 +68,7 @@ def main(options, cmd_interpret, IPC_queue = None):
             active_channels(cmd_interpret, key = active_channels_key)
             print("Timestamp: ", options.timestamp)
             timestamp(cmd_interpret, key = options.timestamp)
+            triggerBitDelay(cmd_interpret, options.trigger_bit_delay)
         # Enable_FPGA_Descramblber(1, cmd_interpret)
         Enable_FPGA_Descramblber(cmd_interpret, options.polarity)
 
@@ -321,6 +322,7 @@ def getOptionParser():
     parser.add_option("--compressed_translation",action="store_true", dest="compressed_translation", default=False, help="Save only FPGA translated data frames with DATA")
     parser.add_option("-s", "--timestamp", type="int",action="store", dest="timestamp", default=0x000C, help="Set timestamp binary, see daq_helpers for more info")
     parser.add_option("--polarity", type="int",action="store", dest="polarity", default=0x000b, help="Set fc polarity, see daq_helpers for more info")
+    parser.add_option("--trigger_bit_delay", type="int",action="store", dest="trigger_bit_delay", default=0x0400, help="Set trigger bit delay, see daq_helpers for more info")
     parser.add_option("-v", "--verbose",action="store_true", dest="verbose", default=False, help="Print status messages to stdout")
     parser.add_option("-w", "--overwrite",action="store_true", dest="overwrite", default=False, help="Overwrite previously saved files")
     parser.add_option("-p", "--make_plots",action="store_true", dest="make_plots", default=False, help="Enable plotting of real time hits")
