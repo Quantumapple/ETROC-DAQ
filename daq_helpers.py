@@ -292,6 +292,12 @@ def stop_L1A_train(cmd_interpret):
 def link_reset(cmd_interpret):
     software_clear_fifo(cmd_interpret) 
 
+# function to check if a thread is alive or not
+def is_alive(thread):
+    if thread is None:
+        return False
+    t = thread.current_thread()
+    return t.is_alive()
 
 # define a receive data class
 class Receive_data(threading.Thread):               # threading class
@@ -471,7 +477,7 @@ class Write_data(threading.Thread):
                     self.translate_thread_handle.set()
                 print("Checking Read Thread from Write Thread")
                 # wait for read thread to die...
-                while(self.read_thread_handle.is_set() is False):
+                while(is_alive(self.read_thread_handle) is False):
                     time.sleep(1)
                 break
         else:
@@ -584,7 +590,7 @@ class Translate_data(threading.Thread):
                     self.plotting_thread_handle.set()
                 print("Checking Write Thread from Translate Thread")
                 # wait for write thread to die...
-                while(self.write_thread_handle.is_set() is False):
+                while(is_alive(self.write_thread_handle) is False):
                     time.sleep(1)
                 break
         else:
@@ -701,7 +707,7 @@ class DAQ_Plotting(threading.Thread):
             if self.plotting_thread_handle.is_set():
                 print("Plot Thread received STOP signal from Translate Thread")
                 # wait for translate thread to die...
-                while(self.translate_thread_handle.is_set()):
+                while(is_alive(self.translate_thread_handle) is False):
                     time.sleep(1)
                 break
             start_time = time.time()
