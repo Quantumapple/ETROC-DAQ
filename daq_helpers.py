@@ -471,7 +471,7 @@ class Write_data(threading.Thread):
                     self.translate_thread_handle.set()
                 print("Checking Read Thread from Write Thread")
                 # wait for read thread to die...
-                while(self.read_thread_handle.is_set()):
+                while(self.read_thread_handle.is_set() is False):
                     time.sleep(1)
                 break
         else:
@@ -584,7 +584,7 @@ class Translate_data(threading.Thread):
                     self.plotting_thread_handle.set()
                 print("Checking Write Thread from Translate Thread")
                 # wait for write thread to die...
-                while(self.write_thread_handle.is_set()):
+                while(self.write_thread_handle.is_set() is False):
                     time.sleep(1)
                 break
         else:
