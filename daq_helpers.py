@@ -292,13 +292,6 @@ def stop_L1A_train(cmd_interpret):
 def link_reset(cmd_interpret):
     software_clear_fifo(cmd_interpret) 
 
-# function to check if a thread is alive or not
-def is_alive(thread):
-    if thread is None:
-        return False
-    t = thread.current_thread()
-    return t.is_alive()
-
 # define a receive data class
 class Receive_data(threading.Thread):               # threading class
     def __init__(self, name, queue, cmd_interpret, num_fifo_read, read_thread_handle, write_thread_handle, time_limit, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
@@ -312,6 +305,7 @@ class Receive_data(threading.Thread):               # threading class
         self.use_IPC = use_IPC
         self.stop_DAQ_event = stop_DAQ_event
         self.IPC_queue = IPC_queue
+        # self.is_alive = False
 
         if self.use_IPC and self.IPC_queue is None:
             self.use_IPC = False
@@ -323,10 +317,14 @@ class Receive_data(threading.Thread):               # threading class
         else:
             self.daq_on = True
             self.stop_DAQ_event.clear()
+
+    # def check_alive(self):
+    #     return self.is_alive
     
     def run(self):
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
+        # self.is_alive = True
         mem_data = []
         total_start_time = time.time()
         print("{} is reading data and pushing to the queue...".format(self.getName()))
@@ -380,6 +378,7 @@ class Receive_data(threading.Thread):               # threading class
                     self.queue.put(mem_line) 
             if not t.alive:
                 print("Read Thread detected alive=False")
+                # self.is_alive = False
                 break  
             if self.read_thread_handle.is_set():
                 print("Read Thread received STOP signal")
@@ -387,12 +386,13 @@ class Receive_data(threading.Thread):               # threading class
                     print("Sending stop signal to Write Thread")
                     self.write_thread_handle.set()
                 print("Stopping Read Thread")
+                # self.is_alive = False
                 break
-        else:
-            print("Read Thread gracefully sending STOP signal to other threads") 
-            self.read_thread_handle.set()
-            print("Sending stop signal to Write Thread")
-            self.write_thread_handle.set()
+        print("Read Thread gracefully sending STOP signal to other threads") 
+        self.read_thread_handle.set()
+        # self.is_alive = False
+        print("Sending stop signal to Write Thread")
+        self.write_thread_handle.set()
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
@@ -412,11 +412,16 @@ class Write_data(threading.Thread):
         self.read_thread_handle = read_thread_handle
         self.write_thread_handle = write_thread_handle
         self.translate_thread_handle = translate_thread_handle
-        self.stop_DAQ_event = stop_DAQ_event
+        # self.stop_DAQ_event = stop_DAQ_event
+        # self.is_alive = False
+
+    # def check_alive(self):
+    #     return self.is_alive
 
     def run(self):
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
+        # self.is_alive = True
         total_lines = 0
         file_lines = 0
         file_counter = 0
@@ -430,6 +435,7 @@ class Write_data(threading.Thread):
             if not t.alive:
                 print("Write Thread detected alive=False")
                 outfile.close()
+                # self.is_alive = False
                 break 
             if(file_lines>self.num_line and (not self.skip_binary)):
                 outfile.close()
@@ -454,6 +460,7 @@ class Write_data(threading.Thread):
                     continue
                 print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM READ_QUEUE!!!")
                 self.read_thread_handle.set()
+                # self.is_alive = False
                 break
             # Handle the raw (binary) line
             if int(mem_data) == 0: continue # Waiting for IPC
@@ -477,12 +484,14 @@ class Write_data(threading.Thread):
                     self.translate_thread_handle.set()
                 print("Checking Read Thread from Write Thread")
                 # wait for read thread to die...
-                while(is_alive(self.read_thread_handle) is False):
+                while(self.read_thread_handle.is_set() == False):
                     time.sleep(1)
+                # self.is_alive = False
                 break
         else:
             print("Write Thread gracefully sending STOP signal to translate thread") 
             self.translate_thread_handle.set()
+        # self.is_alive = False
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
@@ -507,10 +516,15 @@ class Translate_data(threading.Thread):
         self.stop_DAQ_event = stop_DAQ_event
         self.hitmap = {i:np.zeros((16,16)) for i in range(4)}
         self.compressed_translation = compressed_translation
+        # self.is_alive = False
+
+    # def check_alive(self):
+    #     return self.is_alive
 
     def run(self):
         t = threading.current_thread()
         t.alive = True
+        # self.is_alive = True
         total_lines = 0
         file_lines = 0
         file_counter = 0
@@ -524,6 +538,7 @@ class Translate_data(threading.Thread):
             if not t.alive:
                 print("Translate Thread detected alive=False")
                 if(not self.binary_only): outfile.close()
+                # self.is_alive = False
                 break 
             # if self.translate_thread_handle.is_set():
             #     print("Translate Thread received STOP signal from Write Thread")
@@ -549,6 +564,7 @@ class Translate_data(threading.Thread):
                     continue
                 print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!! THIS SENDS STOP SIGNAL TO ALL THREADS!!!")
                 self.read_write_handle.set()
+                # self.is_alive = False
                 break
             TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID, self.hitmap, self.compressed_translation)
             if(write_flag==1):
@@ -590,12 +606,13 @@ class Translate_data(threading.Thread):
                     self.plotting_thread_handle.set()
                 print("Checking Write Thread from Translate Thread")
                 # wait for write thread to die...
-                while(is_alive(self.write_thread_handle) is False):
+                while(self.write_thread_handle.is_set() == False):
                     time.sleep(1)
+                # self.is_alive = False
                 break
-        else:
-            print("Translate Thread gracefully sending STOP signal to plotting thread") 
-            self.plotting_thread_handle.set()
+        print("Translate Thread gracefully sending STOP signal to plotting thread") 
+        self.plotting_thread_handle.set()
+        # self.is_alive = False
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
@@ -611,10 +628,12 @@ class DAQ_Plotting(threading.Thread):
         self.plot_queue_time = plot_queue_time
         self.translate_thread_handle = translate_thread_handle
         self.plotting_thread_handle = plotting_thread_handle
+        # self.is_alive = False
 
     def run(self):
         t = threading.current_thread()
         t.alive = True
+        # self.is_alive = True
 
         ch0 = np.zeros((int(np.sqrt(self.board_size[0])),int(np.sqrt(self.board_size[0])))) 
         ch1 = np.zeros((int(np.sqrt(self.board_size[1])),int(np.sqrt(self.board_size[1])))) 
@@ -703,12 +722,14 @@ class DAQ_Plotting(threading.Thread):
             img3.autoscale()
             if not t.alive:
                 print("Plotting Thread detected alive=False")
+                # self.is_alive = False
                 break
             if self.plotting_thread_handle.is_set():
                 print("Plot Thread received STOP signal from Translate Thread")
                 # wait for translate thread to die...
-                while(is_alive(self.translate_thread_handle) is False):
+                while(self.translate_thread_handle.is_set() == False):
                     time.sleep(1)
+                # self.is_alive = False
                 break
             start_time = time.time()
             delta_time = 0
@@ -763,6 +784,7 @@ class DAQ_Plotting(threading.Thread):
         plt.show()
 
         # Thread then stops running
+        # self.is_alive = False
         print("Plotting Thread broke out of loop")
 
 
