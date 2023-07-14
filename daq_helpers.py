@@ -402,7 +402,6 @@ class Write_data(threading.Thread):
         self.translate_queue = translate_queue
         self.num_file = num_file
         self.num_line = num_line
-        self.time_limit = time_limit
         self.store_dict = store_dict
         self.binary_only = binary_only
         self.compressed_binary = compressed_binary
@@ -417,7 +416,6 @@ class Write_data(threading.Thread):
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
         total_lines = 0
-        total_start_time = time.time()
         file_lines = 0
         file_counter = 0
         if (not self.skip_binary):
@@ -487,14 +485,13 @@ class Write_data(threading.Thread):
 
 #--------------------------------------------------------------------------#
 class Translate_data(threading.Thread):
-    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_file, num_line, time_limit, timestamp, store_dict, binary_only, make_plots, board_ID, write_thread_handle, translate_thread_handle, plotting_thread_handle, compressed_translation, stop_DAQ_event = None):
+    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_file, num_line, timestamp, store_dict, binary_only, make_plots, board_ID, write_thread_handle, translate_thread_handle, plotting_thread_handle, compressed_translation, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.translate_queue = translate_queue
         self.plot_queue = plot_queue
         self.cmd_interpret = cmd_interpret
         self.num_file = num_file
         self.num_line = num_line
-        self.time_limit = time_limit
         self.timestamp = timestamp
         self.store_dict = store_dict
         self.binary_only = binary_only
@@ -513,7 +510,6 @@ class Translate_data(threading.Thread):
         t = threading.current_thread()
         t.alive = True
         total_lines = 0
-        total_start_time = time.time()
         file_lines = 0
         file_counter = 0
         if(not self.binary_only): 
