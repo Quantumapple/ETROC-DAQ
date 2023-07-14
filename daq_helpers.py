@@ -317,10 +317,6 @@ class Receive_data(threading.Thread):               # threading class
         else:
             self.daq_on = True
             self.stop_DAQ_event.clear()
-
-    # def alive(self):
-    #     t = threading.current_thread()
-    #     return t.is_alive()
     
     def run(self):
         t = threading.current_thread()              # Local reference of THIS thread object
@@ -475,7 +471,7 @@ class Write_data(threading.Thread):
                     self.translate_thread_handle.set()
                 print("Checking Read Thread from Write Thread")
                 # wait for read thread to die...
-                while(self.read_thread_handle.is_alive()):
+                while(self.read_thread_handle.is_set()):
                     time.sleep(1)
                 break
         else:
@@ -588,7 +584,7 @@ class Translate_data(threading.Thread):
                     self.plotting_thread_handle.set()
                 print("Checking Write Thread from Translate Thread")
                 # wait for write thread to die...
-                while(self.write_thread_handle.is_alive()):
+                while(self.write_thread_handle.is_set()):
                     time.sleep(1)
                 break
         else:
@@ -705,7 +701,7 @@ class DAQ_Plotting(threading.Thread):
             if self.plotting_thread_handle.is_set():
                 print("Plot Thread received STOP signal from Translate Thread")
                 # wait for translate thread to die...
-                while(self.translate_thread_handle.is_alive()):
+                while(self.translate_thread_handle.is_set()):
                     time.sleep(1)
                 break
             start_time = time.time()
