@@ -256,17 +256,17 @@ def main(options, cmd_interpret, IPC_queue = None):
         plot_queue = Queue()
         read_thread_handle = threading.Event()    # This is how we stop the read thread
         write_thread_handle = threading.Event()   # This is how we stop the write thread
-        translate_thread_handle = None            # This is how we stop the translate thread (if translate enabled) (set down below...)
-        plotting_thread_handle = None             # This is how we stop the plotting thread (if plotting enabled) (set down below...)
+        translate_thread_handle = threading.Event() # This is how we stop the translate thread (if translate enabled) (set down below...)
+        plotting_thread_handle = threading.Event() # This is how we stop the plotting thread (if plotting enabled) (set down below...)
         stop_DAQ_event = threading.Event()     # This is how we notify the Read thread that we are done taking data
                                                # Kill order is read, write, translate
         receive_data = Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
         write_data = Write_data('Write_data', read_queue, translate_queue, options.num_file, options.num_line, store_dict, options.binary_only, options.compressed_binary, options.skip_binary, options.make_plots, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
         if(options.make_plots or (not options.binary_only)):
-            translate_thread_handle = threading.Event()
+            # translate_thread_handle = threading.Event()
             translate_data = Translate_data('Translate_data', translate_queue, plot_queue, cmd_interpret, options.num_file, options.num_line, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, write_thread_handle, translate_thread_handle, plotting_thread_handle, options.compressed_translation, stop_DAQ_event)
         if(options.make_plots):
-            plotting_thread_handle = threading.Event()
+            # plotting_thread_handle = threading.Event()
             daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time, translate_thread_handle, plotting_thread_handle)
 
         # read_write_data.start()

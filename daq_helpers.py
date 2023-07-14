@@ -546,7 +546,7 @@ class Translate_data(threading.Thread):
                 if retry_count < 30:
                     continue
                 print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!! THIS SENDS STOP SIGNAL TO ALL THREADS!!!")
-                self.read_thread_handle.set()
+                self.read_write_handle.set()
                 break
             TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID, self.hitmap, self.compressed_translation)
             if(write_flag==1):
