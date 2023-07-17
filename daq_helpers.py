@@ -195,6 +195,28 @@ def start_L1A_trigger_bit(cmd_interpret):
 
     time.sleep(0.01)
 
+def start_L1A_trigger_bit_data(cmd_interpret):
+    register_11(cmd_interpret, 0x0deb)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0070)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+    
+    register_12(cmd_interpret, 0x0072)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0000)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+    
+    fc_signal_start(cmd_interpret)
+
+    time.sleep(0.01)
+    
+
 def start_L1A_train(cmd_interpret):
 
     ## Register 11, needs do_fc option
@@ -345,6 +367,8 @@ class Receive_data(threading.Thread):               # threading class
                         start_L1A_trigger_bit(self.cmd_interpret)
                     # elif message == 'start L1A 1MHz trigger bit':
                     #     start_L1A_1MHz_trigger_bit(self.cmd_interpret)
+                    elif message == 'start L1A trigger bit data':
+                        start_L1A_trigger_bit_data(self.cmd_interpret)
                     elif message == 'stop L1A':
                         stop_L1A(self.cmd_interpret)
                     elif message == 'stop L1A 1MHz':
