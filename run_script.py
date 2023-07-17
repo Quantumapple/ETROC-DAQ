@@ -76,6 +76,25 @@ def main(options, cmd_interpret, IPC_queue = None):
     #     print("\n", "Resetting Pulse Register 0x0002")
     #     software_clear_fifo(cmd_interpret)
 
+    # Loop till we create the LED Errors
+    # Please ensure LED Pages is set to 011
+    if(options.reset_till_linked):
+        linked_flag = False
+        try:
+            while(not linked_flag):
+                time.sleep(1) 
+                software_clear_fifo(cmd_interpret)
+                testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+                data_error = testregister_2[-1]
+                df_synced = testregister_2[-2]
+                linked_flag = (data_error=="0" and df_synced=="1")
+                print("Inside Reset Loop...")
+        # When ctrl+c is received
+        except KeyboardInterrupt as e:
+            print("Keyboard Interrupted in linking process!")
+            sys.exit(1)
+
+
     if(options.inspect_serial_output):		
         # _ 2b data rate 3b LED configuration 1b testmode 1b timestamp
         testregister = cmd_interpret.read_config_reg(13)
@@ -343,6 +362,7 @@ def getOptionParser():
     parser.add_option("--memo_fc",action="store_true", dest="memo_fc", default=False, help="(DEV ONLY) Do Fast Command with Memory")
     parser.add_option("--memo_fc_start_periodic_ws",action="store_true", dest="memo_fc_start_periodic_ws", default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_periodic_L1A_WS() from daq_helpers.py")
     parser.add_option("--memo_fc_start_onetime_ws", action="store_true", dest="memo_fc_start_onetime_ws" , default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_onetime_L1A_WS() from daq_helpers.py")
+    parser.add_option("--reset_till_linked",action="store_true", dest="reset_till_linked", default=False, help="FIFO clear and reset till data frames are synced and no data error is seen (Please ensure LED Pages is set to 011)")
     return parser
 
 if __name__ == "__main__":

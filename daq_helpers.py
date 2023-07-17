@@ -412,7 +412,7 @@ class Write_data(threading.Thread):
         self.read_thread_handle = read_thread_handle
         self.write_thread_handle = write_thread_handle
         self.translate_thread_handle = translate_thread_handle
-        # self.stop_DAQ_event = stop_DAQ_event
+        self.stop_DAQ_event = stop_DAQ_event
         # self.is_alive = False
 
     # def check_alive(self):
@@ -422,7 +422,6 @@ class Write_data(threading.Thread):
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
         # self.is_alive = True
-        total_lines = 0
         file_lines = 0
         file_counter = 0
         if (not self.skip_binary):
@@ -431,7 +430,7 @@ class Write_data(threading.Thread):
         else:
             print("{} is reading queue and pushing binary onwards...".format(self.getName()))
         retry_count = 0
-        while (total_lines<=self.num_file*self.num_line):
+        while (True):
             if not t.alive:
                 print("Write Thread detected alive=False")
                 outfile.close()
@@ -455,11 +454,14 @@ class Write_data(threading.Thread):
                 if not self.stop_DAQ_event.is_set():
                     retry_count = 0
                     continue
+                if self.write_thread_handle.is_set():
+                    print("Write Thread received STOP signal AND ran out of data to write")
+                    break
                 retry_count += 1
                 if retry_count < 30:
                     continue
                 print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM READ_QUEUE!!!")
-                self.read_thread_handle.set()
+                # self.read_thread_handle.set()
                 # self.is_alive = False
                 break
             # Handle the raw (binary) line
@@ -473,24 +475,22 @@ class Write_data(threading.Thread):
                 else: outfile.write('%s\n'%binary)
             # Increment line counters
             file_lines = file_lines + 1
-            total_lines = total_lines + 1
             # Perform translation related activities if requested
             if(self.make_plots or (not self.binary_only)):
                 self.translate_queue.put(binary)
             if self.write_thread_handle.is_set():
-                print("Write Thread received STOP signal")
+                # print("Write Thread received STOP signal")
                 if not self.translate_thread_handle.is_set():
                     print("Sending stop signal to Translate Thread")
                     self.translate_thread_handle.set()
-                print("Checking Read Thread from Write Thread")
+                # print("Checking Read Thread from Write Thread")
                 # wait for read thread to die...
-                while(self.read_thread_handle.is_set() == False):
-                    time.sleep(1)
+                # while(self.read_thread_handle.is_set() == False):
+                    # time.sleep(1)
                 # self.is_alive = False
-                break
-        else:
-            print("Write Thread gracefully sending STOP signal to translate thread") 
-            self.translate_thread_handle.set()
+        print("Write Thread gracefully sending STOP signal to translate thread") 
+        self.translate_thread_handle.set()
+        self.write_thread_handle.set()
         # self.is_alive = False
         print("%s finished!"%self.getName())
 
@@ -559,11 +559,14 @@ class Translate_data(threading.Thread):
                 if not self.stop_DAQ_event.is_set:
                     retry_count = 0
                     continue
+                if self.translate_thread_handle.is_set():
+                    print("Translate Thread received STOP signal AND ran out of data to translate")
+                    break
                 retry_count += 1
                 if retry_count < 30:
                     continue
                 print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!! THIS SENDS STOP SIGNAL TO ALL THREADS!!!")
-                self.read_write_handle.set()
+                # self.read_write_handle.set()
                 # self.is_alive = False
                 break
             TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID, self.hitmap, self.compressed_translation)
@@ -600,17 +603,19 @@ class Translate_data(threading.Thread):
                     if(not self.binary_only): file_lines  = file_lines  + TDC_len - 1
                     total_lines = total_lines + (TDC_len-1)
             if self.translate_thread_handle.is_set():
-                print("Translate Thread received STOP signal")
+                # print("Translate Thread received STOP signal")
                 if not self.plotting_thread_handle.is_set():
                     print("Sending stop signal to Plotting Thread")
                     self.plotting_thread_handle.set()
-                print("Checking Write Thread from Translate Thread")
+                # print("Checking Write Thread from Translate Thread")
                 # wait for write thread to die...
-                while(self.write_thread_handle.is_set() == False):
-                    time.sleep(1)
+                # while(self.write_thread_handle.is_set() == False):
+                    # time.sleep(1)
                 # self.is_alive = False
-                break
+                # break
+        
         print("Translate Thread gracefully sending STOP signal to plotting thread") 
+        self.translate_thread_handle.set()
         self.plotting_thread_handle.set()
         # self.is_alive = False
         print("%s finished!"%self.getName())
@@ -727,8 +732,8 @@ class DAQ_Plotting(threading.Thread):
             if self.plotting_thread_handle.is_set():
                 print("Plot Thread received STOP signal from Translate Thread")
                 # wait for translate thread to die...
-                while(self.translate_thread_handle.is_set() == False):
-                    time.sleep(1)
+                # while(self.translate_thread_handle.is_set() == False):
+                    # time.sleep(1)
                 # self.is_alive = False
                 break
             start_time = time.time()
