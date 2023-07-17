@@ -76,69 +76,100 @@ def main(options, cmd_interpret, IPC_queue = None):
     #     print("\n", "Resetting Pulse Register 0x0002")
     #     software_clear_fifo(cmd_interpret)
 
-    if(options.inspect_serial_output):		
-        # _ 2b data rate 3b LED configuration 1b testmode 1b timestamp
-        testregister = cmd_interpret.read_config_reg(13)
-        print('\n')
-        print("Written into Reg 13: ", format(testregister, '016b'))
-        print('\n')		              
-        testregister_2 = cmd_interpret.read_status_reg(2)
-        print("Status Reg Addr 2  : ", format(testregister_2, '016b'))
-        testregister_3 = cmd_interpret.read_status_reg(3)
-        print("Status Reg Addr 3  : ", format(testregister_3, '016b'))
-        print("Status Reg Addr 2+3: ", (format(testregister_2, '016b'))+
-        (format(testregister_3, '016b')))
-        print('\n')
+    # Loop till we create the LED Errors
+    # Please ensure LED Pages is set to 011
+    if(options.reset_till_linked):
+        testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+        print("Register 2 upon first run:", testregister_2)
+        data_error = testregister_2[-1]
+        df_synced = testregister_2[-2]
+        linked_flag = (data_error=="0" and df_synced=="1")
 
-        fixed_32 = 0xabaaafaa
-        fixed_16 = int(format(fixed_32,  '032b')[-16:], base=2)
-        fixed_8  = int(format(fixed_32,  '032b')[-8:],  base=2)
+        if(not linked_flag):
+            time.sleep(1) 
+            software_clear_fifo(cmd_interpret)
+            time.sleep(1)
+            testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+            print("Register 2 upon single reset:", testregister_2)
+        # try:
+        #     while(not linked_flag):
+        #         time.sleep(1) 
+        #         software_clear_fifo(cmd_interpret)
+        #         testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+        #         print("Register 2:", testregister_2)
+        #         data_error = testregister_2[-1]
+        #         df_synced = testregister_2[-2]
+        #         linked_flag = (data_error=="0" and df_synced=="1")
+        #         print("Inside Reset Loop...")
+        # # When ctrl+c is received
+        # except KeyboardInterrupt as e:
+        #     print("Keyboard Interrupted in linking process!")
+        #     sys.exit(1)
 
-        quad_8  = ""
-        for elem in format(fixed_8,  '08b'): quad_8 = quad_8 + elem + elem + elem + elem
-        doub_16 = ""
-        for elem in format(fixed_16,  '016b'): doub_16 = doub_16 + elem + elem
 
-        print("Processed Data Checks, look only at relavant bit length")
-        print("Fixed Pattern 8    : ", format(fixed_8,  '08b'))
-        if(format(fixed_8,  '08b') in format(testregister_2, '016b') and 
-        format(fixed_8,  '08b') in format(testregister_3, '016b')):
-            print("08 bit pattern found in both Status Reg 2 & 3")
-        elif(format(fixed_8,  '08b') in format(testregister_2, '016b') or 
-        format(fixed_8,  '08b') in format(testregister_3, '016b')):
-            print("08 bit pattern found in ONLY ONE of Status Reg 2 & 3!")
-        else: print("08 bit pattern not found in any of the Status Reg 2 or 3!")
+    # if(options.inspect_serial_output):		
+    #     # _ 2b data rate 3b LED configuration 1b testmode 1b timestamp
+    #     testregister = cmd_interpret.read_config_reg(13)
+    #     print('\n')
+    #     print("Written into Reg 13: ", format(testregister, '016b'))
+    #     print('\n')		              
+    #     testregister_2 = cmd_interpret.read_status_reg(2)
+    #     print("Status Reg Addr 2  : ", format(testregister_2, '016b'))
+    #     testregister_3 = cmd_interpret.read_status_reg(3)
+    #     print("Status Reg Addr 3  : ", format(testregister_3, '016b'))
+    #     print("Status Reg Addr 2+3: ", (format(testregister_2, '016b'))+
+    #     (format(testregister_3, '016b')))
+    #     print('\n')
 
-        print("Fixed Pattern 16   : ", format(fixed_16, '016b'))
-        if(format(fixed_16,  '016b') in format(testregister_2, '016b')*2 and 
-        format(fixed_16,  '016b') in format(testregister_3, '016b')*2):
-            print("16 bit pattern found in both Status Reg 2 & 3")
-        elif(format(fixed_16,  '016b') in format(testregister_2, '016b')*2 or 
-        format(fixed_16,  '016b') in format(testregister_3, '016b')*2):
-            print("16 bit pattern found in ONLY ONE of Status Reg 2 & 3!")
-        else: print("16 bit pattern not found in any of the Status Reg 2 or 3!")
+    #     fixed_32 = 0xabaaafaa
+    #     fixed_16 = int(format(fixed_32,  '032b')[-16:], base=2)
+    #     fixed_8  = int(format(fixed_32,  '032b')[-8:],  base=2)
 
-        print("Fixed Pattern 32   : ", format(fixed_32, '032b'))
-        if(format(fixed_32,  '032b') in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
-            print("32 bit pattern found in Status Reg 2 + 3")
-        else: print("32 bit pattern not found in Status Reg 2 + 3!")
+    #     quad_8  = ""
+    #     for elem in format(fixed_8,  '08b'): quad_8 = quad_8 + elem + elem + elem + elem
+    #     doub_16 = ""
+    #     for elem in format(fixed_16,  '016b'): doub_16 = doub_16 + elem + elem
 
-        print('\n')
-        print("Raw Data Checks")
-        print("Inflated 8-bit pattern : ", quad_8)
-        print("Inflated 16-bit pattern: ", doub_16)
-        if(quad_8 in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
-            print("Quadrupled 8 bit pattern found in Status Reg 2 + 3")
-        else: print("Quadrupled 8 bit pattern not found in Status Reg 2 + 3!")
-        if(doub_16 in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
-            print("Doubled 16 bit pattern found in Status Reg 2 + 3")
-        else: print("Doubled 16 bit pattern not found in Status Reg 2 + 3!")
-        print('\n')
+    #     print("Processed Data Checks, look only at relavant bit length")
+    #     print("Fixed Pattern 8    : ", format(fixed_8,  '08b'))
+    #     if(format(fixed_8,  '08b') in format(testregister_2, '016b') and 
+    #     format(fixed_8,  '08b') in format(testregister_3, '016b')):
+    #         print("08 bit pattern found in both Status Reg 2 & 3")
+    #     elif(format(fixed_8,  '08b') in format(testregister_2, '016b') or 
+    #     format(fixed_8,  '08b') in format(testregister_3, '016b')):
+    #         print("08 bit pattern found in ONLY ONE of Status Reg 2 & 3!")
+    #     else: print("08 bit pattern not found in any of the Status Reg 2 or 3!")
 
-    if(options.do_fc):
-        register_11(cmd_interpret, key = register_11_key)
-        register_12(cmd_interpret, key = register_12_key)
-        fc_signal_start(cmd_interpret)
+    #     print("Fixed Pattern 16   : ", format(fixed_16, '016b'))
+    #     if(format(fixed_16,  '016b') in format(testregister_2, '016b')*2 and 
+    #     format(fixed_16,  '016b') in format(testregister_3, '016b')*2):
+    #         print("16 bit pattern found in both Status Reg 2 & 3")
+    #     elif(format(fixed_16,  '016b') in format(testregister_2, '016b')*2 or 
+    #     format(fixed_16,  '016b') in format(testregister_3, '016b')*2):
+    #         print("16 bit pattern found in ONLY ONE of Status Reg 2 & 3!")
+    #     else: print("16 bit pattern not found in any of the Status Reg 2 or 3!")
+
+    #     print("Fixed Pattern 32   : ", format(fixed_32, '032b'))
+    #     if(format(fixed_32,  '032b') in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
+    #         print("32 bit pattern found in Status Reg 2 + 3")
+    #     else: print("32 bit pattern not found in Status Reg 2 + 3!")
+
+    #     print('\n')
+    #     print("Raw Data Checks")
+    #     print("Inflated 8-bit pattern : ", quad_8)
+    #     print("Inflated 16-bit pattern: ", doub_16)
+    #     if(quad_8 in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
+    #         print("Quadrupled 8 bit pattern found in Status Reg 2 + 3")
+    #     else: print("Quadrupled 8 bit pattern not found in Status Reg 2 + 3!")
+    #     if(doub_16 in (format(testregister_2, '016b')+format(testregister_3, '016b'))*2):
+    #         print("Doubled 16 bit pattern found in Status Reg 2 + 3")
+    #     else: print("Doubled 16 bit pattern not found in Status Reg 2 + 3!")
+    #     print('\n')
+
+    # if(options.do_fc):
+    #     register_11(cmd_interpret, key = register_11_key)
+    #     register_12(cmd_interpret, key = register_12_key)
+    #     fc_signal_start(cmd_interpret)
     if(options.memo_fc):
         start_L1A(cmd_interpret)
     if(options.memo_fc_start_onetime_ws):
@@ -254,14 +285,20 @@ def main(options, cmd_interpret, IPC_queue = None):
         read_queue = Queue()
         translate_queue = Queue() 
         plot_queue = Queue()
-        read_stop_event = threading.Event()     # This is how we stop the read thread
-        stop_DAQ_event = threading.Event()     # This is how we notify the Write thread that we are done taking data
-        receive_data = Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_stop_event, options.useIPC, stop_DAQ_event, IPC_queue)
-        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_file, options.num_line, options.time_limit, store_dict, options.binary_only, options.compressed_binary, options.skip_binary, options.make_plots, read_stop_event, stop_DAQ_event)
+        read_thread_handle = threading.Event()    # This is how we stop the read thread
+        write_thread_handle = threading.Event()   # This is how we stop the write thread
+        translate_thread_handle = threading.Event() # This is how we stop the translate thread (if translate enabled) (set down below...)
+        plotting_thread_handle = threading.Event() # This is how we stop the plotting thread (if plotting enabled) (set down below...)
+        stop_DAQ_event = threading.Event()     # This is how we notify the Read thread that we are done taking data
+                                               # Kill order is read, write, translate
+        receive_data = Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
+        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_file, options.num_line, store_dict, options.binary_only, options.compressed_binary, options.skip_binary, options.make_plots, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
         if(options.make_plots or (not options.binary_only)):
-            translate_data = Translate_data('Translate_data', translate_queue, plot_queue, cmd_interpret, options.num_file, options.num_line,  options.time_limit, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, read_stop_event, options.compressed_translation, stop_DAQ_event)
+            # translate_thread_handle = threading.Event()
+            translate_data = Translate_data('Translate_data', translate_queue, plot_queue, cmd_interpret, options.num_file, options.num_line, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, write_thread_handle, translate_thread_handle, plotting_thread_handle, options.compressed_translation, stop_DAQ_event)
         if(options.make_plots):
-            daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time, read_stop_event)
+            # plotting_thread_handle = threading.Event()
+            daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time, translate_thread_handle, plotting_thread_handle)
 
         # read_write_data.start()
         try:
@@ -332,11 +369,12 @@ def getOptionParser():
     parser.add_option("--nodaq",action="store_true", dest="nodaq", default=False, help="Switch off DAQ via the FPGA")
     parser.add_option("--useIPC",action="store_true", dest="useIPC", default=False, help="Use Inter Process Communication to control L1A enable/disable")
     parser.add_option("--firmware",action="store_true", dest="firmware", default=False, help="Configure FPGA firmware settings")
-    parser.add_option("--inspect_serial_output",action="store_true", dest="inspect_serial_output", default=False, help="(DEV ONLY) Decode the register binary values for serial port inspection with test pattern mode data")
-    parser.add_option("--do_fc",action="store_true", dest="do_fc", default=False, help="(DEV ONLY) Do Fast Command register setting in frequency train mode")
+    # parser.add_option("--inspect_serial_output",action="store_true", dest="inspect_serial_output", default=False, help="(DEV ONLY) Decode the register binary values for serial port inspection with test pattern mode data")
+    # parser.add_option("--do_fc",action="store_true", dest="do_fc", default=False, help="(DEV ONLY) Do Fast Command register setting in frequency train mode")
     parser.add_option("--memo_fc",action="store_true", dest="memo_fc", default=False, help="(DEV ONLY) Do Fast Command with Memory")
     parser.add_option("--memo_fc_start_periodic_ws",action="store_true", dest="memo_fc_start_periodic_ws", default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_periodic_L1A_WS() from daq_helpers.py")
     parser.add_option("--memo_fc_start_onetime_ws", action="store_true", dest="memo_fc_start_onetime_ws" , default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_onetime_L1A_WS() from daq_helpers.py")
+    parser.add_option("--reset_till_linked",action="store_true", dest="reset_till_linked", default=False, help="FIFO clear and reset till data frames are synced and no data error is seen (Please ensure LED Pages is set to 011)")
     return parser
 
 if __name__ == "__main__":
