@@ -79,6 +79,7 @@ def main(options, cmd_interpret, IPC_queue = None):
     # Loop till we create the LED Errors
     # Please ensure LED Pages is set to 011
     if(options.reset_till_linked):
+        time.sleep(2) 
         testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
         print("Register 2 upon first run:", testregister_2)
         data_error = testregister_2[-1]

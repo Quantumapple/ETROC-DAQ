@@ -173,11 +173,11 @@ def start_L1A_trigger_bit(cmd_interpret):
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
     
-    register_12(cmd_interpret, 0x0072)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
+    # register_12(cmd_interpret, 0x0072)
+    # cmd_interpret.write_config_reg(10, 0x0000)
+    # cmd_interpret.write_config_reg(9, 0x0000)
+    # fc_init_pulse(cmd_interpret)
+    # time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0075)
     cmd_interpret.write_config_reg(10, 0x0005)
