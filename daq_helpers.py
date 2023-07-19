@@ -16,6 +16,7 @@ import queue
 from command_interpret import *
 from ETROC1_ArrayReg import *
 from translate_data import *
+import datetime
 #========================================================================================#
 '''
 @author: Wei Zhang, Murtaza Safdari
@@ -314,8 +315,58 @@ def stop_L1A_train(cmd_interpret):
 def link_reset(cmd_interpret):
     software_clear_fifo(cmd_interpret) 
 
-# define a receive data class
-class Receive_data(threading.Thread):               # threading class
+# define a threading class for saving data from FPGA Registers only
+class Save_FPGA_data(threading.Thread):
+    def __init__(self, name, cmd_interpret, time_limit, overwrite, output_directory):
+        threading.Thread.__init__(self, name=name)
+        self.cmd_interpret = cmd_interpret
+        self.time_limit = time_limit
+        self.overwrite = overwrite
+        self.output_directory = output_directory
+
+    def run(self):
+        start_L1A_trigger_bit(self.cmd_interpret)
+        t = threading.current_thread()              # Local reference of THIS thread object
+        t.alive = True                              # Thread is alive by default
+        print("{} is saving FPGA data directly...".format(self.getName()))
+        total_start_time = time.time()
+        userdefinedir = self.output_directory
+        today = datetime.date.today()
+        todaystr = "../ETROC-Data/" + today.isoformat() + "_Array_Test_Results"
+        try:
+            os.mkdir(todaystr)
+            print("Directory %s was created!"%todaystr)
+        except FileExistsError:
+            print("Directory %s already exists!"%todaystr)
+        userdefine_dir = todaystr + "/%s"%userdefinedir
+        try:
+            os.mkdir(userdefine_dir)
+        except FileExistsError:
+            print("User defined directory %s already created!"%(userdefine_dir))
+            if(self.overwrite != True): 
+                print("Overwriting is not enabled, exiting code abruptly...")
+                sys.exit(1)
+        outfile = open("./%s/FPGA_Data.dat"%(userdefine_dir), 'w')
+        while ((time.time()-total_start_time<=self.time_limit)):
+            if not t.alive:
+                print("Check Link Thread detected alive=False")
+                break  
+            read_register = self.cmd_interpret.read_config_reg(7)
+            fpga_duration = int(format(read_register, '016b')[-6:], base=2)
+            read_register = self.cmd_interpret.read_config_reg(8)
+            en_L1A        = format(read_register, '016b')[-11]
+            fpga_state    = int(format(self.cmd_interpret.read_status_reg(7), '016b'), base=2)
+            fpga_data     = int(format(self.cmd_interpret.read_status_reg(4), '016b')+format(self.cmd_interpret.read_status_reg(3), '016b'), base=2)
+            fpga_header   = int(format(self.cmd_interpret.read_status_reg(6), '016b')+format(self.cmd_interpret.read_status_reg(5), '016b'), base=2)
+            outfile.write(f'{fpga_state},{en_L1A},{fpga_duration},{fpga_data},{fpga_header}\n')
+            time.sleep(1)
+        outfile.close()
+        stop_L1A_trigger_bit(self.cmd_interpret)
+        print("%s finished!"%self.getName())
+#--------------------------------------------------------------------------#
+
+# define a receive data threading class
+class Receive_data(threading.Thread):
     def __init__(self, name, queue, cmd_interpret, num_fifo_read, read_thread_handle, write_thread_handle, time_limit, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
         threading.Thread.__init__(self, name=name)
         self.queue = queue
@@ -327,11 +378,8 @@ class Receive_data(threading.Thread):               # threading class
         self.use_IPC = use_IPC
         self.stop_DAQ_event = stop_DAQ_event
         self.IPC_queue = IPC_queue
-        # self.is_alive = False
-
         if self.use_IPC and self.IPC_queue is None:
             self.use_IPC = False
-
         if not self.use_IPC:
             self.daq_on = True
             if self.stop_DAQ_event is not None:
@@ -339,14 +387,10 @@ class Receive_data(threading.Thread):               # threading class
         else:
             self.daq_on = True
             self.stop_DAQ_event.clear()
-
-    # def check_alive(self):
-    #     return self.is_alive
     
     def run(self):
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
-        # self.is_alive = True
         mem_data = []
         total_start_time = time.time()
         print("{} is reading data and pushing to the queue...".format(self.getName()))
@@ -418,15 +462,14 @@ class Receive_data(threading.Thread):               # threading class
         print("Sending stop signal to Write Thread")
         self.write_thread_handle.set()
         print("%s finished!"%self.getName())
-
 #--------------------------------------------------------------------------#
+
 # define a write data class
 class Write_data(threading.Thread):
-    def __init__(self, name, read_queue, translate_queue, num_file, num_line, store_dict, binary_only, compressed_binary, skip_binary, make_plots, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event = None):
+    def __init__(self, name, read_queue, translate_queue, num_line, store_dict, binary_only, compressed_binary, skip_binary, make_plots, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.read_queue = read_queue
         self.translate_queue = translate_queue
-        self.num_file = num_file
         self.num_line = num_line
         self.store_dict = store_dict
         self.binary_only = binary_only
@@ -520,12 +563,11 @@ class Write_data(threading.Thread):
 
 #--------------------------------------------------------------------------#
 class Translate_data(threading.Thread):
-    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_file, num_line, timestamp, store_dict, binary_only, make_plots, board_ID, write_thread_handle, translate_thread_handle, plotting_thread_handle, compressed_translation, stop_DAQ_event = None):
+    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_line, timestamp, store_dict, binary_only, make_plots, board_ID, write_thread_handle, translate_thread_handle, plotting_thread_handle, compressed_translation, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.translate_queue = translate_queue
         self.plot_queue = plot_queue
         self.cmd_interpret = cmd_interpret
-        self.num_file = num_file
         self.num_line = num_line
         self.timestamp = timestamp
         self.store_dict = store_dict
@@ -924,6 +966,13 @@ def register_11(cmd_interpret, key = 0x0000):
 ## 0000||0100||0000||0000 = 0x0400: shift of one clock cycle
 def triggerBitDelay(cmd_interpret, key = 0x0400): 
     cmd_interpret.write_config_reg(8, key)
+
+#--------------------------------------------------------------------------#
+## Register 7
+## 4-digit 16 bit hex
+## LSB 6 bits  - time (s) for FPGA counters
+def counterDuration(cmd_interpret, key = 0x0005): 
+    cmd_interpret.write_config_reg(7, key)
 
 #--------------------------------------------------------------------------#
 ## Fast Command Signal Start
