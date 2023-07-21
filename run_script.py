@@ -97,6 +97,30 @@ def main(options, cmd_interpret, IPC_queue = None):
                 data_error = testregister_2[-1]
                 df_synced = testregister_2[-2]
                 linked_flag = (data_error=="0" and df_synced=="1")
+    
+    # Loop till we create the LED Errors
+    # Please ensure LED Pages is set to 011
+    if(options.reset_till_trigger_linked):
+        time.sleep(3) 
+        testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+        print("Register 2 upon first run:", testregister_2)
+        data_error = testregister_2[-1]
+        df_synced = testregister_2[-2]
+        trigger_error = testregister_2[-3]
+        trigger_synced = testregister_2[-4]
+        linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
+        linked_index = 0
+        while (linked_index<10 and (not linked_flag)):
+            software_clear_fifo(cmd_interpret)
+            time.sleep(3)
+            testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+            print("Register 2 upon single reset:", testregister_2)
+            data_error = testregister_2[-1]
+            df_synced = testregister_2[-2]
+            trigger_error = testregister_2[-3]
+            trigger_synced = testregister_2[-4]
+            linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
+            linked_index += 1
 
     if(options.memo_fc):
         start_L1A(cmd_interpret)
@@ -258,6 +282,7 @@ def getOptionParser():
     parser.add_option("-f", "--firmware",action="store_true", dest="firmware", default=False, help="Configure FPGA firmware settings")
     parser.add_option("--memo_fc",action="store_true", dest="memo_fc", default=False, help="(DEV ONLY) Do Fast Command with Memory")
     parser.add_option("--reset_till_linked",action="store_true", dest="reset_till_linked", default=False, help="FIFO clear and reset till data frames are synced and no data error is seen (Please ensure LED Pages is set to 011)")
+    parser.add_option("--reset_till_trigger_linked",action="store_true", dest="reset_till_trigger_linked", default=False, help="FIFO clear and reset till data frames AND trigger bits are synced and no data error is seen (Please ensure LED Pages is set to 011)")
     parser.add_option("--fpga_data_time_limit", dest="fpga_data_time_limit", action="store", type="int", default=5, help="(DEV ONLY) Set time limit in integer seconds for FPGA Data saving thread")
     parser.add_option("--fpga_data",action="store_true", dest="fpga_data", default=False, help="(DEV ONLY) Save FPGA Register data")
     parser.add_option("--memo_fc_start_periodic_ws",action="store_true", dest="memo_fc_start_periodic_ws", default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_periodic_L1A_WS() from daq_helpers.py")
