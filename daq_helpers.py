@@ -266,7 +266,7 @@ def stop_L1A_trigger_bit(cmd_interpret):
     fc_signal_start(cmd_interpret)
     time.sleep(0.01)
 
-    software_clear_fifo(cmd_interpret)
+    # software_clear_fifo(cmd_interpret)
     time.sleep(0.01)
 
 def stop_L1A_1MHz(cmd_interpret):

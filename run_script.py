@@ -57,6 +57,8 @@ def main_process(IPC_queue, options, log_file = None):
     s.close()
 
 def set_trigger_linked(cmd_interpret):
+    reads = 0
+    clears = 0
     testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
     print("Register 2 upon checking:", testregister_2)
     data_error = testregister_2[-1]
@@ -71,16 +73,21 @@ def set_trigger_linked(cmd_interpret):
         while linked_flag is False:
             time.sleep(1.01)
             testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+            reads += 1
+            print("Read register:",reads)
+            print("Register after waiting to link",testregister_2)
             df_synced = testregister_2[-2]
             data_error = testregister_2[-1]
             trigger_synced = testregister_2[-4]
             trigger_error = testregister_2[-3]
             linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
-            if data_error=="1" or trigger_error=="1":
-                print("Found data error!")
+            print("Linked flag is",linked_flag)
+            # if data_error=="1" or trigger_error=="1":
+            if linked_flag is False:
+                # print("Found error!")
                 software_clear_fifo(cmd_interpret)
-                print("Cleared FIFO")
-                continue
+                clears += 1
+                print("Cleared FIFO:",clears)
     print("Register 2 after trying to link:", testregister_2)
     return True
 
@@ -92,7 +99,7 @@ def check_trigger_linked(cmd_interpret):
     trigger_error = testregister_2[-3]
     trigger_synced = testregister_2[-4]
     if (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1"):
-        print("All is linked")
+        print("All is linked with no errors")
         return True
     return False
     
@@ -101,7 +108,7 @@ def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory):
     try:
         fpga_data.start()
         while fpga_data.is_alive():
-            fpga_data.join(1.1)
+            fpga_data.join(1.2)
     except KeyboardInterrupt as e:
         fpga_data.alive = False
         fpga_data.join()
@@ -117,8 +124,12 @@ def main(options, cmd_interpret, IPC_queue = None):
         counterDuration(cmd_interpret, options.counter_duration)
         Enable_FPGA_Descramblber(cmd_interpret, options.polarity)
     
-    time.sleep(1)                                 # delay 1000 milliseconds
-    software_clear_fifo(cmd_interpret)            # clear fifo content
+    if(options.clear_fifo):
+        time.sleep(0.1)                                 # delay 1000 milliseconds
+        software_clear_fifo(cmd_interpret)              # clear fifo content
+        time.sleep(0.1)                                 # delay 1000 milliseconds
+        software_clear_fifo(cmd_interpret)              # clear fifo content  
+        print("Cleared FIFO")  
 
     # Loop till we create the LED Errors
     # Please ensure LED Pages is set to 011
@@ -315,6 +326,7 @@ def getOptionParser():
     parser.add_option("--check_link_at_end",action="store_true", dest="check_link_at_end", default=False, help="Check link after getting FPGA and if not linked then take FPGA data again)")
     parser.add_option("--fpga_data_time_limit", dest="fpga_data_time_limit", action="store", type="int", default=5, help="(DEV ONLY) Set time limit in integer seconds for FPGA Data saving thread")
     parser.add_option("--fpga_data",action="store_true", dest="fpga_data", default=False, help="(DEV ONLY) Save FPGA Register data")
+    parser.add_option("--clear_fifo",action="store_true", dest="clear_fifo", default=False, help="Clear FIFO at beginning of script")
     parser.add_option("--memo_fc_start_periodic_ws",action="store_true", dest="memo_fc_start_periodic_ws", default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_periodic_L1A_WS() from daq_helpers.py")
     parser.add_option("--memo_fc_start_onetime_ws", action="store_true", dest="memo_fc_start_onetime_ws" , default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_onetime_L1A_WS() from daq_helpers.py")
     return parser
