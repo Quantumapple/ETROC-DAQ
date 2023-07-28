@@ -359,7 +359,7 @@ class Save_FPGA_data(threading.Thread):
             fpga_data     = int(format(self.cmd_interpret.read_status_reg(4), '016b')+format(self.cmd_interpret.read_status_reg(3), '016b'), base=2)
             fpga_header   = int(format(self.cmd_interpret.read_status_reg(6), '016b')+format(self.cmd_interpret.read_status_reg(5), '016b'), base=2)
             outfile.write(f'{fpga_state},{en_L1A},{fpga_duration},{fpga_data},{fpga_header}\n')
-            time.sleep(1)
+            time.sleep(0.01)
         outfile.close()
         stop_L1A_trigger_bit(self.cmd_interpret)
         print("%s finished!"%self.getName())
