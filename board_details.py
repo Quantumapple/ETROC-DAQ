@@ -22,6 +22,16 @@ Any inserted jumpers will flip the bit
 
 '''
 
+#ETROC1 Only
+slaveA_addr_list = [0x03,  0x02,  0x01]
+slaveB_addr_list = [0x7f,  0x7e,  0x7d]
+#slaveA_addr_list = [0x03,  0x02,  0x01, 0x00]
+#slaveB_addr_list = [0x7f,  0x7e,  0x7d, 0x7c]
+
+# Use this to control how many boards are actually attempted for connection
+# ETROC version number
+board_type       = [2, 1, 1, 1]
+
 ## Register 15, needs firmware option
 active_channels_key = 0x0011
 
@@ -47,10 +57,22 @@ register_12_key = 0x0006
 # w is the memo FC (active high)
 register_14_key = 0x000b
 
-# Use this to control how many boards are actually attempted for connection
-# ETROC version number
-board_type       = [2, 1, 1, 1]
+
 
 board_size       = [256, 16, 16, 16]
+
 board_name       = ["F28", "F29", "F30", "F47"]
-board_ID         = ["10111111100001111","00000000000000000","00000000000000000", "00000000000000000"]
+board_ID         = ["10111111100001111","00000000000000000","00000000000000000", "00000000000000000"] 
+# 10111111100001111
+CLSel_board      = [  0,    0,    0, 0 ]			# Load Capacitance of the preamp first stage, default 0
+RfSel_board      = [  2,    2,    2, 2 ]			# Feedback resistance seleciton
+IBSel_board      = [  0,    0,    0, 0 ]			# Bias current selection of the input transistor in the preamp
+
+def single_pixel_threshold(size, address, threshold):
+	threshold_list = []
+	for i in range(size):
+		if i==address:
+			threshold_list.append(threshold)
+		else:
+			threshold_list.append(0x000)
+	return threshold_list

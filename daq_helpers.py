@@ -16,7 +16,6 @@ import queue
 from command_interpret import *
 from ETROC1_ArrayReg import *
 from translate_data import *
-import datetime
 #========================================================================================#
 '''
 @author: Wei Zhang, Murtaza Safdari
@@ -28,6 +27,7 @@ def start_periodic_L1A_WS(cmd_interpret):
     ## 4-digit 16 bit hex, Duration is LSB 12 bits
     ## This tells us how many memory slots to use
     register_11(cmd_interpret, 0x0deb)
+
     time.sleep(0.01)
 
     ## 4-digit 16 bit hex, 0xWXYZ
@@ -36,35 +36,201 @@ def start_periodic_L1A_WS(cmd_interpret):
     ## Z - Input command
     register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
     cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
+    cmd_interpret.write_config_reg(9, 0x0deb)   # 3563
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0032)          # This is periodic BC Reset FC
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
+    # register_12(cmd_interpret, 0x0032)          # This is periodic BC Reset FC
+    # cmd_interpret.write_config_reg(10, 0x0000)
+    # cmd_interpret.write_config_reg(9, 0x0000)
+    # fc_init_pulse(cmd_interpret)
+
+    # time.sleep(0.01)
+
+    # for i in range(890): # 890 for i*4
+    #     addr_ci = i*4
+    #     # print(addr_ci)
+    #     register_12(cmd_interpret, 0x0035)          # This is periodic Qinj FC
+    #     cmd_interpret.write_config_reg(10, addr_ci)
+    #     cmd_interpret.write_config_reg(9, addr_ci)
+    #     fc_init_pulse(cmd_interpret)
+
+    # time.sleep(0.01)
+
+    offset = 5
+
+    # register_12(cmd_interpret, 0x0035)          # This is periodic Qinj FC
+    # cmd_interpret.write_config_reg(10, 0x00ff)
+    # cmd_interpret.write_config_reg(9, 0x00ff)
+    # fc_init_pulse(cmd_interpret)
+    # print(offset+2)
+
+    # time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0008)          # This is periodic ws start
+    cmd_interpret.write_config_reg(10, offset +1)
+    cmd_interpret.write_config_reg(9, offset +1)
     fc_init_pulse(cmd_interpret)
+
+
+
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0035)          # This is periodic Qinj FC
-    cmd_interpret.write_config_reg(10, 0x0001)
-    cmd_interpret.write_config_reg(9, 0x0001)
+    register_12(cmd_interpret, 0x0005)          
+    cmd_interpret.write_config_reg(10, offset+3)
+    cmd_interpret.write_config_reg(9, offset+3)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0036)          # This is periodic L1A FC
-    cmd_interpret.write_config_reg(10, 0x01f0)
-    cmd_interpret.write_config_reg(9, 0x01ff)
+    register_12(cmd_interpret, 0x0005)          
+    cmd_interpret.write_config_reg(10, offset+6+2)
+    cmd_interpret.write_config_reg(9, offset+6+2)
     fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0005)          
+    cmd_interpret.write_config_reg(10, offset+10+2)
+    cmd_interpret.write_config_reg(9, offset+10+2)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0009)          # This is periodic ws stop
+    cmd_interpret.write_config_reg(10, offset + 16+4)
+    cmd_interpret.write_config_reg(9, offset + 16+4)
+    fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
+
+    time.sleep(0.01)
+
+def WS_onetime_ws_start(cmd_interpret):
+    ## 4-digit 16 bit hex, Duration is LSB 12 bits
+    ## This tells us how many memory slots to use
+    register_11(cmd_interpret, 0x0deb)
+
+    time.sleep(0.01)
+
+    ## 4-digit 16 bit hex, 0xWXYZ
+    ## WX (8 bit) -  Error Mask
+    ## Y - trigSize[1:0],Period,testTrig
+    ## Z - Input command
+    register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)   # 3563
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0008)          # This is onetime ws_start
+    cmd_interpret.write_config_reg(10, 0x0001)
+    cmd_interpret.write_config_reg(9, 0x0001)   
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
+
+    time.sleep(0.01)
+
+def WS_onetime_ws_stop(cmd_interpret):
+    ## 4-digit 16 bit hex, Duration is LSB 12 bits
+    ## This tells us how many memory slots to use
+    register_11(cmd_interpret, 0x0deb)
+
+    time.sleep(0.01)
+
+    ## 4-digit 16 bit hex, 0xWXYZ
+    ## WX (8 bit) -  Error Mask
+    ## Y - trigSize[1:0],Period,testTrig
+    ## Z - Input command
+    register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)   # 3563
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0009)          # This is onetime ws_stop
+    cmd_interpret.write_config_reg(10, 0x0001)
+    cmd_interpret.write_config_reg(9, 0x0001)   
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
+
+    time.sleep(0.01)
+
+def WS_start_charge_injection_stop(cmd_interpret):
+    ## 4-digit 16 bit hex, Duration is LSB 12 bits
+    ## This tells us how many memory slots to use
+    register_11(cmd_interpret, 0x0deb)
+
+    time.sleep(0.01)
+
+    ## 4-digit 16 bit hex, 0xWXYZ
+    ## WX (8 bit) -  Error Mask
+    ## Y - trigSize[1:0],Period,testTrig
+    ## Z - Input command
+    register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)   # 3563
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    offset = 5
+
+    register_12(cmd_interpret, 0x0008)          # This is onetime ws start
+    cmd_interpret.write_config_reg(10, offset +1)
+    cmd_interpret.write_config_reg(9, offset +1)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0005)          # This is onetime charge injection
+    cmd_interpret.write_config_reg(10, offset+3)
+    cmd_interpret.write_config_reg(9, offset+3)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0005)          # This is onetime charge injection
+    cmd_interpret.write_config_reg(10, offset+8)
+    cmd_interpret.write_config_reg(9, offset+8)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    # register_12(cmd_interpret, 0x0005)          # This is onetime charge injection
+    # cmd_interpret.write_config_reg(10, offset+12)
+    # cmd_interpret.write_config_reg(9, offset+12)
+    # fc_init_pulse(cmd_interpret)
+
+    # time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0009)          # This is onetime ws_stop
+    cmd_interpret.write_config_reg(10, offset+20)
+    cmd_interpret.write_config_reg(9, offset+20)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
+
     time.sleep(0.01)
     
 def start_onetime_L1A_WS(cmd_interpret):
     ## 4-digit 16 bit hex, Duration is LSB 12 bits
     ## This tells us how many memory slots to use
     register_11(cmd_interpret, 0x0deb)
+
     time.sleep(0.01)
 
     ## 4-digit 16 bit hex, 0xWXYZ
@@ -75,29 +241,33 @@ def start_onetime_L1A_WS(cmd_interpret):
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0002)          # This is onetime BC Reset FC
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0005)          # This is onetime Qinj FC
     cmd_interpret.write_config_reg(10, 0x0001)
     cmd_interpret.write_config_reg(9, 0x0001)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0006)          # This is onetime L1A FC
     cmd_interpret.write_config_reg(10, 0x01f0)
     cmd_interpret.write_config_reg(9, 0x01ff)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
-    time.sleep(0.01)
 
+    time.sleep(0.01)
 def start_L1A(cmd_interpret):
     ## dec = 3564
     register_11(cmd_interpret, 0x0deb)
@@ -108,43 +278,52 @@ def start_L1A(cmd_interpret):
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0032)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0035)
     cmd_interpret.write_config_reg(10, 0x0001)
     cmd_interpret.write_config_reg(9, 0x0001)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0036)
-    cmd_interpret.write_config_reg(10, 0x01f9)
-    cmd_interpret.write_config_reg(9, 0x01f9)
+    # 1f7
+    cmd_interpret.write_config_reg(10, 0x01f0)
+    cmd_interpret.write_config_reg(9, 0x01ff)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
+
     time.sleep(0.01)
 
 def start_L1A_1MHz(cmd_interpret):
     register_11(cmd_interpret, 0x0de7)
+
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0030)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0de7)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
     
     register_12(cmd_interpret, 0x0032)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     for index in range(89):
@@ -152,71 +331,64 @@ def start_L1A_1MHz(cmd_interpret):
         cmd_interpret.write_config_reg(10, 0x0001 + index*40)
         cmd_interpret.write_config_reg(9, 0x0001 + index*40)
         fc_init_pulse(cmd_interpret)
+
+        time.sleep(0.01)
+
+        register_12(cmd_interpret, 0x0036)
+        cmd_interpret.write_config_reg(10, 0x017 + index*40)
+        cmd_interpret.write_config_reg(9, 0x01b + index*40)
+        fc_init_pulse(cmd_interpret)
+
+        time.sleep(0.01)
+
+        # register_12(cmd_interpret, 0x0036)
+        # cmd_interpret.write_config_reg(10, 0x01f + index*40)
+        # cmd_interpret.write_config_reg(9, 0x01f + index*40)
+        # fc_init_pulse(cmd_interpret)
+
+        # time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)
+
+    time.sleep(0.01)
+
+def start_L1A_1MHz_clean(cmd_interpret):
+    register_11(cmd_interpret, 0x0de7)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0030)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0de7)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+    
+    register_12(cmd_interpret, 0x0032)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0000)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    for index in range(89):
+        register_12(cmd_interpret, 0x0035)
+        cmd_interpret.write_config_reg(10, 0x0001 + index*40)
+        cmd_interpret.write_config_reg(9, 0x0001 + index*40)
+        fc_init_pulse(cmd_interpret)
+
         time.sleep(0.01)
 
         register_12(cmd_interpret, 0x0036)
         cmd_interpret.write_config_reg(10, 0x019 + index*40)
         cmd_interpret.write_config_reg(9, 0x019 + index*40)
         fc_init_pulse(cmd_interpret)
+
         time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
-    time.sleep(0.01)
-
-def start_L1A_trigger_bit(cmd_interpret):
-    register_11(cmd_interpret, 0x0deb)
 
     time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0070)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-    
-    # register_12(cmd_interpret, 0x0072)
-    # cmd_interpret.write_config_reg(10, 0x0000)
-    # cmd_interpret.write_config_reg(9, 0x0000)
-    # fc_init_pulse(cmd_interpret)
-    # time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0075)
-    cmd_interpret.write_config_reg(10, 0x0005)
-    cmd_interpret.write_config_reg(9, 0x0005)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    # register_12(cmd_interpret, 0x0076)
-    # cmd_interpret.write_config_reg(10, 0x01f9)
-    # cmd_interpret.write_config_reg(9, 0x01f9)
-    # fc_init_pulse(cmd_interpret)
-    # time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-
-    time.sleep(0.01)
-
-def start_L1A_trigger_bit_data(cmd_interpret):
-    register_11(cmd_interpret, 0x0deb)
-
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0070)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-    
-    register_12(cmd_interpret, 0x0072)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-    
-    fc_signal_start(cmd_interpret)
-
-    time.sleep(0.01)
-    
 
 def start_L1A_train(cmd_interpret):
 
@@ -243,30 +415,51 @@ def start_L1A_train(cmd_interpret):
     fc_signal_start(cmd_interpret)
     software_clear_fifo(cmd_interpret) 
 
+def start_L1A_1MHz_noQinj(cmd_interpret):
+    register_11(cmd_interpret, 0x0de7)
+
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0030)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0de7)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+    
+    register_12(cmd_interpret, 0x0032)
+    cmd_interpret.write_config_reg(10, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0000)
+    fc_init_pulse(cmd_interpret)
+
+    time.sleep(0.01)
+
+    for index in range(89):
+
+        register_12(cmd_interpret, 0x0036)
+        cmd_interpret.write_config_reg(10, 0x019 + index*40)
+        cmd_interpret.write_config_reg(9, 0x019 + index*40)
+        fc_init_pulse(cmd_interpret)
+        time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)
+    time.sleep(0.01)
+
+
 def stop_L1A(cmd_interpret):
     register_12(cmd_interpret, 0x0030)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
+
     time.sleep(0.01)
 
     software_clear_fifo(cmd_interpret)
-    time.sleep(0.01)
 
-def stop_L1A_trigger_bit(cmd_interpret):
-    register_12(cmd_interpret, 0x0070)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-    time.sleep(0.01)
-
-    # software_clear_fifo(cmd_interpret)
     time.sleep(0.01)
 
 def stop_L1A_1MHz(cmd_interpret):
@@ -274,25 +467,15 @@ def stop_L1A_1MHz(cmd_interpret):
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0de7)
     fc_init_pulse(cmd_interpret)
+
     time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
+
     time.sleep(0.01)
 
     software_clear_fifo(cmd_interpret)
-    time.sleep(0.01)
 
-def stop_L1A_1MHz_trigger_bit(cmd_interpret):
-    register_12(cmd_interpret, 0x0070)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0de7)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-    time.sleep(0.01)
-
-    software_clear_fifo(cmd_interpret)
     time.sleep(0.01)
 
 def stop_L1A_train(cmd_interpret):
@@ -315,71 +498,22 @@ def stop_L1A_train(cmd_interpret):
 def link_reset(cmd_interpret):
     software_clear_fifo(cmd_interpret) 
 
-# define a threading class for saving data from FPGA Registers only
-class Save_FPGA_data(threading.Thread):
-    def __init__(self, name, cmd_interpret, time_limit, overwrite, output_directory):
-        threading.Thread.__init__(self, name=name)
-        self.cmd_interpret = cmd_interpret
-        self.time_limit = time_limit
-        self.overwrite = overwrite
-        self.output_directory = output_directory
 
-    def run(self):
-        start_L1A_trigger_bit(self.cmd_interpret)
-        t = threading.current_thread()              # Local reference of THIS thread object
-        t.alive = True                              # Thread is alive by default
-        print("{} is saving FPGA data directly...".format(self.getName()))
-        total_start_time = time.time()
-        userdefinedir = self.output_directory
-        today = datetime.date.today()
-        todaystr = "../ETROC-Data/" + today.isoformat() + "_Array_Test_Results"
-        try:
-            os.mkdir(todaystr)
-            print("Directory %s was created!"%todaystr)
-        except FileExistsError:
-            print("Directory %s already exists!"%todaystr)
-        userdefine_dir = todaystr + "/%s"%userdefinedir
-        try:
-            os.mkdir(userdefine_dir)
-        except FileExistsError:
-            print("User defined directory %s already created!"%(userdefine_dir))
-            if(self.overwrite != True): 
-                print("Overwriting is not enabled, exiting code abruptly...")
-                sys.exit(1)
-        outfile = open("./%s/FPGA_Data.dat"%(userdefine_dir), 'w')
-        while ((time.time()-total_start_time<=self.time_limit)):
-            if not t.alive:
-                print("Check Link Thread detected alive=False")
-                break  
-            read_register = self.cmd_interpret.read_config_reg(7)
-            fpga_duration = int(format(read_register, '016b')[-6:], base=2)
-            read_register = self.cmd_interpret.read_config_reg(8)
-            en_L1A        = format(read_register, '016b')[-11]
-            fpga_state    = int(format(self.cmd_interpret.read_status_reg(7), '016b'), base=2)
-            fpga_data     = int(format(self.cmd_interpret.read_status_reg(4), '016b')+format(self.cmd_interpret.read_status_reg(3), '016b'), base=2)
-            fpga_header   = int(format(self.cmd_interpret.read_status_reg(6), '016b')+format(self.cmd_interpret.read_status_reg(5), '016b'), base=2)
-            outfile.write(f'{fpga_state},{en_L1A},{fpga_duration},{fpga_data},{fpga_header}\n')
-            time.sleep(0.01)
-        outfile.close()
-        stop_L1A_trigger_bit(self.cmd_interpret)
-        print("%s finished!"%self.getName())
-#--------------------------------------------------------------------------#
-
-# define a receive data threading class
-class Receive_data(threading.Thread):
-    def __init__(self, name, queue, cmd_interpret, num_fifo_read, read_thread_handle, write_thread_handle, time_limit, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
+# define a receive data class
+class Receive_data(threading.Thread):               # threading class
+    def __init__(self, name, queue, cmd_interpret, num_fifo_read, read_stop_event, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
         threading.Thread.__init__(self, name=name)
         self.queue = queue
         self.cmd_interpret = cmd_interpret
         self.num_fifo_read = num_fifo_read
-        self.read_thread_handle = read_thread_handle
-        self.write_thread_handle = write_thread_handle
-        self.time_limit = time_limit
+        self.read_stop_event = read_stop_event
         self.use_IPC = use_IPC
         self.stop_DAQ_event = stop_DAQ_event
         self.IPC_queue = IPC_queue
+
         if self.use_IPC and self.IPC_queue is None:
             self.use_IPC = False
+
         if not self.use_IPC:
             self.daq_on = True
             if self.stop_DAQ_event is not None:
@@ -387,14 +521,14 @@ class Receive_data(threading.Thread):
         else:
             self.daq_on = True
             self.stop_DAQ_event.clear()
+
     
     def run(self):
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
         mem_data = []
-        total_start_time = time.time()
         print("{} is reading data and pushing to the queue...".format(self.getName()))
-        while ((time.time()-total_start_time<=self.time_limit)):
+        while True:
             if self.use_IPC:
                 try:
                     message = self.IPC_queue.get(False)
@@ -407,20 +541,14 @@ class Receive_data(threading.Thread):
                         start_L1A(self.cmd_interpret)
                     elif message == 'start L1A 1MHz':
                         start_L1A_1MHz(self.cmd_interpret)
-                    elif message == 'start L1A trigger bit':
-                        start_L1A_trigger_bit(self.cmd_interpret)
-                    # elif message == 'start L1A 1MHz trigger bit':
-                    #     start_L1A_1MHz_trigger_bit(self.cmd_interpret)
-                    elif message == 'start L1A trigger bit data':
-                        start_L1A_trigger_bit_data(self.cmd_interpret)
+                    elif message == 'start L1A 1MHz noQinj':
+                        start_L1A_1MHz_noQinj(self.cmd_interpret)
+                    elif message == 'start L1A 1MHz clean':
+                        start_L1A_1MHz_clean(self.cmd_interpret)
                     elif message == 'stop L1A':
                         stop_L1A(self.cmd_interpret)
                     elif message == 'stop L1A 1MHz':
                         stop_L1A_1MHz(self.cmd_interpret)
-                    elif message == 'stop L1A trigger bit':
-                        stop_L1A_trigger_bit(self.cmd_interpret)
-                    elif message == 'stop L1A 1MHz trigger bit':
-                        stop_L1A_1MHz_trigger_bit(self.cmd_interpret)
                     elif message == 'stop L1A train':
                         stop_L1A_train(self.cmd_interpret)
                     elif message == 'start L1A train':
@@ -429,11 +557,6 @@ class Receive_data(threading.Thread):
                         self.stop_DAQ_event.set()
                     elif message == 'link reset':
                         link_reset(self.cmd_interpret)
-                    ## Special if condition for delay change during the DAQ
-                    ## Example: change delay 0x0421
-                    ##   becomes: change delay 1057
-                    elif ' '.join(message.split(' ')[:2]) == 'change delay':
-                        triggerBitDelay(self.cmd_interpret, int(message.split(' ')[2], base=16))
                     else:
                         print(f'Unknown message: {message}')
                 except queue.Empty:
@@ -446,49 +569,35 @@ class Receive_data(threading.Thread):
                     self.queue.put(mem_line) 
             if not t.alive:
                 print("Read Thread detected alive=False")
-                # self.is_alive = False
                 break  
-            if self.read_thread_handle.is_set():
-                print("Read Thread received STOP signal")
-                if not self.write_thread_handle.is_set():
-                    print("Sending stop signal to Write Thread")
-                    self.write_thread_handle.set()
-                print("Stopping Read Thread")
-                # self.is_alive = False
+            if self.read_stop_event.is_set():
+                print("Read Thread received STOP signal from Write Thread")
                 break
-        print("Read Thread gracefully sending STOP signal to other threads") 
-        self.read_thread_handle.set()
-        # self.is_alive = False
-        print("Sending stop signal to Write Thread")
-        self.write_thread_handle.set()
         print("%s finished!"%self.getName())
-#--------------------------------------------------------------------------#
 
+#--------------------------------------------------------------------------#
 # define a write data class
 class Write_data(threading.Thread):
-    def __init__(self, name, read_queue, translate_queue, num_line, store_dict, binary_only, compressed_binary, skip_binary, make_plots, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event = None):
+    def __init__(self, name, read_queue, translate_queue, num_file, num_line, time_limit, store_dict, binary_only, compressed_binary, skip_binary, make_plots, read_stop_event, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.read_queue = read_queue
         self.translate_queue = translate_queue
+        self.num_file = num_file
         self.num_line = num_line
+        self.time_limit = time_limit
         self.store_dict = store_dict
         self.binary_only = binary_only
         self.compressed_binary = compressed_binary
         self.skip_binary = skip_binary
         self.make_plots = make_plots
-        self.read_thread_handle = read_thread_handle
-        self.write_thread_handle = write_thread_handle
-        self.translate_thread_handle = translate_thread_handle
+        self.read_stop_event = read_stop_event
         self.stop_DAQ_event = stop_DAQ_event
-        # self.is_alive = False
-
-    # def check_alive(self):
-    #     return self.is_alive
 
     def run(self):
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
-        # self.is_alive = True
+        total_lines = 0
+        total_start_time = time.time()
         file_lines = 0
         file_counter = 0
         if (not self.skip_binary):
@@ -497,11 +606,10 @@ class Write_data(threading.Thread):
         else:
             print("{} is reading queue and pushing binary onwards...".format(self.getName()))
         retry_count = 0
-        while (True):
+        while (total_lines<=self.num_file*self.num_line) if (self.time_limit<0) else (time.time()-total_start_time<=self.time_limit):
             if not t.alive:
                 print("Write Thread detected alive=False")
                 outfile.close()
-                # self.is_alive = False
                 break 
             if(file_lines>self.num_line and (not self.skip_binary)):
                 outfile.close()
@@ -521,15 +629,11 @@ class Write_data(threading.Thread):
                 if not self.stop_DAQ_event.is_set():
                     retry_count = 0
                     continue
-                if self.write_thread_handle.is_set():
-                    print("Write Thread received STOP signal AND ran out of data to write")
-                    break
                 retry_count += 1
                 if retry_count < 30:
                     continue
                 print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM READ_QUEUE!!!")
-                # self.read_thread_handle.set()
-                # self.is_alive = False
+                self.read_stop_event.set()
                 break
             # Handle the raw (binary) line
             if int(mem_data) == 0: continue # Waiting for IPC
@@ -542,33 +646,25 @@ class Write_data(threading.Thread):
                 else: outfile.write('%s\n'%binary)
             # Increment line counters
             file_lines = file_lines + 1
+            total_lines = total_lines + 1
             # Perform translation related activities if requested
             if(self.make_plots or (not self.binary_only)):
                 self.translate_queue.put(binary)
-            if self.write_thread_handle.is_set():
-                # print("Write Thread received STOP signal")
-                if not self.translate_thread_handle.is_set():
-                    print("Sending stop signal to Translate Thread")
-                    self.translate_thread_handle.set()
-                # print("Checking Read Thread from Write Thread")
-                # wait for read thread to die...
-                # while(self.read_thread_handle.is_set() == False):
-                    # time.sleep(1)
-                # self.is_alive = False
-        print("Write Thread gracefully sending STOP signal to translate thread") 
-        self.translate_thread_handle.set()
-        self.write_thread_handle.set()
-        # self.is_alive = False
+        else:
+            print("Write Thread gracefully sending STOP signal to other threads") 
+            self.read_stop_event.set()
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
 class Translate_data(threading.Thread):
-    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_line, timestamp, store_dict, binary_only, make_plots, board_ID, write_thread_handle, translate_thread_handle, plotting_thread_handle, compressed_translation, stop_DAQ_event = None):
+    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_file, num_line, time_limit, timestamp, store_dict, binary_only, make_plots, board_ID, read_stop_event, compressed_translation, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.translate_queue = translate_queue
         self.plot_queue = plot_queue
         self.cmd_interpret = cmd_interpret
+        self.num_file = num_file
         self.num_line = num_line
+        self.time_limit = time_limit
         self.timestamp = timestamp
         self.store_dict = store_dict
         self.binary_only = binary_only
@@ -576,22 +672,16 @@ class Translate_data(threading.Thread):
         self.board_ID = board_ID
         self.queue_ch = [deque() for i in range(4)]
         self.link_ch  = ["" for i in range(4)]
-        self.write_thread_handle = write_thread_handle
-        self.translate_thread_handle = translate_thread_handle
-        self.plotting_thread_handle = plotting_thread_handle
+        self.read_stop_event = read_stop_event
         self.stop_DAQ_event = stop_DAQ_event
         self.hitmap = {i:np.zeros((16,16)) for i in range(4)}
         self.compressed_translation = compressed_translation
-        # self.is_alive = False
-
-    # def check_alive(self):
-    #     return self.is_alive
 
     def run(self):
         t = threading.current_thread()
         t.alive = True
-        # self.is_alive = True
         total_lines = 0
+        total_start_time = time.time()
         file_lines = 0
         file_counter = 0
         if(not self.binary_only): 
@@ -604,12 +694,11 @@ class Translate_data(threading.Thread):
             if not t.alive:
                 print("Translate Thread detected alive=False")
                 if(not self.binary_only): outfile.close()
-                # self.is_alive = False
                 break 
-            # if self.translate_thread_handle.is_set():
-            #     print("Translate Thread received STOP signal from Write Thread")
-            #     if(not self.binary_only): outfile.close()
-            #     break
+            if self.read_stop_event.is_set():
+                print("Translate Thread received STOP signal from Write Thread")
+                if(not self.binary_only): outfile.close()
+                break
             if((not self.binary_only) and file_lines>self.num_line):
                 outfile.close()
                 file_lines=0
@@ -625,15 +714,11 @@ class Translate_data(threading.Thread):
                 if not self.stop_DAQ_event.is_set:
                     retry_count = 0
                     continue
-                if self.translate_thread_handle.is_set():
-                    print("Translate Thread received STOP signal AND ran out of data to translate")
-                    break
                 retry_count += 1
                 if retry_count < 30:
                     continue
                 print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!! THIS SENDS STOP SIGNAL TO ALL THREADS!!!")
-                # self.read_write_handle.set()
-                # self.is_alive = False
+                self.read_stop_event.set()
                 break
             TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID, self.hitmap, self.compressed_translation)
             if(write_flag==1):
@@ -668,27 +753,11 @@ class Translate_data(threading.Thread):
                 if(TDC_len>0):
                     if(not self.binary_only): file_lines  = file_lines  + TDC_len - 1
                     total_lines = total_lines + (TDC_len-1)
-            if self.translate_thread_handle.is_set():
-                # print("Translate Thread received STOP signal")
-                if not self.plotting_thread_handle.is_set():
-                    print("Sending stop signal to Plotting Thread")
-                    self.plotting_thread_handle.set()
-                # print("Checking Write Thread from Translate Thread")
-                # wait for write thread to die...
-                # while(self.write_thread_handle.is_set() == False):
-                    # time.sleep(1)
-                # self.is_alive = False
-                # break
-        
-        print("Translate Thread gracefully sending STOP signal to plotting thread") 
-        self.translate_thread_handle.set()
-        self.plotting_thread_handle.set()
-        # self.is_alive = False
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
 class DAQ_Plotting(threading.Thread):
-    def __init__(self, name, queue, timestamp, store_dict, pixel_address, board_type, board_size, plot_queue_time, translate_thread_handle, plotting_thread_handle):
+    def __init__(self, name, queue, timestamp, store_dict, pixel_address, board_type, board_size, plot_queue_time, read_stop_event):
         threading.Thread.__init__(self, name=name)
         self.queue = queue
         self.timestamp = timestamp
@@ -697,14 +766,11 @@ class DAQ_Plotting(threading.Thread):
         self.board_type = board_type
         self.board_size = board_size
         self.plot_queue_time = plot_queue_time
-        self.translate_thread_handle = translate_thread_handle
-        self.plotting_thread_handle = plotting_thread_handle
-        # self.is_alive = False
+        self.read_stop_event = read_stop_event
 
     def run(self):
         t = threading.current_thread()
         t.alive = True
-        # self.is_alive = True
 
         ch0 = np.zeros((int(np.sqrt(self.board_size[0])),int(np.sqrt(self.board_size[0])))) 
         ch1 = np.zeros((int(np.sqrt(self.board_size[1])),int(np.sqrt(self.board_size[1])))) 
@@ -793,14 +859,9 @@ class DAQ_Plotting(threading.Thread):
             img3.autoscale()
             if not t.alive:
                 print("Plotting Thread detected alive=False")
-                # self.is_alive = False
                 break
-            if self.plotting_thread_handle.is_set():
-                print("Plot Thread received STOP signal from Translate Thread")
-                # wait for translate thread to die...
-                # while(self.translate_thread_handle.is_set() == False):
-                    # time.sleep(1)
-                # self.is_alive = False
+            if self.read_stop_event.is_set():
+                print("Plot Thread received STOP signal from Write Thread")
                 break
             start_time = time.time()
             delta_time = 0
@@ -855,33 +916,32 @@ class DAQ_Plotting(threading.Thread):
         plt.show()
 
         # Thread then stops running
-        # self.is_alive = False
         print("Plotting Thread broke out of loop")
 
 
-#--------------------------------------------------------------------------#
-
-## IIC write slave device
-# @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
-# @param slave[7:0] : slave device address
-# @param wr: 1-bit '0' is write, '1' is read
-# @param reg_addr[7:0] : register address
-# @param data[7:0] : 8-bit write data
-def iic_write(mode, slave_addr, wr, reg_addr, data, cmd_interpret):
+## #--------------------------------------------------------------------------#
+## 
+## ## IIC write slave device
+## # @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
+## # @param slave[7:0] : slave device address
+## # @param wr: 1-bit '0' is write, '1' is read
+## # @param reg_addr[7:0] : register address
+## # @param data[7:0] : 8-bit write data
+def iic_write_ws(mode, slave_addr, wr, reg_addr, data, cmd_interpret):
     val = mode << 24 | slave_addr << 17 | wr << 16 | reg_addr << 8 | data
     cmd_interpret.write_config_reg(4, 0xffff & val)
     cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
     time.sleep(0.01)
     cmd_interpret.write_pulse_reg(0x0001)                                     # reset ddr3 data fifo
     time.sleep(0.01)
-
-#--------------------------------------------------------------------------#
-## IIC read slave device
-# @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
-# @param slave[6:0]: slave device address
-# @param wr: 1-bit '0' is write, '1' is read
-# @param reg_addr[7:0] : register address
-def iic_read(mode, slave_addr, wr, reg_addr, cmd_interpret):
+## 
+## #--------------------------------------------------------------------------#
+## ## IIC read slave device
+## # @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
+## # @param slave[6:0]: slave device address
+## # @param wr: 1-bit '0' is write, '1' is read
+## # @param reg_addr[7:0] : register address
+def iic_read_ws(mode, slave_addr, wr, reg_addr, cmd_interpret):
     val = mode << 24 | slave_addr << 17 |  0 << 16 | reg_addr << 8 | 0x00	  # write device addr and reg addr
     cmd_interpret.write_config_reg(4, 0xffff & val)
     cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
@@ -895,6 +955,162 @@ def iic_read(mode, slave_addr, wr, reg_addr, cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
     time.sleep(0.01)									                      # delay 10ns then to read data
     return cmd_interpret.read_status_reg(0) & 0xff
+
+
+#--------------------------------------------------------------------------#
+def iic_check(slave_addr: int, cmd_interpret):
+    '''
+    '''
+    mode = 0
+    wr = 1
+    val = mode << 24 | slave_addr << 17 | wr << 16 	    # write device addr and read one byte, ignore read address
+    cmd_interpret.write_config_reg(4, 0xffff & val)
+    cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+    time.sleep(0.01)
+    cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
+    ack_error = cmd_interpret.read_status_reg(0) & 0x0100   #the 9th bit of status register is ACK_ERROR
+    return (ack_error == 0)  # if no error, return true
+
+
+#--------------------------------------------------------------------------#
+## IIC write slave device
+# @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
+# @param slave[7:0] : slave device address
+# @param wr: 1-bit '0' is write, '1' is read
+# @param reg_addr[7:0] : register address
+# @param data[7:0] : 8-bit write data
+def iic_write(slave_addr: int, reg_addr: int, reg_bits: int, data: int, cmd_interpret):
+    '''
+    '''
+    data_byte = data & 0xff
+    if reg_bits == 8 :
+        mode = 1
+        wr = 0
+        reg_addr = 0x00ff & reg_addr
+        val = mode << 24 | slave_addr << 17 | wr << 16 | reg_addr << 8 | data_byte
+        cmd_interpret.write_config_reg(4, 0xffff & val)
+        cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+        time.sleep(0.01)
+        cmd_interpret.write_pulse_reg(0x0001)           # reset ddr3 data fifo
+        time.sleep(0.01)
+    elif reg_bits == 16:
+        mode = 2
+        wr = 0
+        reg_addr_lsb = 0x00ff & reg_addr
+        reg_addr_msb = (0xff00 & reg_addr) >> 8
+        val = mode << 24 | slave_addr << 17 | wr << 16 | reg_addr_lsb << 8 | data_byte
+        cmd_interpret.write_config_reg(4, 0xffff & val)
+        cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+        cmd_interpret.write_config_reg(6, 0xffff & reg_addr_msb)
+        time.sleep(0.01)
+        cmd_interpret.write_pulse_reg(0x0001)           # reset ddr3 data fifo
+        time.sleep(0.01)
+    else:
+        # self.send_message("Unknown bit size trying to be sent", "Error")
+        print("Unknown bit size trying to be sent", "Error")
+    return  # TODO: implement this for the FPGA
+
+
+#--------------------------------------------------------------------------#
+## IIC read slave device
+# @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
+# @param slave[6:0]: slave device address
+# @param wr: 1-bit '0' is write, '1' is read
+# @param reg_addr[7:0] : register address
+def iic_read(slave_addr: int, reg_addr: int, reg_bits: int, cmd_interpret):
+    '''
+    '''
+    if reg_bits == 8 :
+        mode = 0
+        wr = 0
+        reg_addr = 0xff & reg_addr
+        val = mode << 24 | slave_addr << 17 |  wr << 16 | reg_addr << 8 | 0x00	  # write device addr and reg addr
+        #write 8 bit address first
+        cmd_interpret.write_config_reg(4, 0xffff & val)
+        cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+        time.sleep(0.01)
+        cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
+        #read 8 bit data
+        wr = 1
+        val = mode << 24 | slave_addr << 17 | wr << 16 | reg_addr << 8 | 0x00	  # write device addr and read one byte
+        cmd_interpret.write_config_reg(4, 0xffff & val)
+        cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+        time.sleep(0.01)
+        cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
+        time.sleep(0.01)		
+    elif reg_bits == 16:
+        mode = 1
+        wr = 0
+        reg_addr_lsb = 0x00ff & reg_addr
+        reg_addr_msb = (0xff00 & reg_addr) >> 8
+        #write 16 bit address first
+        val = mode << 24 | slave_addr << 17 | wr << 16 | reg_addr_lsb << 8 | reg_addr_msb	  # write device addr and read one byte
+        cmd_interpret.write_config_reg(4, 0xffff & val)
+        cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+        time.sleep(0.01)
+        cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
+        #read 8 bit data
+        mode = 0
+        wr = 1
+        val = mode << 24 | slave_addr << 17 | wr << 16 | reg_addr << 8 | 0x00	  # write device addr and read one byte
+        cmd_interpret.write_config_reg(4, 0xffff & val)
+        cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+        time.sleep(0.01)
+        cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
+        time.sleep(0.01)									                      # delay 10ns then to read data
+    else:
+        # self.send_message("Unknown bit size trying to be sent", "Error")
+        print("Unknown bit size trying to be sent", "Error")
+    rd_data = cmd_interpret.read_status_reg(0) & 0xff							                      # delay 10ns then to read data
+    return rd_data  # TODO: implement this for the FPGA
+
+
+#--------------------------------------------------------------------------#
+## IIC read slave device
+# @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
+# @param slave[6:0]: slave device address
+# @param wr: 1-bit '0' is write, '1' is read
+# @param reg_addr[7:0] : register address
+def iic_read_new(slave_addr: int, reg_addr: int, reg_bits: int, cmd_interpret):
+    '''
+    '''
+    if reg_bits == 8 :
+        mode = 0
+        wr = 0
+        reg_addr = 0xff & reg_addr
+        val = mode << 24 | slave_addr << 17 |  wr << 16 | reg_addr << 8 | 0x00	  # write device addr and reg addr
+        #write 8 bit address first
+        cmd_interpret.write_config_reg(4, 0xffff & val)
+        cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+        time.sleep(0.01)
+        cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
+        #read 8 bit data
+        wr = 1
+        val = mode << 24 | slave_addr << 17 | wr << 16 | reg_addr << 8 | 0x00	  # write device addr and read one byte
+        cmd_interpret.write_config_reg(4, 0xffff & val)
+        cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+        time.sleep(0.01)
+        cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
+        time.sleep(0.01)		
+    elif reg_bits == 16:
+        mode = 2
+        wr = 1
+        reg_addr_lsb = 0x00ff & reg_addr
+        reg_addr_msb = (0xff00 & reg_addr) >> 8
+        #write 16 bit address first && read 8 bit data
+        val = mode << 24 | slave_addr << 17 | wr << 16 | reg_addr_lsb << 8 | reg_addr_msb	  # write device addr and read one byte
+        cmd_interpret.write_config_reg(4, 0xffff & val)
+        cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+        time.sleep(0.01)
+        cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
+        time.sleep(0.01)									                      # delay 10ns then to read data
+    else:
+        # self.send_message("Unknown bit size trying to be sent", "Error")
+        print("Unknown bit size trying to be sent", "Error")
+    rd_data = cmd_interpret.read_status_reg(0) & 0xff							                      # delay 10ns then to read data
+    return rd_data  # TODO: implement this for the FPGA
+
+
 #--------------------------------------------------------------------------#
 ## Enable FPGA Descrambler
 def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
@@ -958,21 +1174,6 @@ def register_12(cmd_interpret, key = 0x0000):
 ## YZ (8 bit) - Error Mask
 def register_11(cmd_interpret, key = 0x0000): 
     cmd_interpret.write_config_reg(11, key)
-
-#--------------------------------------------------------------------------#
-## Register 8
-## 4-digit 16 bit hex
-## LSB 10 bits are delay, LSB 11th bit is delay enabled
-## 0000||0100||0000||0000 = 0x0400: shift of one clock cycle
-def triggerBitDelay(cmd_interpret, key = 0x0400): 
-    cmd_interpret.write_config_reg(8, key)
-
-#--------------------------------------------------------------------------#
-## Register 7
-## 4-digit 16 bit hex
-## LSB 6 bits  - time (s) for FPGA counters
-def counterDuration(cmd_interpret, key = 0x0005): 
-    cmd_interpret.write_config_reg(7, key)
 
 #--------------------------------------------------------------------------#
 ## Fast Command Signal Start
