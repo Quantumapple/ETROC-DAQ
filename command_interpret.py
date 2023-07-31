@@ -69,7 +69,7 @@ class command_interpret:
         self.ss.sendall(struct.pack('I',data)[::-1])
         data = 0x80140000                                   #read Cnt 32bit memory words
         self.ss.sendall(struct.pack('I',data)[::-1])
-        for i in xrange(Cnt):
+        for i in range(Cnt):
             print(hex(struct.unpack('I', self.ss.recv(4)[::-1])[0]))
 
     ## read_data_fifo
