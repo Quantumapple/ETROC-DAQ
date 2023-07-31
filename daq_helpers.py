@@ -180,6 +180,7 @@ def start_L1A_trigger_bit(cmd_interpret):
     # fc_init_pulse(cmd_interpret)
     # time.sleep(0.01)
 
+    # QInj FC
     register_12(cmd_interpret, 0x0075)
     cmd_interpret.write_config_reg(10, 0x0005)
     cmd_interpret.write_config_reg(9, 0x0005)
@@ -201,12 +202,14 @@ def start_L1A_trigger_bit_data(cmd_interpret):
 
     time.sleep(0.01)
 
+    # Idle
     register_12(cmd_interpret, 0x0070)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
     
+    # BCR
     register_12(cmd_interpret, 0x0072)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
@@ -325,7 +328,7 @@ class Save_FPGA_data(threading.Thread):
         self.output_directory = output_directory
 
     def run(self):
-        start_L1A_trigger_bit(self.cmd_interpret)
+        start_L1A_trigger_bit_data(self.cmd_interpret)
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
         print("{} is saving FPGA data directly...".format(self.getName()))
