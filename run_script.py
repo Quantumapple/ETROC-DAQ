@@ -103,8 +103,8 @@ def check_trigger_linked(cmd_interpret):
         return True
     return False
     
-def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory):
-    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory)
+def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj):
+    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory, isQInj)
     try:
         fpga_data.start()
         while fpga_data.is_alive():
@@ -225,17 +225,17 @@ def main(options, cmd_interpret, IPC_queue = None):
                 print("Overwriting is not enabled, exiting code abruptly...")
                 sys.exit(1)
 
-    if(options.fpga_data):
+    if(options.fpga_data or options.fpga_data_QInj):
         if(options.reset_till_trigger_linked):
             print("Checking trigger link at beginning")
             set_trigger_linked(cmd_interpret)
-        get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory)
+        get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj)
         if(options.check_link_at_end):
             print("Checking trigger link at end")
             linked_flag = check_trigger_linked(cmd_interpret)
             while linked_flag is False:
                 set_trigger_linked(cmd_interpret)
-                get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory)
+                get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj)
                 linked_flag = check_trigger_linked(cmd_interpret)
 
     if(not options.nodaq):
@@ -326,6 +326,7 @@ def getOptionParser():
     parser.add_option("--check_link_at_end",action="store_true", dest="check_link_at_end", default=False, help="Check link after getting FPGA and if not linked then take FPGA data again)")
     parser.add_option("--fpga_data_time_limit", dest="fpga_data_time_limit", action="store", type="int", default=5, help="(DEV ONLY) Set time limit in integer seconds for FPGA Data saving thread")
     parser.add_option("--fpga_data",action="store_true", dest="fpga_data", default=False, help="(DEV ONLY) Save FPGA Register data")
+    parser.add_option("--fpga_data_QInj",action="store_true", dest="fpga_data_QInj", default=False, help="(DEV ONLY) Save FPGA Register data and send QInj")
     parser.add_option("--clear_fifo",action="store_true", dest="clear_fifo", default=False, help="Clear FIFO at beginning of script")
     parser.add_option("--memo_fc_start_periodic_ws",action="store_true", dest="memo_fc_start_periodic_ws", default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_periodic_L1A_WS() from daq_helpers.py")
     parser.add_option("--memo_fc_start_onetime_ws", action="store_true", dest="memo_fc_start_onetime_ws" , default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_onetime_L1A_WS() from daq_helpers.py")

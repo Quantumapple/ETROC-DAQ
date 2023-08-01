@@ -168,12 +168,14 @@ def start_L1A_trigger_bit(cmd_interpret):
 
     time.sleep(0.01)
 
+    # IDLE
     register_12(cmd_interpret, 0x0070)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
     
+    # BCR
     # register_12(cmd_interpret, 0x0072)
     # cmd_interpret.write_config_reg(10, 0x0000)
     # cmd_interpret.write_config_reg(9, 0x0000)
@@ -320,15 +322,19 @@ def link_reset(cmd_interpret):
 
 # define a threading class for saving data from FPGA Registers only
 class Save_FPGA_data(threading.Thread):
-    def __init__(self, name, cmd_interpret, time_limit, overwrite, output_directory):
+    def __init__(self, name, cmd_interpret, time_limit, overwrite, output_directory, isQInj):
         threading.Thread.__init__(self, name=name)
         self.cmd_interpret = cmd_interpret
         self.time_limit = time_limit
         self.overwrite = overwrite
         self.output_directory = output_directory
+        self.isQInj = isQInj
 
     def run(self):
-        start_L1A_trigger_bit_data(self.cmd_interpret)
+        if(self.isQInj):
+            start_L1A_trigger_bit(self.cmd_interpret) # seding IDLE + QINJ FC
+        else:
+            stop_L1A_trigger_bit(self.cmd_interpret) # only sending IDLE FC 
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
         print("{} is saving FPGA data directly...".format(self.getName()))
