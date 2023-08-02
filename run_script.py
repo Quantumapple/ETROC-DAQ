@@ -91,6 +91,35 @@ def set_trigger_linked(cmd_interpret):
     print("Register 2 after trying to link:", testregister_2)
     return True
 
+def set_linked(cmd_interpret):
+    reads = 0
+    clears = 0
+    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+    print("Register 2 upon checking:", testregister_2)
+    data_error = testregister_2[-1]
+    df_synced = testregister_2[-2]
+    linked_flag = (data_error=="0" and df_synced=="1")
+    if linked_flag:
+        print("Already Linked:",testregister_2)
+        return True
+    else:
+        while linked_flag is False:
+            time.sleep(1.01)
+            testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+            reads += 1
+            print("Read register:",reads)
+            print("Register after waiting to link",testregister_2)
+            df_synced = testregister_2[-2]
+            data_error = testregister_2[-1]
+            linked_flag = (data_error=="0" and df_synced=="1")
+            print("Linked flag is",linked_flag)
+            if linked_flag is False:
+                software_clear_fifo(cmd_interpret)
+                clears += 1
+                print("Cleared FIFO:",clears)
+    print("Register 2 after trying to link:", testregister_2)
+    return True
+
 def check_trigger_linked(cmd_interpret):
     testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
     print("Register 2 upon checking:", testregister_2)
@@ -102,13 +131,23 @@ def check_trigger_linked(cmd_interpret):
         print("All is linked with no errors")
         return True
     return False
+
+def check_linked(cmd_interpret):
+    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+    print("Register 2 upon checking:", testregister_2)
+    data_error = testregister_2[-1]
+    df_synced = testregister_2[-2]
+    if (data_error=="0" and df_synced=="1"):
+        print("All is linked with no errors")
+        return True
+    return False
     
-def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj):
-    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory, isQInj)
+def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
+    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val)
     try:
         fpga_data.start()
         while fpga_data.is_alive():
-            fpga_data.join(1.2)
+            fpga_data.join(0.8)
     except KeyboardInterrupt as e:
         fpga_data.alive = False
         fpga_data.join()
@@ -121,7 +160,6 @@ def main(options, cmd_interpret, IPC_queue = None):
         active_channels(cmd_interpret, key = active_channels_key)
         timestamp(cmd_interpret, key = options.timestamp)
         triggerBitDelay(cmd_interpret, options.trigger_bit_delay)
-        counterDuration(cmd_interpret, options.counter_duration)
         Enable_FPGA_Descramblber(cmd_interpret, options.polarity)
     
     if(options.clear_fifo):
@@ -131,33 +169,14 @@ def main(options, cmd_interpret, IPC_queue = None):
         software_clear_fifo(cmd_interpret)              # clear fifo content  
         print("Cleared FIFO")  
 
+    if(options.counter_duration):
+        counterDuration(cmd_interpret, options.counter_duration)
+
     # Loop till we create the LED Errors
     # Please ensure LED Pages is set to 011
     if(options.reset_till_linked):
-        time.sleep(0.1) 
-        testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-        print("Register 2 upon first run:", testregister_2)
-        data_error = testregister_2[-1]
-        df_synced = testregister_2[-2]
-        linked_flag = (data_error=="0" and df_synced=="1")
-
-        if(not linked_flag):
-            software_clear_fifo(cmd_interpret)
-            time.sleep(0.1)
-            testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-            print("Register 2 upon single reset:", testregister_2)
-            data_error = testregister_2[-1]
-            df_synced = testregister_2[-2]
-            linked_flag = (data_error=="0" and df_synced=="1")
-
-            if(not linked_flag):
-                software_clear_fifo(cmd_interpret)
-                time.sleep(0.1)
-                testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-                print("Register 2 upon single reset:", testregister_2)
-                data_error = testregister_2[-1]
-                df_synced = testregister_2[-2]
-                linked_flag = (data_error=="0" and df_synced=="1")
+        time.sleep(0.1)
+        set_linked(cmd_interpret)
 
     if(options.memo_fc):
         start_L1A(cmd_interpret)
@@ -229,14 +248,21 @@ def main(options, cmd_interpret, IPC_queue = None):
         if(options.reset_till_trigger_linked):
             print("Checking trigger link at beginning")
             set_trigger_linked(cmd_interpret)
-        get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj)
-        if(options.check_link_at_end):
+        get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
+        if(options.check_trigger_link_at_end):
             print("Checking trigger link at end")
             linked_flag = check_trigger_linked(cmd_interpret)
             while linked_flag is False:
                 set_trigger_linked(cmd_interpret)
-                get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj)
+                get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
                 linked_flag = check_trigger_linked(cmd_interpret)
+        elif(options.check_link_at_end):
+            print("Checking data link at end")
+            linked_flag = check_linked(cmd_interpret)
+            while linked_flag is False:
+                set_linked(cmd_interpret)
+                get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
+                linked_flag = check_linked(cmd_interpret)
 
     if(not options.nodaq):
         ## start receive_data, write_data, daq_plotting threading
@@ -313,6 +339,7 @@ def getOptionParser():
     parser.add_option("-p", "--polarity", type="int",action="store", dest="polarity", default=0x000b, help="Set fc polarity, see daq_helpers for more info")
     parser.add_option("-d", "--trigger_bit_delay", type="int",action="store", dest="trigger_bit_delay", default=0x0400, help="Set trigger bit delay, see daq_helpers for more info")
     parser.add_option("-c", "--counter_duration", type="int",action="store", dest="counter_duration", default=0x0005, help="LSB 6 bits - Time (s) for FPGA data counting")
+    parser.add_option("--DAC_Val", dest="DAC_Val", action="store", type="int", help="DAC value set for FPGA data taking", default=-1)
     parser.add_option("-v", "--verbose",action="store_true", dest="verbose", default=False, help="Print status messages to stdout")
     parser.add_option("-w", "--overwrite",action="store_true", dest="overwrite", default=False, help="Overwrite previously saved files")
     parser.add_option("--make_plots",action="store_true", dest="make_plots", default=False, help="Enable plotting of real time hits")
@@ -323,7 +350,8 @@ def getOptionParser():
     parser.add_option("--memo_fc",action="store_true", dest="memo_fc", default=False, help="(DEV ONLY) Do Fast Command with Memory")
     parser.add_option("--reset_till_linked",action="store_true", dest="reset_till_linked", default=False, help="FIFO clear and reset till data frames are synced and no data error is seen (Please ensure LED Pages is set to 011)")
     parser.add_option("--reset_till_trigger_linked",action="store_true", dest="reset_till_trigger_linked", default=False, help="FIFO clear and reset till data frames AND trigger bits are synced and no data error is seen (Please ensure LED Pages is set to 011)")
-    parser.add_option("--check_link_at_end",action="store_true", dest="check_link_at_end", default=False, help="Check link after getting FPGA and if not linked then take FPGA data again)")
+    parser.add_option("--check_link_at_end",action="store_true", dest="check_link_at_end", default=False, help="Check data link after getting FPGA and if not linked then take FPGA data again)")
+    parser.add_option("--check_trigger_link_at_end",action="store_true", dest="check_trigger_link_at_end", default=False, help="Check trigger link after getting FPGA and if not linked then take FPGA data again)")
     parser.add_option("--fpga_data_time_limit", dest="fpga_data_time_limit", action="store", type="int", default=5, help="(DEV ONLY) Set time limit in integer seconds for FPGA Data saving thread")
     parser.add_option("--fpga_data",action="store_true", dest="fpga_data", default=False, help="(DEV ONLY) Save FPGA Register data")
     parser.add_option("--fpga_data_QInj",action="store_true", dest="fpga_data_QInj", default=False, help="(DEV ONLY) Save FPGA Register data and send QInj")

@@ -101,7 +101,6 @@ def start_onetime_L1A_WS(cmd_interpret):
 def start_L1A(cmd_interpret):
     ## dec = 3564
     register_11(cmd_interpret, 0x0deb)
-
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0030)
@@ -189,11 +188,12 @@ def start_L1A_trigger_bit(cmd_interpret):
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
-    # register_12(cmd_interpret, 0x0076)
-    # cmd_interpret.write_config_reg(10, 0x01f9)
-    # cmd_interpret.write_config_reg(9, 0x01f9)
-    # fc_init_pulse(cmd_interpret)
-    # time.sleep(0.01)
+    ### Send L1A
+    register_12(cmd_interpret, 0x0076)
+    cmd_interpret.write_config_reg(10, 0x01fd)
+    cmd_interpret.write_config_reg(9, 0x01fd)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
 
@@ -322,13 +322,14 @@ def link_reset(cmd_interpret):
 
 # define a threading class for saving data from FPGA Registers only
 class Save_FPGA_data(threading.Thread):
-    def __init__(self, name, cmd_interpret, time_limit, overwrite, output_directory, isQInj):
+    def __init__(self, name, cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
         threading.Thread.__init__(self, name=name)
         self.cmd_interpret = cmd_interpret
         self.time_limit = time_limit
         self.overwrite = overwrite
         self.output_directory = output_directory
         self.isQInj = isQInj
+        self.DAC_Val = DAC_Val
 
     def run(self):
         if(self.isQInj):
@@ -348,27 +349,34 @@ class Save_FPGA_data(threading.Thread):
         except FileExistsError:
             print("Directory %s already exists!"%todaystr)
         userdefine_dir = todaystr + "/%s"%userdefinedir
+        outfile = None
         try:
             os.mkdir(userdefine_dir)
         except FileExistsError:
             print("User defined directory %s already created!"%(userdefine_dir))
-            if(self.overwrite != True): 
-                print("Overwriting is not enabled, exiting code abruptly...")
-                sys.exit(1)
-        outfile = open("./%s/FPGA_Data.dat"%(userdefine_dir), 'w')
-        while ((time.time()-total_start_time<=self.time_limit)):
-            if not t.alive:
-                print("Check Link Thread detected alive=False")
-                break  
-            read_register = self.cmd_interpret.read_config_reg(7)
-            fpga_duration = int(format(read_register, '016b')[-6:], base=2)
-            read_register = self.cmd_interpret.read_config_reg(8)
-            en_L1A        = format(read_register, '016b')[-11]
-            fpga_state    = int(format(self.cmd_interpret.read_status_reg(7), '016b'), base=2)
-            fpga_data     = int(format(self.cmd_interpret.read_status_reg(4), '016b')+format(self.cmd_interpret.read_status_reg(3), '016b'), base=2)
-            fpga_header   = int(format(self.cmd_interpret.read_status_reg(6), '016b')+format(self.cmd_interpret.read_status_reg(5), '016b'), base=2)
-            outfile.write(f'{fpga_state},{en_L1A},{fpga_duration},{fpga_data},{fpga_header}\n')
-            time.sleep(0.01)
+            if(self.overwrite != True):
+                outfile = open("./%s/FPGA_Data.dat"%(userdefine_dir), 'a')
+            else:
+                if os.path.exists("./%s/FPGA_Data.dat"%(userdefine_dir)):
+                    os.system("rm ./%s/FPGA_Data.dat"%(userdefine_dir))
+                outfile = open("./%s/FPGA_Data.dat"%(userdefine_dir), 'w')
+        if outfile is None:
+            print("Outfile not set!")
+            sys.exit(1)
+        sleep_time = self.time_limit
+        if sleep_time < 3:
+            sleep_time = 3
+        if not t.alive:
+            print("Check Link Thread detected alive=False")
+        time.sleep(sleep_time)
+        read_register = self.cmd_interpret.read_config_reg(7)
+        fpga_duration = int(format(read_register, '016b')[-6:], base=2)
+        read_register = self.cmd_interpret.read_config_reg(8)
+        en_L1A        = format(read_register, '016b')[-11]
+        fpga_state    = int(format(self.cmd_interpret.read_status_reg(7), '016b'), base=2)
+        fpga_data     = int(format(self.cmd_interpret.read_status_reg(4), '016b')+format(self.cmd_interpret.read_status_reg(3), '016b'), base=2)
+        fpga_header   = int(format(self.cmd_interpret.read_status_reg(6), '016b')+format(self.cmd_interpret.read_status_reg(5), '016b'), base=2)
+        outfile.write(f'{fpga_state},{en_L1A},{fpga_duration},{fpga_data},{fpga_header},{self.DAC_Val}\n')
         outfile.close()
         stop_L1A_trigger_bit(self.cmd_interpret)
         print("%s finished!"%self.getName())
