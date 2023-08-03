@@ -2,14 +2,10 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
-import copy
 import time
-#import visa
-import struct
 import socket
 import threading
 import datetime
-#import heartrate
 from queue import Queue
 import numpy as np
 import matplotlib.pyplot as plt
@@ -161,10 +157,10 @@ def main(options, cmd_interpret, IPC_queue = None):
 
     if(options.memo_fc):
         start_L1A(cmd_interpret)
-    if(options.memo_fc_start_onetime_ws):
-        start_onetime_L1A_WS(cmd_interpret)
-    if(options.memo_fc_start_periodic_ws):
-        start_periodic_L1A_WS(cmd_interpret)
+    # if(options.memo_fc_start_onetime_ws):
+    #     start_onetime_L1A_WS(cmd_interpret)
+    # if(options.memo_fc_start_periodic_ws):
+    #     start_periodic_L1A_WS(cmd_interpret)
 
     if(options.verbose):
         read_register_7 = cmd_interpret.read_config_reg(7)

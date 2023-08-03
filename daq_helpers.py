@@ -24,7 +24,7 @@ import datetime
 This script is composed of all the helper functions needed for I2C comms, FPGA, etc
 '''
 #--------------------------------------------------------------------------#
-def start_periodic_L1A_WS(cmd_interpret):
+def start_periodic_WS(cmd_interpret):
     ## 4-digit 16 bit hex, Duration is LSB 12 bits
     ## This tells us how many memory slots to use
     register_11(cmd_interpret, 0x0deb)
@@ -40,28 +40,28 @@ def start_periodic_L1A_WS(cmd_interpret):
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0032)          # This is periodic BC Reset FC
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0035)          # This is periodic Qinj FC
+    register_12(cmd_interpret, 0x0038)          # This is periodic WS start
     cmd_interpret.write_config_reg(10, 0x0001)
     cmd_interpret.write_config_reg(9, 0x0001)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0036)          # This is periodic L1A FC
-    cmd_interpret.write_config_reg(10, 0x01f0)
-    cmd_interpret.write_config_reg(9, 0x01ff)
+    register_12(cmd_interpret, 0x0035)          # This is periodic Qinj FC
+    cmd_interpret.write_config_reg(10, 0x0005)
+    cmd_interpret.write_config_reg(9, 0x0005)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0039)          # This is periodic WS stop
+    cmd_interpret.write_config_reg(10, 0x0009)
+    cmd_interpret.write_config_reg(9, 0x0009)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
     time.sleep(0.01)
     
-def start_onetime_L1A_WS(cmd_interpret):
+def start_onetime_WS(cmd_interpret):
     ## 4-digit 16 bit hex, Duration is LSB 12 bits
     ## This tells us how many memory slots to use
     register_11(cmd_interpret, 0x0deb)
@@ -77,21 +77,52 @@ def start_onetime_L1A_WS(cmd_interpret):
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0002)          # This is onetime BC Reset FC
+    register_12(cmd_interpret, 0x0008)          # This is periodic WS start
+    cmd_interpret.write_config_reg(10, 0x0006)
+    cmd_interpret.write_config_reg(9, 0x0006)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0005)          # This is periodic Qinj FC
+    cmd_interpret.write_config_reg(10, 0x0009)
+    cmd_interpret.write_config_reg(9, 0x0009)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0005)          # This is periodic Qinj FC
+    cmd_interpret.write_config_reg(10, 0x000e)
+    cmd_interpret.write_config_reg(9, 0x000e)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0005)          # This is periodic Qinj FC
+    cmd_interpret.write_config_reg(10, 0x0012)
+    cmd_interpret.write_config_reg(9, 0x0012)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    # register_12(cmd_interpret, 0x0009)          # This is periodic WS stop
+    # cmd_interpret.write_config_reg(10, 0x001a)
+    # cmd_interpret.write_config_reg(9, 0x001a)
+    # fc_init_pulse(cmd_interpret)
+    # time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
+    time.sleep(0.01)
+
+def stop_ws(cmd_interpret):
+    register_11(cmd_interpret, 0x0deb)
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
     cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)   # 3563
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0005)          # This is onetime Qinj FC
+    register_12(cmd_interpret, 0x0009)          # This is onetime ws_stop
     cmd_interpret.write_config_reg(10, 0x0001)
-    cmd_interpret.write_config_reg(9, 0x0001)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0006)          # This is onetime L1A FC
-    cmd_interpret.write_config_reg(10, 0x01f0)
-    cmd_interpret.write_config_reg(9, 0x01ff)
+    cmd_interpret.write_config_reg(9, 0x0001)   
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
@@ -422,6 +453,10 @@ class Receive_data(threading.Thread):
                     #     start_L1A_1MHz_trigger_bit(self.cmd_interpret)
                     elif message == 'start L1A trigger bit data':
                         start_L1A_trigger_bit_data(self.cmd_interpret)
+                    elif message == 'start periodic ws':
+                        start_periodic_WS(self.cmd_interpret)
+                    elif message == 'start onetime ws':
+                        start_onetime_WS(self.cmd_interpret)
                     elif message == 'stop L1A':
                         stop_L1A(self.cmd_interpret)
                     elif message == 'stop L1A 1MHz':
@@ -430,6 +465,8 @@ class Receive_data(threading.Thread):
                         stop_L1A_trigger_bit(self.cmd_interpret)
                     elif message == 'stop L1A 1MHz trigger bit':
                         stop_L1A_1MHz_trigger_bit(self.cmd_interpret)
+                    elif message == 'stop ws':
+                        stop_ws(self.cmd_interpret)
                     elif message == 'stop L1A train':
                         stop_L1A_train(self.cmd_interpret)
                     elif message == 'start L1A train':
@@ -869,7 +906,18 @@ class DAQ_Plotting(threading.Thread):
 
 
 #--------------------------------------------------------------------------#
+def iic_check(slave_addr: int, cmd_interpret):
+    mode = 0
+    wr = 1
+    val = mode << 24 | slave_addr << 17 | wr << 16 	    # write device addr and read one byte, ignore read address
+    cmd_interpret.write_config_reg(4, 0xffff & val)
+    cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
+    time.sleep(0.01)
+    cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
+    ack_error = cmd_interpret.read_status_reg(0) & 0x0100   #the 9th bit of status register is ACK_ERROR
+    return (ack_error == 0)  # if no error, return true
 
+#--------------------------------------------------------------------------#
 ## IIC write slave device
 # @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
 # @param slave[7:0] : slave device address
