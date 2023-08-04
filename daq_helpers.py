@@ -936,6 +936,11 @@ def software_clear_fifo(cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0002)                                     # trigger pulser_reg[1]
 
 #--------------------------------------------------------------------------#
+## software clear error
+def software_clear_error(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0006)                                     # trigger pulser_reg[5]
+
+#--------------------------------------------------------------------------#
 ## Register 15
 ## Enable channel
 ## 4 bit binary, WXYZ

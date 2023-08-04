@@ -58,7 +58,8 @@ def main_process(IPC_queue, options, log_file = None):
 
 def set_trigger_linked(cmd_interpret):
     reads = 0
-    clears = 0
+    clears_error = 0
+    clears_fifo = 0
     testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
     print("Register 2 upon checking:", testregister_2)
     data_error = testregister_2[-1]
@@ -81,13 +82,22 @@ def set_trigger_linked(cmd_interpret):
             trigger_synced = testregister_2[-4]
             trigger_error = testregister_2[-3]
             linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
+            error_flag = (data_error=="0" and trigger_error=="0")
             print("Linked flag is",linked_flag)
-            # if data_error=="1" or trigger_error=="1":
+            print("Error flag is",error_flag)
             if linked_flag is False:
-                # print("Found error!")
-                software_clear_fifo(cmd_interpret)
-                clears += 1
-                print("Cleared FIFO:",clears)
+                if error_flag is False:
+                    software_clear_error(cmd_interpret)
+                    clears_error += 1
+                    print("Cleared Error:",clears_error)
+                    if clears_error == 4:
+                        software_clear_fifo(cmd_interpret)
+                        clears_fifo += 1
+                        print("Cleared FIFO:",clears_fifo)
+                else:
+                    software_clear_fifo(cmd_interpret)
+                    clears_fifo += 1
+                    print("Cleared FIFO:",clears_fifo)
     print("Register 2 after trying to link:", testregister_2)
     return True
 
@@ -167,7 +177,14 @@ def main(options, cmd_interpret, IPC_queue = None):
         software_clear_fifo(cmd_interpret)              # clear fifo content
         time.sleep(0.1)                                 # delay 1000 milliseconds
         software_clear_fifo(cmd_interpret)              # clear fifo content  
-        print("Cleared FIFO")  
+        print("Cleared FIFO") 
+
+    if(options.clear_error):
+        time.sleep(0.1)                                 # delay 1000 milliseconds
+        software_clear_error(cmd_interpret)             # clear error content
+        time.sleep(0.1)                                 # delay 1000 milliseconds
+        software_clear_error(cmd_interpret)             # clear error content  
+        print("Cleared Error")  
 
     if(options.counter_duration):
         counterDuration(cmd_interpret, options.counter_duration)
@@ -356,6 +373,7 @@ def getOptionParser():
     parser.add_option("--fpga_data",action="store_true", dest="fpga_data", default=False, help="(DEV ONLY) Save FPGA Register data")
     parser.add_option("--fpga_data_QInj",action="store_true", dest="fpga_data_QInj", default=False, help="(DEV ONLY) Save FPGA Register data and send QInj")
     parser.add_option("--clear_fifo",action="store_true", dest="clear_fifo", default=False, help="Clear FIFO at beginning of script")
+    parser.add_option("--clear_error",action="store_true", dest="clear_error", default=False, help="Clear error at beginning of script")
     parser.add_option("--memo_fc_start_periodic_ws",action="store_true", dest="memo_fc_start_periodic_ws", default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_periodic_L1A_WS() from daq_helpers.py")
     parser.add_option("--memo_fc_start_onetime_ws", action="store_true", dest="memo_fc_start_onetime_ws" , default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_onetime_L1A_WS() from daq_helpers.py")
     return parser
