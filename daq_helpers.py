@@ -333,7 +333,7 @@ class Save_FPGA_data(threading.Thread):
 
     def run(self):
         if(self.isQInj):
-            start_L1A_trigger_bit(self.cmd_interpret) # seding IDLE + QINJ FC
+            start_L1A_trigger_bit(self.cmd_interpret) # sending IDLE + QINJ FC + L1A FC
         else:
             stop_L1A_trigger_bit(self.cmd_interpret) # only sending IDLE FC 
         t = threading.current_thread()              # Local reference of THIS thread object
@@ -369,14 +369,15 @@ class Save_FPGA_data(threading.Thread):
         if not t.alive:
             print("Check Link Thread detected alive=False")
         time.sleep(sleep_time)
-        read_register = self.cmd_interpret.read_config_reg(7)
-        fpga_duration = int(format(read_register, '016b')[-6:], base=2)
-        read_register = self.cmd_interpret.read_config_reg(8)
-        en_L1A        = format(read_register, '016b')[-11]
-        fpga_state    = int(format(self.cmd_interpret.read_status_reg(7), '016b'), base=2)
-        fpga_data     = int(format(self.cmd_interpret.read_status_reg(4), '016b')+format(self.cmd_interpret.read_status_reg(3), '016b'), base=2)
-        fpga_header   = int(format(self.cmd_interpret.read_status_reg(6), '016b')+format(self.cmd_interpret.read_status_reg(5), '016b'), base=2)
-        outfile.write(f'{fpga_state},{en_L1A},{fpga_duration},{fpga_data},{fpga_header},{self.DAC_Val}\n')
+        read_register   = self.cmd_interpret.read_config_reg(7)
+        fpga_duration   = int(format(read_register, '016b')[-6:], base=2)
+        read_register   = self.cmd_interpret.read_config_reg(8)
+        en_L1A          = format(read_register, '016b')[-11]
+        fpga_data       = int(format(self.cmd_interpret.read_status_reg(4), '016b')+format(self.cmd_interpret.read_status_reg(3), '016b'), base=2)
+        fpga_header     = int(format(self.cmd_interpret.read_status_reg(6), '016b')+format(self.cmd_interpret.read_status_reg(5), '016b'), base=2)
+        fpga_state      = int(format(self.cmd_interpret.read_status_reg(7), '016b'), base=2)
+        fpga_triggerbit = int(format(self.cmd_interpret.read_status_reg(9), '016b')+format(self.cmd_interpret.read_status_reg(8), '016b'), base=2)
+        outfile.write(f'{fpga_state},{en_L1A},{fpga_duration},{fpga_data},{fpga_header},{fpga_triggerbit},{self.DAC_Val}\n')
         outfile.close()
         stop_L1A_trigger_bit(self.cmd_interpret)
         print("%s finished!"%self.getName())
