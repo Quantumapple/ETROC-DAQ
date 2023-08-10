@@ -22,6 +22,10 @@ from ETROC1_ArrayReg import *
 from daq_helpers import *
 from board_details import *
 from config_etroc1 import *
+from tqdm import tqdm
+
+from usb_iss import UsbIss, defs
+from pathlib import Path
 #========================================================================================#
 freqency = 1000
 duration = 1000
@@ -145,46 +149,70 @@ def main(options, cmd_interpret, IPC_queue = None):
         start_onetime_L1A_WS(cmd_interpret)
 
     if(options.ws_i2c_initialization):
+        port = '/dev/ttyACM0'
+        # set usb-iss iic master device
+        iss = UsbIss()
+        iss.open(port)
+        iss.setup_i2c(clock_khz=100)
+
         devAddr = 0x60
         reg_bits = 16
         reg_addr = 0b100_1110_0000_00001   ## pixelConfig[15:8]    default:0x26
-        # data = 0x3f   # Qinjen;  Qinj = 32
-        data = 0x33   # Qinjen;  Qinj = 20
+        data = 0x3e   # Qinjen;  Qinj = 30
+        # data = 0x3b    # Qinjen; Qinj = 28
+        # data = 0x37  # Qinjen; Qinj = 24
+        # data = 0x33   # Qinjen;  Qinj = 20
         # data = 0x26
-        iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+        register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+        iss.i2c.write_ad2(devAddr, register, [data])
 
         devAddr = 0x60
         reg_bits = 16
-        reg_addr = 0b101_1110_0000_00000   ## pixelConfig[7:0] default:0x5C (pixelConfig[4:2]:IBSel[2:0] = 0b111)
+        reg_addr = 0b100_1110_0000_00000   ## pixelConfig[7:0] default:0x5C (pixelConfig[4:2]:IBSel[2:0] = 0b111)
         # data = 0x5c
         data = 0x1c  # max gain; default power
-        iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+        register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+        iss.i2c.write_ad2(devAddr, register, [data])
+        #########################TF
+        reg_bits = 16
+        reg_addr = 0b100_1110_0000_00101   ## pixelConfig[7:0] default:0x5C (pixelConfig[4:2]:IBSel[2:0] = 0b111)
+        # data = 0x5c
+        data = 0x0c  # max gain; default power
+        register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+        iss.i2c.write_ad2(devAddr, register, [data])
+
+        # reg_addr = 0x0003   ## PeriCfg3
+        # data = 0x38
+        # iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+
+
+        #########################
+
 
         slaveA_addr_WS = 0x40
-
         ### 1F
         reg_add = 0x1f
         data = 0x22 ### clk_gen rst & mem rst
-        iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)
+        iss.i2c.write(slaveA_addr_WS, reg_add, [data])
 
         data = 0x0b  ### fc ws_stop; bypass
+        # data = 0x2b  ### external WS enable
         # data = 0x8b ### fc ws_stop; vga
-        iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)
+        iss.i2c.write(slaveA_addr_WS, reg_add, [data])
 
         ### 0F
         reg_add = 0x0f
         data = 0x00
-        iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)     
+        iss.i2c.write(slaveA_addr_WS, reg_add, [data])    
         ### 0E
         reg_add = 0x0e
         data = 0x00
-        iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)  
+        iss.i2c.write(slaveA_addr_WS, reg_add, [data])  
         ### 0D
         reg_add = 0x0d
         data = 0x10  # default ctrl == 10
-        iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret) 
+        iss.i2c.write(slaveA_addr_WS, reg_add, [data])
 
-        # start_periodic_L1A_WS(cmd_interpret)
     
     if(options.fc_ws_start):
         WS_onetime_ws_start(cmd_interpret)
@@ -195,43 +223,186 @@ def main(options, cmd_interpret, IPC_queue = None):
     if(options.ws_onetime_charge_injection):
         WS_start_charge_injection_stop(cmd_interpret)
 
+    # if(options.ws_reconstruction):
+    #     WS_start_charge_injection_stop(cmd_interpret)
+
     if(options.ws_memory_readout):
+        # COM_Port = "COM5"
+        port = '/dev/ttyACM0'
+        # set usb-iss iic master device
+        iss = UsbIss()
+        iss.open(port)
+        iss.setup_i2c(clock_khz=100)
+
         def WS_memory_read(file_name):
             slaveA_addr_WS = 0x40
 
             reg_add = 0x1f
-            # data = 0x2f  ### bypass mode
+            data = 0x2f  ### bypass mode
             # data = 0xaf  ### vga mode
-            data = 0x0f  ### fc ws_stop; bypass
+            # data = 0xf  ### fc ws_stop; bypass
+            # data = 0x4f  ### fc 400ns; bypass
+            # data = 0x8f ### ws_stop; vga
 
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret) 
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
 
             reg_rd_add_MSB = 0x1d
             reg_rd_add_LSB = 0x1c
             dout_MSB_add = 0x21
             dout_LSB_add = 0x20
             file1 = open(file_name, "w")
+            # for i in tqdm(range(1024)):
             for i in range(1024):
                 rd_add_MSB = i // 4
                 rd_add_LSB2 = i % 4
                 rd_add_LSB = rd_add_LSB2 * 64
-                iic_write_ws(1, slaveA_addr_WS, 0, reg_rd_add_MSB, rd_add_MSB, cmd_interpret)
-                iic_write_ws(1, slaveA_addr_WS, 0, reg_rd_add_LSB, rd_add_LSB, cmd_interpret)
+                # iic_write_ws(1, slaveA_addr_WS, 0, reg_rd_add_MSB, rd_add_MSB, cmd_interpret)
+                iss.i2c.write(slaveA_addr_WS, reg_rd_add_MSB, [rd_add_MSB])
+                # iic_write_ws(1, slaveA_addr_WS, 0, reg_rd_add_LSB, rd_add_LSB, cmd_interpret)
+                iss.i2c.write(slaveA_addr_WS, reg_rd_add_LSB, [rd_add_LSB])
 
                 dout_MSB = []
-                dout_MSB = iic_read_ws(0, slaveA_addr_WS, 1, dout_MSB_add, cmd_interpret)
+                # dout_MSB = iic_read_ws(0, slaveA_addr_WS, 1, dout_MSB_add, cmd_interpret)
+                dout_MSB = iss.i2c.read(slaveA_addr_WS, dout_MSB_add, 1)
                 dout_LSB = []
-                dout_LSB = iic_read_ws(0, slaveA_addr_WS, 1, dout_LSB_add, cmd_interpret)
+                # dout_LSB = iic_read_ws(0, slaveA_addr_WS, 1, dout_LSB_add, cmd_interpret)
+                dout_LSB = iss.i2c.read(slaveA_addr_WS, dout_LSB_add, 1)
                 # print(i, bin(rd_add_MSB), bin(rd_add_LSB2), dout_MSB, dout_LSB/4)
-                print(i, dout_MSB, dout_LSB/4)
-                dout_to_file = str(i) + "  " + str(dout_MSB) + "  " + str(dout_LSB) + "\n"
+                print(i, dout_MSB[0], dout_LSB[0]/4)
+                dout_to_file = str(i) + "  " + str(dout_MSB[0]) + "  " + str(dout_LSB[0]) + "\n"
                 file1.writelines(dout_to_file)
             file1.close()
 
-        WS_memory_read("WS_memory_data_0729_test_1.txt");   
+            slaveA_addr_WS = 0x40
+            reg_add = 0x1f
+            data = 0x0b         # set rd_en_I2C off //TF_08_01
+            # iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data]) 
 
+        WS_memory_read("WS_memory_data_B5_0808_bypass_BX3_BX8_BX13_Q30_linux_fc_1.txt");   
+        
+        # slaveA_addr_WS = 0x40
+        # reg_add = 0x1f
+        # data = 0x0b  ### disable read
+
+        # iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)
+        # iss.i2c.write(slaveA_addr_WS, reg_add, [data]) 
+
+    if(options.ws_reconstruction):
+
+        # current_directory = os.path.dirname(os.path.abspath(__file__))
+        file_name = "WS_memory_data_B5_0808_bypass_BX3_BX8_BX13_Q30_linux_fc_1.txt"
+        # file_path = os.path.join(current_directory, file_name)
+        #print(os.path.abspath(file_name))
+
+        with open(file_name, 'r') as f:
+            b1 = np.loadtxt(f, dtype=int).T
+
+        data_1 = b1[1, :]
+        data_2 = b1[2, :]
+
+        data1 = data_1 % 128
+        k = None
+        for i in range(1024):
+            if data_1[i] > 127:
+                k = i
+                break
+
+        #print(np.where(data_1 > 127)[0])
+        end_ind = k - 128 * 7
+
+        data_1st_tem = np.zeros((1024, 8), dtype=int)
+        data_2st_tem = np.zeros((1024, 8), dtype=int)
+
+        for i in range(1024):
+            data_1_tem = np.binary_repr(data_1[i], width=8)
+            l1 = len(data_1_tem)
+            data_1st_tem[i] = [int(d) for d in data_1_tem.zfill(8)]
+            data_2_tem = np.binary_repr(data_2[i], width=8)
+            l1 = len(data_2_tem)
+            data_2st_tem[i] = [int(d) for d in data_2_tem.zfill(8)]
+
+        data_1st = data_1st_tem[:, 1:7]
+        data_2st = np.hstack((data_1st_tem[:, 7].reshape(-1, 1), data_2st_tem[:, 0:6]))
+
+        gain = 0.04 / 5 * 8.5 *1.25
+        Aout_1st = np.zeros(1024)
+        Aout_2st = np.zeros(1024)
+        for i in range(1024):
+            Aout_1st[i] = 32 * data_1st[i, 0] + 16 * data_1st[i, 1] + 8 * data_1st[i, 2] + \
+                4 * data_1st[i, 3] + 2 * data_1st[i, 4] + data_1st[i, 5]
+            # Aout_1st = int('0b'+data_1_tem[i,1:7],0)
+
+            Aout_2st[i] = 24 * data_2st[i, 0] + 16 * data_2st[i, 1] + 10 * data_2st[i, 2] + \
+                6 * data_2st[i, 3] + 4 * data_2st[i, 4] + 2 * data_2st[i, 5] + data_2st[i, 6]
+
+        Aout = Aout_1st - gain * Aout_2st
+
+        Aout_ch = np.zeros((8, 128))
+        Aout_ch_align = np.zeros((8, 128))
+
+        for ch in range(1, 9):
+            Aout_ch[8 - ch, :] = Aout[(ch - 1) * 128: ch * 128]
+
+
+        for ch in range(1, 9):
+            if end_ind == 128:
+                Aout_ch_align[ch - 1, :] = Aout_ch[ch - 1, :]
+            else:
+                Aout_ch_align[ch - 1, :128 - end_ind] = Aout_ch[ch - 1, end_ind:]
+                Aout_ch_align[ch - 1, 129 - end_ind - 1: 128] = Aout_ch[ch - 1, :end_ind]
+
+        # plt.figure()
+        # for i in range(8):
+        #     plt.subplot(8, 1, i + 1)
+        #     plt.plot(Aout_ch_align[i])
+        # plt.ylim([0, 2.4])
+
+        Aout_8ch = np.zeros(1024)
+        for i in range(1024):
+            Aout_8ch[i] = Aout_ch_align[(i - 1) % 8, (i - 1) // 8]
+
+        # for i in range(128):
+        #     Aout_8ch[8 * i - 0] = Aout_ch_align[7, i]
+        #     Aout_8ch[8 * i - 1] = Aout_ch_align[6, i]
+        #     Aout_8ch[8 * i - 2] = Aout_ch_align[5, i]
+        #     Aout_8ch[8 * i - 3] = Aout_ch_align[4, i]
+        #     Aout_8ch[8 * i - 4] = Aout_ch_align[3, i]
+        #     Aout_8ch[8 * i - 5] = Aout_ch_align[2, i]
+        #     Aout_8ch[8 * i - 6] = Aout_ch_align[1, i]
+        #     Aout_8ch[8 * i - 7] = Aout_ch_align[0, i]
+
+        Aout_8ch_v = -(Aout_8ch - (31.5 - gain * 31.5)) * 1.2 / 32
+        N = np.arange(1024)
+        t = N * 1 / 2.56
+
+        highest_values = np.sort((Aout_8ch_v))[-2:]
+        print("两个pulse的峰值: ", highest_values)
+
+        plt.figure()
+        plt.plot(t, Aout_8ch_v, linewidth = 0.5 )
+        plt.ylim([-0.3, 0.1])
+        # plt.ylim([-1, 0.4])
+        plt.xlim([0, 400])
+        plt.ylabel("Voltage(V)")
+        plt.xlabel("Time(ns)")
+        plt.show()
+
+        #print("Mean of Aout_8ch_v ", np.mean(Aout_8ch_v))
+        #print("Variance of Aout_8ch_v ", np.var(Aout_8ch_v))
+        #print('\n')
+
+        # high_pulse_indices = np.where(Aout_8ch_v > -0.22)[0]
+        
 
     if(options.memo_fc_start_periodic_ws):
+        # COM_Port = "COM5"
+        port = '/dev/ttyACM0'
+        # set usb-iss iic master device
+        iss = UsbIss()
+        iss.open(port)
+        iss.setup_i2c(clock_khz=100)
+
         ###################### I2C Initialization
         def WS_I2C_Initial(slaveA_addr_WS):
 
@@ -245,10 +416,9 @@ def main(options, cmd_interpret, IPC_queue = None):
             data = 0x33   # Qinjen;  Qinj = 20
             # data = 0x1f   # Qinj disable; max Qinj
             # data = 0x26
-
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
-            # val = iic_read(devAddr, reg_addr, reg_bits, cmd_interpret)
-            # print('0x{0:02x}'.format(reg_addr), '0x{0:02x}'.format(val))
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)))
 
 
             devAddr = 0x60
@@ -258,38 +428,42 @@ def main(options, cmd_interpret, IPC_queue = None):
             data = 0x1c  # max gain; default power
             # data = 0x00  # max gain; max power
             # data = 0x40
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
-            # val = iic_read(devAddr, reg_addr, reg_bits, cmd_interpret)
-            # print('0x{0:02x}'.format(reg_addr), '0x{0:02x}'.format(val))
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)))
 
             ### 1F
             reg_add = 0x1f
             data = 0x22 ### clk_gen rst & mem rst
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)
+            # iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1)))
           
             # data = 0x2b  ### ext bypass mode
             # data = 0xab  ### ext vga mode
             # data = 0x4b  ### fc 400ns; bypass
             data = 0x0b  ### fc ws_stop; bypass
             # data = 0x8b ### fc ws_stop; vga
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)
-            # data_test = iic_read_ws(0, slaveA_addr_WS, 1, reg_add, cmd_interpret)   
-            # print(hex(data_test))
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1)))
             ### 0F
             reg_add = 0x0f
             data = 0x00
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)     
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1)))    
             ### 0E
             reg_add = 0x0e
             data = 0x00
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)  
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1))) 
             ### 0D
             reg_add = 0x0d
             data = 0x10  # default ctrl == 10
             # data = 0x00  # ctrl for mem effect reduction == 00
             # data = 0x18  # ctrl for mem effect reduction == 11
             # data = 0x30  # short DAC enable
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret) 
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1))) 
 
             start_periodic_L1A_WS(cmd_interpret)
 
@@ -297,30 +471,37 @@ def main(options, cmd_interpret, IPC_queue = None):
             ### 0D        <7:5>: EN,RST,SHORT_DAC
             reg_add = 0x0d
             data = 0x30   # short DAC
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)           
+            # iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret) 
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1)))           
 
             data = 0x70   # RST
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)   
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1)))    
 
             time.sleep(0.01)
 
             data = 0x30   # no RST
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)   
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1)))    
 
             time.sleep(0.01)
 
             data = 0xb0   # EN
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)   
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1)))    
 
             time.sleep(1)
 
             data = 0x30   # DISABLE
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)   
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1)))    
 
             time.sleep(0.01)
 
             data = 0x10   # no SHORT
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)   
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1)))    
 
         ######################### WS memory readout
 
@@ -332,8 +513,8 @@ def main(options, cmd_interpret, IPC_queue = None):
             data = 0x0f  ### fc ws_stop; bypass
             # data = 0x4f  ### fc 400ns; bypass
             # data = 0x8f ### ws_stop; vga
-
-            iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret) 
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+            print('0x{0:02x}'.format(reg_add), '0x{0:02x}'.format(iss.i2c.read(slaveA_addr_WS, reg_add, byte_count = 1)))  
 
             reg_rd_add_MSB = 0x1d
             reg_rd_add_LSB = 0x1c
@@ -344,13 +525,17 @@ def main(options, cmd_interpret, IPC_queue = None):
                 rd_add_MSB = i // 4
                 rd_add_LSB2 = i % 4
                 rd_add_LSB = rd_add_LSB2 * 64
-                iic_write_ws(1, slaveA_addr_WS, 0, reg_rd_add_MSB, rd_add_MSB, cmd_interpret)
-                iic_write_ws(1, slaveA_addr_WS, 0, reg_rd_add_LSB, rd_add_LSB, cmd_interpret)
+                # iic_write_ws(1, slaveA_addr_WS, 0, reg_rd_add_MSB, rd_add_MSB, cmd_interpret)
+                iss.i2c.write(slaveA_addr_WS, reg_rd_add_MSB, [rd_add_MSB])
+                # iic_write_ws(1, slaveA_addr_WS, 0, reg_rd_add_LSB, rd_add_LSB, cmd_interpret)
+                iss.i2c.write(slaveA_addr_WS, reg_rd_add_LSB, [rd_add_LSB])
 
                 dout_MSB = []
-                dout_MSB = iic_read_ws(0, slaveA_addr_WS, 1, dout_MSB_add, cmd_interpret)
+                # dout_MSB = iic_read_ws(0, slaveA_addr_WS, 1, dout_MSB_add, cmd_interpret)
+                dout_MSB = iss.i2c.read(slaveA_addr_WS, dout_MSB_add, byte_count = 1)
                 dout_LSB = []
-                dout_LSB = iic_read_ws(0, slaveA_addr_WS, 1, dout_LSB_add, cmd_interpret)
+                # dout_LSB = iic_read_ws(0, slaveA_addr_WS, 1, dout_LSB_add, cmd_interpret)
+                dout_LSB = iss.i2c.read(slaveA_addr_WS, dout_LSB_add, byte_count = 1)
                 # print(i, bin(rd_add_MSB), bin(rd_add_LSB2), dout_MSB, dout_LSB/4)
                 print(i, dout_MSB, dout_LSB/4)
                 dout_to_file = str(i) + "  " + str(dout_MSB) + "  " + str(dout_LSB) + "\n"
@@ -394,153 +579,147 @@ def main(options, cmd_interpret, IPC_queue = None):
     
     
     if(options.etroc2_i2c):
-        # print('etroc2_ws_i2c_configuration_test...')
-
-        # devAddr = 0x60
-        # reg_bits = 16
-        # reg_addr = 0x000e
-        # val = iic_read(devAddr, reg_addr, reg_bits, cmd_interpret)
-        # print('0x{0:02x}'.format(reg_addr), '0x{0:02x}'.format(val))
-
-        # iic_read_val = []
-        # for i in range(32):
-        #     reg_addr_lsb = i
-        #     reg_addr_msb = 0x00
-        #     reg_addr = (reg_addr_msb << 8) | reg_addr_lsb
-        #     iic_read_val += [iic_read(devAddr, reg_addr, reg_bits, cmd_interpret)]
-
-        # print(iic_read_val)
-
-        # for i in range(32):
-        #     print('0x{0:04x}'.format(i), '0x{0:02x}'.format(iic_read_val[i]))
+        # COM_Port = "COM5"
+        port = '/dev/ttyACM0'
+        # set usb-iss iic master device
+        iss = UsbIss()
+        iss.open(port)
+        iss.setup_i2c(clock_khz=100)
 
         print('etroc2_i2c_configuration...')
         devAddr = 0x60
-        reg_bits = 16
-        # reg_addr = 12
-        # val = iic_read(devAddr, reg_addr, reg_bits, cmd_interpret)
-        # print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(val))
+        reg_addr = 0x0000
+        register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+        # iss.i2c.write_ad2(devAddr, register, data)
+        print(''.join('0x%2x '%i for i in (iss.i2c.read_ad2(devAddr, register, byte_count = 32))))
 
-        def etroc2_pllCal(devAddr, reg_bits, cmd_interpret):
+        def etroc2_pllCal(devAddr):
             ###--------------------------------------------------------------------------###
             ### calibrate the on-chip PLL
             ###
             reg_addr = 0x000f   ## PeriCfg15
             data = 0x20
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
-            # print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iic_read(devAddr, 0x000e, reg_bits, cmd_interpret)))
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
             data = 0x60
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
-            # print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iic_read(devAddr, 0x000e, reg_bits, cmd_interpret)))
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
 
-        def etroc2_dataRate(devAddr, reg_bits, cmd_interpret):
+        def etroc2_dataRate(devAddr):
             ###--------------------------------------------------------------------------###
             ### Adjust the data output rate to 320 Mbps
             ###
             reg_addr = 0x0013   ## PeriCfg19
             data = 0x42
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
-            # print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iic_read(devAddr, reg_addr, reg_bits, cmd_interpret)))
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
 
-        def etroc2_softBoot(devAddr, reg_bits, cmd_interpret):
+        def etroc2_softBoot(devAddr):
             ###--------------------------------------------------------------------------###
             #### softBoot the chip
             ###
             reg_addr = 0x0012   ## PeriCfg18
             data = 0x02
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
             data = 0x00
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
 
-        def etroc2_settingFC(devAddr, reg_bits, cmd_interpret):
+        def etroc2_settingFC(devAddr):
             ###--------------------------------------------------------------------------###
             #### setting FC asy alignment
             ###
             reg_addr = 0x000d   ## PeriCfg13
             data = 0xa0
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
             data = 0x80
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
-            reg_addr = reg_addr - 1
-            val = iic_read(devAddr, reg_addr, reg_bits, cmd_interpret)
-            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(val))
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
 
-        def etroc2_settingEFuse(devAddr, reg_bits, cmd_interpret):
+        def etroc2_settingEFuse(devAddr):
             ###--------------------------------------------------------------------------###
             #### setting FC asy alignment
             ###
             reg_addr = 0x0016   ## PeriCfg22
             data = 0x0f
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
             reg_addr = 0x0017   ## PeriCfg23
             data = 0x7f
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
-            reg_addr = 0x0018   ## PeriCfg23
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+            reg_addr = 0x0018   ## PeriCfg24
             data = 0x01
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
 
-        def etroc2_fcDataDelay(devAddr, reg_bits, cmd_interpret):
+        def etroc2_fcDataDelay(devAddr):
             ###--------------------------------------------------------------------------###
             #### setting FC asy alignment
             ###
             reg_addr = 0x0012   ## PeriCfg22
             data = 0x10
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
-            #reg_addr = reg_addr - 1
-            #val = iic_read(devAddr, reg_addr, reg_bits, cmd_interpret)
-            #print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(val))
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
 
-        def etroc2_fcClkDelay(devAddr, reg_bits, cmd_interpret):
+        def etroc2_fcClkDelay(devAddr):
             ###--------------------------------------------------------------------------###
             #### setting FC asy alignment
             ###
             reg_addr = 0x0012   ## PeriCfg22
             data = 0x08
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
 
-        def etroc2_groRst(devAddr, reg_bits, cmd_interpret):
+        def etroc2_groRst(devAddr):
             ###--------------------------------------------------------------------------###
             #### setting FC asy alignment
             ###
             reg_addr = 0x000e   ## PeriCfg22
             data = 0x70
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
             data = 0xf0
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
 
-        def etroc2_pixelEn(devAddr, reg_bits, cmd_interpret): # col 14, row 0 for WS
+        def etroc2_pixelEn(devAddr): # col 14, row 0 for WS
             ###--------------------------------------------------------------------------###
             #### pixel enable
             ###        
             reg_addr = 0b100_1110_0000_00001   ## pixelConfig[15:8] 0x01
             data = 0x26
-            iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
-            # val = iic_read(devAddr, reg_addr, reg_bits, cmd_interpret)
-            # print('0x{0:02x}'.format(reg_addr), '0x{0:02x}'.format(val))
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
 
 
-        etroc2_pllCal(devAddr, reg_bits, cmd_interpret)     ## re-calibrate pll, etroc2_softBoot has the similar function
-        etroc2_dataRate(devAddr, reg_bits, cmd_interpret)   ## change data rate to 320 Mbps, default is 640 Mbps 
-        etroc2_settingEFuse(devAddr, reg_bits, cmd_interpret)
+        etroc2_pllCal(devAddr)     ## re-calibrate pll, etroc2_softBoot has the similar function
+        etroc2_dataRate(devAddr)   ## change data rate to 320 Mbps, default is 640 Mbps 
+        etroc2_settingEFuse(devAddr)
 
-        etroc2_settingFC(devAddr, reg_bits, cmd_interpret)    ## FC asy alignment
-        # etroc2_fcDataDelay(devAddr, reg_bits, cmd_interpret)
-        # etroc2_groRst(devAddr, reg_bits, cmd_interpret)
+        etroc2_settingFC(devAddr)    ## FC asy alignment
+        # etroc2_fcDataDelay(devAddr)
+        etroc2_fcClkDelay(devAddr)
+        # etroc2_groRst(devAddr)
 
-        # etroc2_pixelEn(devAddr, reg_bits, cmd_interpret) # col 14, row 0 for WS
-
-        #### 100_
-        # 1: pixel matrix 0: periphery
-        # 1: staus, 0: confuguration
-        # 0: direct message to a pixel, 1: broadcast
-        # [12:9]: column
-        # [8:5]: row
-        # [4:0]: in-pixel register 
-        # 100_0000_0000_00000
-        
-        # reg_addr = 0b100_1000_0000_00010
-        # val = iic_read(devAddr, reg_addr, reg_bits, cmd_interpret)
-        # print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(val))
+        # etroc2_pixelEn(devAddr) # col 14, row 0 for WS
     
     
     if(options.i2c):
@@ -666,6 +845,402 @@ def main(options, cmd_interpret, IPC_queue = None):
         # read_write_data.join()
 #--------------------------------------------------------------------------#
 ## if statement
+        
+    if(options.ws_testing):
+        ''' 
+        i2c initialization
+        '''
+        port = '/dev/ttyACM0'
+        # set usb-iss iic master device
+        iss = UsbIss()
+        iss.open(port)
+        iss.setup_i2c(clock_khz=100)
+
+        devAddr = 0x60
+        reg_bits = 16
+        reg_addr = 0b100_1110_0000_00001   ## pixelConfig[15:8]    default:0x26
+        data = 0x3e   # Qinjen;  Qinj = 30
+        # data = 0x3b    # Qinjen; Qinj = 28
+        # data = 0x37  # Qinjen; Qinj = 24
+        # data = 0x33   # Qinjen;  Qinj = 20
+        # data = 0x26
+        register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+        iss.i2c.write_ad2(devAddr, register, [data])
+
+        devAddr = 0x60
+        reg_bits = 16
+        reg_addr = 0b100_1110_0000_00000   ## pixelConfig[7:0] default:0x5C (pixelConfig[4:2]:IBSel[2:0] = 0b111)
+        # data = 0x5c
+        data = 0x1c  # max gain; default power
+        register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+        iss.i2c.write_ad2(devAddr, register, [data])
+        #########################TF
+        reg_bits = 16
+        reg_addr = 0b100_1110_0000_00101   ## pixelConfig[7:0] default:0x5C (pixelConfig[4:2]:IBSel[2:0] = 0b111)
+        # data = 0x5c
+        data = 0x0c  # max gain; default power
+        register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+        iss.i2c.write_ad2(devAddr, register, [data])
+
+        # reg_addr = 0x0003   ## PeriCfg3
+        # data = 0x38
+        # iic_write(devAddr, reg_addr, reg_bits, data, cmd_interpret)
+
+
+        #########################
+
+
+        slaveA_addr_WS = 0x40
+        ### 1F
+        reg_add = 0x1f
+        data = 0x22 ### clk_gen rst & mem rst
+        iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+
+        data = 0x0b  ### fc ws_stop; bypass
+        # data = 0x2b  ### external WS enable
+        # data = 0x8b ### fc ws_stop; vga
+        iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+
+        ### 0F
+        reg_add = 0x0f
+        data = 0x00
+        iss.i2c.write(slaveA_addr_WS, reg_add, [data])    
+        ### 0E
+        reg_add = 0x0e
+        data = 0x00
+        iss.i2c.write(slaveA_addr_WS, reg_add, [data])  
+        ### 0D
+        reg_add = 0x0d
+        data = 0x10  # default ctrl == 10
+        iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+
+        print("Initialization done")
+        time.sleep(1)
+
+        # # COM_Port = "COM5"
+        # port = '/dev/ttyACM0'
+        # # set usb-iss iic master device
+        # iss = UsbIss()
+        # iss.open(port)
+        # iss.setup_i2c(clock_khz=100)
+
+        print('etroc2_i2c_configuration...')
+        devAddr = 0x60
+        reg_addr = 0x0000
+        register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+        # iss.i2c.write_ad2(devAddr, register, data)
+        print(''.join('0x%2x '%i for i in (iss.i2c.read_ad2(devAddr, register, byte_count = 32))))
+
+        def etroc2_pllCal(devAddr):
+            ###--------------------------------------------------------------------------###
+            ### calibrate the on-chip PLL
+            ###
+            reg_addr = 0x000f   ## PeriCfg15
+            data = 0x20
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+            data = 0x60
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+
+        def etroc2_dataRate(devAddr):
+            ###--------------------------------------------------------------------------###
+            ### Adjust the data output rate to 320 Mbps
+            ###
+            reg_addr = 0x0013   ## PeriCfg19
+            data = 0x42
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+
+        def etroc2_softBoot(devAddr):
+            ###--------------------------------------------------------------------------###
+            #### softBoot the chip
+            ###
+            reg_addr = 0x0012   ## PeriCfg18
+            data = 0x02
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+            data = 0x00
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+
+        def etroc2_settingFC(devAddr):
+            ###--------------------------------------------------------------------------###
+            #### setting FC asy alignment
+            ###
+            reg_addr = 0x000d   ## PeriCfg13
+            data = 0xa0
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+            data = 0x80
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+
+        def etroc2_settingEFuse(devAddr):
+            ###--------------------------------------------------------------------------###
+            #### setting FC asy alignment
+            ###
+            reg_addr = 0x0016   ## PeriCfg22
+            data = 0x0f
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+            reg_addr = 0x0017   ## PeriCfg23
+            data = 0x7f
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+            reg_addr = 0x0018   ## PeriCfg24
+            data = 0x01
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+
+        def etroc2_fcDataDelay(devAddr):
+            ###--------------------------------------------------------------------------###
+            #### setting FC asy alignment
+            ###
+            reg_addr = 0x0012   ## PeriCfg22
+            data = 0x10
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+
+        def etroc2_fcClkDelay(devAddr):
+            ###--------------------------------------------------------------------------###
+            #### setting FC asy alignment
+            ###
+            reg_addr = 0x0012   ## PeriCfg22
+            data = 0x08
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+
+        def etroc2_groRst(devAddr):
+            ###--------------------------------------------------------------------------###
+            #### setting FC asy alignment
+            ###
+            reg_addr = 0x000e   ## PeriCfg22
+            data = 0x70
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+            data = 0xf0
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+
+        def etroc2_pixelEn(devAddr): # col 14, row 0 for WS
+            ###--------------------------------------------------------------------------###
+            #### pixel enable
+            ###        
+            reg_addr = 0b100_1110_0000_00001   ## pixelConfig[15:8] 0x01
+            data = 0x26
+            register = (reg_addr << 8) & 0xff00 | (reg_addr >> 8) & 0x00ff
+            iss.i2c.write_ad2(devAddr, register, [data])
+            print('0x{0:04x}'.format(reg_addr), '0x{0:02x}'.format(iss.i2c.read_ad2(devAddr, register, byte_count = 1)[0]))
+
+
+        etroc2_pllCal(devAddr)     ## re-calibrate pll, etroc2_softBoot has the similar function
+        etroc2_dataRate(devAddr)   ## change data rate to 320 Mbps, default is 640 Mbps 
+        etroc2_settingEFuse(devAddr)
+
+        etroc2_settingFC(devAddr)    ## FC asy alignment
+        # etroc2_fcDataDelay(devAddr)
+        # etroc2_fcClkDelay(devAddr)
+        # etroc2_groRst(devAddr)
+
+        # etroc2_pixelEn(devAddr) # col 14, row 0 for WS
+
+        time.sleep(1)
+
+
+        '''
+        one time charge injection
+        '''
+        WS_start_charge_injection_stop(cmd_interpret)
+        print("charge injection done")
+        time.sleep(0.1)
+
+        '''
+        ws_memory_readout
+        '''
+        # COM_Port = "COM5"
+        port = '/dev/ttyACM0'
+        # set usb-iss iic master device
+        iss = UsbIss()
+        iss.open(port)
+        iss.setup_i2c(clock_khz=100)
+
+        today = datetime.date.today()
+        todaystr = "./WS-Data/" + today.isoformat() + "_Test_Results/"
+        base_dir = Path(todaystr)
+        base_dir.mkdir(exist_ok=True) 
+        outfile = base_dir / ("WS_rawdata_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M") + ".csv")
+
+        def WS_memory_read(file_name):
+            slaveA_addr_WS = 0x40
+
+            reg_add = 0x1f
+            data = 0x2f  ### bypass mode
+            # data = 0xaf  ### vga mode
+            # data = 0xf  ### fc ws_stop; bypass
+            # data = 0x4f  ### fc 400ns; bypass
+            # data = 0x8f ### ws_stop; vga
+
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data])
+
+            reg_rd_add_MSB = 0x1d
+            reg_rd_add_LSB = 0x1c
+            dout_MSB_add = 0x21
+            dout_LSB_add = 0x20
+            file1 = open(file_name, "w")
+            # for i in tqdm(range(1024)):
+            for i in range(1024):
+                rd_add_MSB = i // 4
+                rd_add_LSB2 = i % 4
+                rd_add_LSB = rd_add_LSB2 * 64
+                # iic_write_ws(1, slaveA_addr_WS, 0, reg_rd_add_MSB, rd_add_MSB, cmd_interpret)
+                iss.i2c.write(slaveA_addr_WS, reg_rd_add_MSB, [rd_add_MSB])
+                # iic_write_ws(1, slaveA_addr_WS, 0, reg_rd_add_LSB, rd_add_LSB, cmd_interpret)
+                iss.i2c.write(slaveA_addr_WS, reg_rd_add_LSB, [rd_add_LSB])
+
+                dout_MSB = []
+                # dout_MSB = iic_read_ws(0, slaveA_addr_WS, 1, dout_MSB_add, cmd_interpret)
+                dout_MSB = iss.i2c.read(slaveA_addr_WS, dout_MSB_add, 1)
+                dout_LSB = []
+                # dout_LSB = iic_read_ws(0, slaveA_addr_WS, 1, dout_LSB_add, cmd_interpret)
+                dout_LSB = iss.i2c.read(slaveA_addr_WS, dout_LSB_add, 1)
+                # print(i, bin(rd_add_MSB), bin(rd_add_LSB2), dout_MSB, dout_LSB/4)
+                print(i, dout_MSB[0], dout_LSB[0]/4)
+                dout_to_file = str(i) + "  " + str(dout_MSB[0]) + "  " + str(dout_LSB[0]) + "\n"
+                file1.writelines(dout_to_file)
+            file1.close()
+
+            slaveA_addr_WS = 0x40
+            reg_add = 0x1f
+            data = 0x0b         # set rd_en_I2C off //TF_08_01
+            # iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)
+            iss.i2c.write(slaveA_addr_WS, reg_add, [data]) 
+
+        WS_memory_read(outfile);  
+
+        print("memory readout done") 
+        time.sleep(1)
+        
+        # slaveA_addr_WS = 0x40
+        # reg_add = 0x1f
+        # data = 0x0b  ### disable read
+
+        # iic_write_ws(1, slaveA_addr_WS, 0, reg_add, data, cmd_interpret)
+        # iss.i2c.write(slaveA_addr_WS, reg_add, [data]) 
+
+        '''
+        ws_reconstruction
+        '''
+        # file_name = "WS_memory_data_B5_0808_bypass_BX3_BX8_BX13_Q30_linux_fc_1.txt"
+        # file_path = os.path.join(current_directory, file_name)
+        #print(os.path.abspath(file_name))
+
+        with open(outfile, 'r') as f:
+            b1 = np.loadtxt(f, dtype=int).T
+
+        data_1 = b1[1, :]
+        data_2 = b1[2, :]
+
+        data1 = data_1 % 128
+        k = None
+        for i in range(1024):
+            if data_1[i] > 127:
+                k = i
+                break
+
+        #print(np.where(data_1 > 127)[0])
+        end_ind = k - 128 * 7
+
+        data_1st_tem = np.zeros((1024, 8), dtype=int)
+        data_2st_tem = np.zeros((1024, 8), dtype=int)
+
+        for i in range(1024):
+            data_1_tem = np.binary_repr(data_1[i], width=8)
+            l1 = len(data_1_tem)
+            data_1st_tem[i] = [int(d) for d in data_1_tem.zfill(8)]
+            data_2_tem = np.binary_repr(data_2[i], width=8)
+            l1 = len(data_2_tem)
+            data_2st_tem[i] = [int(d) for d in data_2_tem.zfill(8)]
+
+        data_1st = data_1st_tem[:, 1:7]
+        data_2st = np.hstack((data_1st_tem[:, 7].reshape(-1, 1), data_2st_tem[:, 0:6]))
+
+        gain = 0.04 / 5 * 8.5
+        Aout_1st = np.zeros(1024)
+        Aout_2st = np.zeros(1024)
+        for i in range(1024):
+            Aout_1st[i] = 32 * data_1st[i, 0] + 16 * data_1st[i, 1] + 8 * data_1st[i, 2] + \
+                4 * data_1st[i, 3] + 2 * data_1st[i, 4] + data_1st[i, 5]
+            # Aout_1st = int('0b'+data_1_tem[i,1:7],0)
+
+            Aout_2st[i] = 24 * data_2st[i, 0] + 16 * data_2st[i, 1] + 10 * data_2st[i, 2] + \
+                6 * data_2st[i, 3] + 4 * data_2st[i, 4] + 2 * data_2st[i, 5] + data_2st[i, 6]
+
+        Aout = Aout_1st - gain * Aout_2st
+
+        Aout_ch = np.zeros((8, 128))
+        Aout_ch_align = np.zeros((8, 128))
+
+        for ch in range(1, 9):
+            Aout_ch[8 - ch, :] = Aout[(ch - 1) * 128: ch * 128]
+
+
+        for ch in range(1, 9):
+            if end_ind == 128:
+                Aout_ch_align[ch - 1, :] = Aout_ch[ch - 1, :]
+            else:
+                Aout_ch_align[ch - 1, :128 - end_ind] = Aout_ch[ch - 1, end_ind:]
+                Aout_ch_align[ch - 1, 129 - end_ind - 1: 128] = Aout_ch[ch - 1, :end_ind]
+
+        # plt.figure()
+        # for i in range(8):
+        #     plt.subplot(8, 1, i + 1)
+        #     plt.plot(Aout_ch_align[i])
+        # plt.ylim([0, 2.4])
+
+        Aout_8ch = np.zeros(1024)
+        for i in range(1024):
+            Aout_8ch[i] = Aout_ch_align[(i - 1) % 8, (i - 1) // 8]
+
+        # for i in range(128):
+        #     Aout_8ch[8 * i - 0] = Aout_ch_align[7, i]
+        #     Aout_8ch[8 * i - 1] = Aout_ch_align[6, i]
+        #     Aout_8ch[8 * i - 2] = Aout_ch_align[5, i]
+        #     Aout_8ch[8 * i - 3] = Aout_ch_align[4, i]
+        #     Aout_8ch[8 * i - 4] = Aout_ch_align[3, i]
+        #     Aout_8ch[8 * i - 5] = Aout_ch_align[2, i]
+        #     Aout_8ch[8 * i - 6] = Aout_ch_align[1, i]
+        #     Aout_8ch[8 * i - 7] = Aout_ch_align[0, i]
+
+        Aout_8ch_v = -(Aout_8ch - (31.5 - gain * 31.5)) * 1.2 / 32
+        N = np.arange(1024)
+        t = N * 1 / 2.56
+
+        # highest_values = np.sort((Aout_8ch_v))[-2:]
+        # print("两个pulse的峰值: ", highest_values)
+
+        plt.figure()
+        plt.plot(t, Aout_8ch_v, linewidth = 0.5 )
+        plt.ylim([-0.6, 0.6])
+        # plt.ylim([-1, 0.4])
+        plt.xlim([0, 400])
+        plt.ylabel("Voltage(V)")
+        plt.xlabel("Time(ns)")
+        plt.show()
 
 def getOptionParser():
     
@@ -709,7 +1284,8 @@ def getOptionParser():
     parser.add_option("--ws_onetime_charge_injection", action="store_true", dest="ws_onetime_charge_injection" , default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke WS_start_charge_injection_stop() from daq_helpers.py")
     parser.add_option("--ws_memory_readout", action="store_true", dest="ws_memory_readout" , default=False, help="(WS DEV ONLY) Read the data in WS memory and store them in .txt file for further processing")
     parser.add_option("--ws_i2c_initialization", action="store_true", dest="ws_i2c_initialization" , default=False, help="(WS DEV ONLY) Initialize the I2C in WS and ETROC0")
-
+    parser.add_option("--ws_reconstruction", action="store_true", dest="ws_reconstruction" , default=False, help="(WS DEV ONLY) Reconstruct the waveform")   
+    parser.add_option("--ws_testing", action="store_true", dest="ws_testing",default = False, help="(WS DEV ONLY), test the WS and Reconstruction the waveform")
     return parser
 
 if __name__ == "__main__":

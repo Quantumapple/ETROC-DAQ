@@ -110,9 +110,9 @@ def etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compresse
             # Translating frame trailer
             trail_found = True
             last_line = last_line + "TRAILER "
-            last_line = last_line + "CHIPID " + f"{hex(int(last_element[1:18], base=2))}" + " "
+            last_line = last_line + "CHIPID " + last_element[1:18] + " "
             last_line = last_line + "STATUS " + last_element[18:24] + " "
-            last_line = last_line + "HITS " + f"{int(last_element[24:32], base=2)}" + " "
+            last_line = last_line + "HITS " + last_element[24:32] + " "
             last_line = last_line + "CRC " + last_element[32:40]
             # Expected
             if(links[channel]=="HEADER" or links[channel]=="DATA"): links[channel] = "TRAILER"

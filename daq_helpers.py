@@ -78,15 +78,15 @@ def start_periodic_L1A_WS(cmd_interpret):
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0005)          
-    cmd_interpret.write_config_reg(10, offset+3)
-    cmd_interpret.write_config_reg(9, offset+3)
+    cmd_interpret.write_config_reg(10, offset+4)
+    cmd_interpret.write_config_reg(9, offset+4)
     fc_init_pulse(cmd_interpret)
 
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0005)          
-    cmd_interpret.write_config_reg(10, offset+6+2)
-    cmd_interpret.write_config_reg(9, offset+6+2)
+    cmd_interpret.write_config_reg(10, offset+10)
+    cmd_interpret.write_config_reg(9, offset+10)
     fc_init_pulse(cmd_interpret)
 
     time.sleep(0.01)
@@ -98,12 +98,24 @@ def start_periodic_L1A_WS(cmd_interpret):
 
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0009)          # This is periodic ws stop
-    cmd_interpret.write_config_reg(10, offset + 16+4)
-    cmd_interpret.write_config_reg(9, offset + 16+4)
-    fc_init_pulse(cmd_interpret)
+    # register_12(cmd_interpret, 0x0005)          
+    # cmd_interpret.write_config_reg(10, offset+18)
+    # cmd_interpret.write_config_reg(9, offset+18)
+    # fc_init_pulse(cmd_interpret)
 
-    time.sleep(0.01)
+    # time.sleep(0.01)
+
+    # register_12(cmd_interpret, 0x0005)          
+    # cmd_interpret.write_config_reg(10, offset+21)
+    # cmd_interpret.write_config_reg(9, offset+21)
+    # fc_init_pulse(cmd_interpret)
+
+    # register_12(cmd_interpret, 0x0009)          # This is periodic ws stop
+    # cmd_interpret.write_config_reg(10, offset + 16+4)
+    # cmd_interpret.write_config_reg(9, offset + 16+4)
+    # fc_init_pulse(cmd_interpret)
+
+    # time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
 
@@ -167,6 +179,8 @@ def WS_onetime_ws_stop(cmd_interpret):
 
     time.sleep(0.01)
 
+
+
 def WS_start_charge_injection_stop(cmd_interpret):
     ## 4-digit 16 bit hex, Duration is LSB 12 bits
     ## This tells us how many memory slots to use
@@ -208,12 +222,12 @@ def WS_start_charge_injection_stop(cmd_interpret):
 
     time.sleep(0.01)
 
-    # register_12(cmd_interpret, 0x0005)          # This is onetime charge injection
-    # cmd_interpret.write_config_reg(10, offset+12)
-    # cmd_interpret.write_config_reg(9, offset+12)
-    # fc_init_pulse(cmd_interpret)
+    register_12(cmd_interpret, 0x0005)          # This is onetime charge injection
+    cmd_interpret.write_config_reg(10, offset+13)
+    cmd_interpret.write_config_reg(9, offset+13)
+    fc_init_pulse(cmd_interpret)
 
-    # time.sleep(0.01)
+    time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0009)          # This is onetime ws_stop
     cmd_interpret.write_config_reg(10, offset+20)
