@@ -4,11 +4,7 @@ import time
 #import visa
 import threading
 import numpy as np
-import matplotlib
 import os
-# matplotlib.use('WebAgg')
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from queue import Queue
 from collections import deque
@@ -98,38 +94,6 @@ def start_onetime_L1A_WS(cmd_interpret):
     fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
     time.sleep(0.01)
 
-def start_L1A(cmd_interpret):
-    ## dec = 3564
-    register_11(cmd_interpret, 0x0deb)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0030)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0032)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0035)
-    cmd_interpret.write_config_reg(10, 0x0001)
-    cmd_interpret.write_config_reg(9, 0x0001)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0036)
-    cmd_interpret.write_config_reg(10, 0x01f9)
-    cmd_interpret.write_config_reg(9, 0x01f9)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-    time.sleep(0.01)
-
 def start_L1A_1MHz(cmd_interpret):
     register_11(cmd_interpret, 0x0de7)
     time.sleep(0.01)
@@ -162,116 +126,44 @@ def start_L1A_1MHz(cmd_interpret):
     fc_signal_start(cmd_interpret)
     time.sleep(0.01)
 
-def start_L1A_trigger_bit(cmd_interpret):
-    register_11(cmd_interpret, 0x0deb)
-
-    time.sleep(0.01)
+def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Initialize = True, Triggerbit=True):
+    if(Initialize):
+        register_11(cmd_interpret, 0x0deb)
+        time.sleep(0.01)
 
     # IDLE
-    register_12(cmd_interpret, 0x0070)
+    register_12(cmd_interpret, 0x0070 if Triggerbit else 0x0030)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0deb)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
-    
-    # BCR
-    # register_12(cmd_interpret, 0x0072)
-    # cmd_interpret.write_config_reg(10, 0x0000)
-    # cmd_interpret.write_config_reg(9, 0x0000)
-    # fc_init_pulse(cmd_interpret)
-    # time.sleep(0.01)
+
+    if(BCR):
+        # BCR
+        register_12(cmd_interpret, 0x0072 if Triggerbit else 0x0032)
+        cmd_interpret.write_config_reg(10, 0x0000)
+        cmd_interpret.write_config_reg(9, 0x0000)
+        fc_init_pulse(cmd_interpret)
+        time.sleep(0.01)
 
     # QInj FC
-    register_12(cmd_interpret, 0x0075)
-    cmd_interpret.write_config_reg(10, 0x0005)
-    cmd_interpret.write_config_reg(9, 0x0005)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
+    if(QInj):
+        register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
+        cmd_interpret.write_config_reg(10, 0x0005)
+        cmd_interpret.write_config_reg(9, 0x0005)
+        fc_init_pulse(cmd_interpret)
+        time.sleep(0.01)
 
     ### Send L1A
-    register_12(cmd_interpret, 0x0076)
-    cmd_interpret.write_config_reg(10, 0x01fd)
-    cmd_interpret.write_config_reg(9, 0x01fd)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
+    if(L1A):
+        register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
+        cmd_interpret.write_config_reg(10, 0x01fd)
+        cmd_interpret.write_config_reg(9, 0x01fd)
+        fc_init_pulse(cmd_interpret)
+        time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
 
-    time.sleep(0.01)
-
-def start_L1A_trigger_bit_data(cmd_interpret):
-    register_11(cmd_interpret, 0x0deb)
-
-    time.sleep(0.01)
-
-    # Idle
-    register_12(cmd_interpret, 0x0070)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-    
-    # BCR
-    register_12(cmd_interpret, 0x0072)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-    
-    fc_signal_start(cmd_interpret)
-
-    time.sleep(0.01)
-    
-
-def start_L1A_train(cmd_interpret):
-
-    ## Register 11, needs do_fc option
-    ## 4-digit 16 bit hex, Duration
-    register_11_key = 0x0021
-
-    ## Register 12, needs do_fc option
-    ## 4-digit 16 bit hex, 0xWXYZ
-    ## WX (8 bit) -  Error Mask
-    ## Y - trigSize[1:0],Period,testTrig
-    ## Z - Input command
-    register_12_key = 0x0036
-    register_11(cmd_interpret, key = register_11_key)
-    register_12(cmd_interpret, key = register_12_key)
-    fc_signal_start(cmd_interpret)
-    software_clear_fifo(cmd_interpret) 
-    time.sleep(0.5)
-
-    register_11_key = 0x0020
-    register_12_key = 0x0035
-    register_11(cmd_interpret, key = register_11_key)
-    register_12(cmd_interpret, key = register_12_key)
-    fc_signal_start(cmd_interpret)
-    software_clear_fifo(cmd_interpret) 
-
-def stop_L1A(cmd_interpret):
-    register_12(cmd_interpret, 0x0030)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-    time.sleep(0.01)
-
-    software_clear_fifo(cmd_interpret)
-    time.sleep(0.01)
-
-def stop_L1A_trigger_bit(cmd_interpret):
-    register_12(cmd_interpret, 0x0070)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-    time.sleep(0.01)
-
-    # software_clear_fifo(cmd_interpret)
     time.sleep(0.01)
 
 def stop_L1A_1MHz(cmd_interpret):
@@ -287,38 +179,114 @@ def stop_L1A_1MHz(cmd_interpret):
     software_clear_fifo(cmd_interpret)
     time.sleep(0.01)
 
-def stop_L1A_1MHz_trigger_bit(cmd_interpret):
-    register_12(cmd_interpret, 0x0070)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0de7)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-    time.sleep(0.01)
-
-    software_clear_fifo(cmd_interpret)
-    time.sleep(0.01)
-
-def stop_L1A_train(cmd_interpret):
-    software_clear_fifo(cmd_interpret)
-
-    register_11_key = 0x0021
-    register_12_key = 0x0006
-    register_11(cmd_interpret, key = register_11_key)
-    register_12(cmd_interpret, key = register_12_key)
-    fc_signal_start(cmd_interpret)
-    software_clear_fifo(cmd_interpret) 
-
-    register_11_key = 0x0020
-    register_12_key = 0x0005
-    register_11(cmd_interpret, key = register_11_key)
-    register_12(cmd_interpret, key = register_12_key)
-    fc_signal_start(cmd_interpret)
-    software_clear_fifo(cmd_interpret) 
-
 def link_reset(cmd_interpret):
     software_clear_fifo(cmd_interpret) 
+
+def set_trigger_linked(cmd_interpret):
+    reads = 0
+    clears_error = 0
+    clears_fifo = 0
+    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+    print("Register 2 upon checking:", testregister_2)
+    data_error = testregister_2[-1]
+    df_synced = testregister_2[-2]
+    trigger_error = testregister_2[-3]
+    trigger_synced = testregister_2[-4]
+    linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
+    if linked_flag:
+        print("Already Linked:",testregister_2)
+        return True
+    else:
+        while linked_flag is False:
+            time.sleep(1.01)
+            testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+            reads += 1
+            print("Read register:",reads)
+            print("Register after waiting to link",testregister_2)
+            df_synced = testregister_2[-2]
+            data_error = testregister_2[-1]
+            trigger_synced = testregister_2[-4]
+            trigger_error = testregister_2[-3]
+            linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
+            error_flag = (data_error=="0" and trigger_error=="0")
+            print("Linked flag is",linked_flag)
+            print("Error flag is",error_flag)
+            if linked_flag is False:
+                if error_flag is False:
+                    software_clear_error(cmd_interpret)
+                    clears_error += 1
+                    print("Cleared Error:",clears_error)
+                    if clears_error == 4:
+                        software_clear_fifo(cmd_interpret)
+                        clears_fifo += 1
+                        print("Cleared FIFO:",clears_fifo)
+                else:
+                    software_clear_fifo(cmd_interpret)
+                    clears_fifo += 1
+                    print("Cleared FIFO:",clears_fifo)
+    print("Register 2 after trying to link:", testregister_2)
+    return True
+
+def set_linked(cmd_interpret):
+    reads = 0
+    clears = 0
+    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+    print("Register 2 upon checking:", testregister_2)
+    data_error = testregister_2[-1]
+    df_synced = testregister_2[-2]
+    linked_flag = (data_error=="0" and df_synced=="1")
+    if linked_flag:
+        print("Already Linked:",testregister_2)
+        return True
+    else:
+        while linked_flag is False:
+            time.sleep(1.01)
+            testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+            reads += 1
+            print("Read register:",reads)
+            print("Register after waiting to link",testregister_2)
+            df_synced = testregister_2[-2]
+            data_error = testregister_2[-1]
+            linked_flag = (data_error=="0" and df_synced=="1")
+            print("Linked flag is",linked_flag)
+            if linked_flag is False:
+                software_clear_fifo(cmd_interpret)
+                clears += 1
+                print("Cleared FIFO:",clears)
+    print("Register 2 after trying to link:", testregister_2)
+    return True
+
+def check_trigger_linked(cmd_interpret):
+    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+    print("Register 2 upon checking:", testregister_2)
+    data_error = testregister_2[-1]
+    df_synced = testregister_2[-2]
+    trigger_error = testregister_2[-3]
+    trigger_synced = testregister_2[-4]
+    if (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1"):
+        print("All is linked with no errors")
+        return True
+    return False
+
+def check_linked(cmd_interpret):
+    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+    print("Register 2 upon checking:", testregister_2)
+    data_error = testregister_2[-1]
+    df_synced = testregister_2[-2]
+    if (data_error=="0" and df_synced=="1"):
+        print("All is linked with no errors")
+        return True
+    return False
+    
+def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
+    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val)
+    try:
+        fpga_data.start()
+        while fpga_data.is_alive():
+            fpga_data.join(0.8)
+    except KeyboardInterrupt as e:
+        fpga_data.alive = False
+        fpga_data.join()
 
 # define a threading class for saving data from FPGA Registers only
 class Save_FPGA_data(threading.Thread):
@@ -333,13 +301,12 @@ class Save_FPGA_data(threading.Thread):
 
     def run(self):
         if(self.isQInj):
-            start_L1A_trigger_bit(self.cmd_interpret) # sending IDLE + QINJ FC + L1A FC
+            configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True)
         else:
-            stop_L1A_trigger_bit(self.cmd_interpret) # only sending IDLE FC 
+            configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=False,L1A=False)
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
         print("{} is saving FPGA data directly...".format(self.getName()))
-        total_start_time = time.time()
         userdefinedir = self.output_directory
         today = datetime.date.today()
         todaystr = "../ETROC-Data/" + today.isoformat() + "_Array_Test_Results"
@@ -379,7 +346,7 @@ class Save_FPGA_data(threading.Thread):
         fpga_triggerbit = int(format(self.cmd_interpret.read_status_reg(9), '016b')+format(self.cmd_interpret.read_status_reg(8), '016b'), base=2)
         outfile.write(f'{fpga_state},{en_L1A},{fpga_duration},{fpga_data},{fpga_header},{fpga_triggerbit},{self.DAC_Val}\n')
         outfile.close()
-        stop_L1A_trigger_bit(self.cmd_interpret)
+        configure_memo_FC(self.cmd_interpret,Initialize=False,QInj=False,L1A=False)
         print("%s finished!"%self.getName())
 #--------------------------------------------------------------------------#
 
@@ -422,27 +389,19 @@ class Receive_data(threading.Thread):
                     elif message == 'stop DAQ':
                         self.daq_on = False
                     elif message == 'start L1A':
-                        start_L1A(self.cmd_interpret)
+                        configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True,BCR=True,Triggerbit=False)
                     elif message == 'start L1A 1MHz':
                         start_L1A_1MHz(self.cmd_interpret)
                     elif message == 'start L1A trigger bit':
-                        start_L1A_trigger_bit(self.cmd_interpret)
-                    # elif message == 'start L1A 1MHz trigger bit':
-                    #     start_L1A_1MHz_trigger_bit(self.cmd_interpret)
+                        configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True)
                     elif message == 'start L1A trigger bit data':
-                        start_L1A_trigger_bit_data(self.cmd_interpret)
+                        configure_memo_FC(self.cmd_interpret,Initialize=True) #IDLE FC Only
                     elif message == 'stop L1A':
-                        stop_L1A(self.cmd_interpret)
+                        configure_memo_FC(self.cmd_interpret,Initialize=False,Triggerbit=False)
                     elif message == 'stop L1A 1MHz':
                         stop_L1A_1MHz(self.cmd_interpret)
                     elif message == 'stop L1A trigger bit':
-                        stop_L1A_trigger_bit(self.cmd_interpret)
-                    elif message == 'stop L1A 1MHz trigger bit':
-                        stop_L1A_1MHz_trigger_bit(self.cmd_interpret)
-                    elif message == 'stop L1A train':
-                        stop_L1A_train(self.cmd_interpret)
-                    elif message == 'start L1A train':
-                        start_L1A_train(self.cmd_interpret)
+                        configure_memo_FC(self.cmd_interpret,Initialize=False)
                     elif message == 'allow threads to exit':
                         self.stop_DAQ_event.set()
                     elif message == 'link reset':
@@ -484,7 +443,7 @@ class Receive_data(threading.Thread):
 
 # define a write data class
 class Write_data(threading.Thread):
-    def __init__(self, name, read_queue, translate_queue, num_line, store_dict, binary_only, compressed_binary, skip_binary, make_plots, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event = None):
+    def __init__(self, name, read_queue, translate_queue, num_line, store_dict, binary_only, compressed_binary, skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.read_queue = read_queue
         self.translate_queue = translate_queue
@@ -493,7 +452,6 @@ class Write_data(threading.Thread):
         self.binary_only = binary_only
         self.compressed_binary = compressed_binary
         self.skip_binary = skip_binary
-        self.make_plots = make_plots
         self.read_thread_handle = read_thread_handle
         self.write_thread_handle = write_thread_handle
         self.translate_thread_handle = translate_thread_handle
@@ -550,10 +508,10 @@ class Write_data(threading.Thread):
                 # self.is_alive = False
                 break
             # Handle the raw (binary) line
-            if int(mem_data) == 0: continue # Waiting for IPC
-            if int(mem_data) == 38912: continue # got a Filler
-            if int(mem_data) == 9961472: continue # got a Filler
-            if int(mem_data) == 2550136832: continue # got a Filler
+            # if int(mem_data) == 0: continue # Waiting for IPC
+            # if int(mem_data) == 38912: continue # got a Filler
+            # if int(mem_data) == 9961472: continue # got a Filler
+            # if int(mem_data) == 2550136832: continue # got a Filler
             binary = format(int(mem_data), '032b')
             if(not self.skip_binary):
                 if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
@@ -561,7 +519,7 @@ class Write_data(threading.Thread):
             # Increment line counters
             file_lines = file_lines + 1
             # Perform translation related activities if requested
-            if(self.make_plots or (not self.binary_only)):
+            if(not self.binary_only):
                 self.translate_queue.put(binary)
             if self.write_thread_handle.is_set():
                 # print("Write Thread received STOP signal")
@@ -581,22 +539,19 @@ class Write_data(threading.Thread):
 
 #--------------------------------------------------------------------------#
 class Translate_data(threading.Thread):
-    def __init__(self, name, translate_queue, plot_queue, cmd_interpret, num_line, timestamp, store_dict, binary_only, make_plots, board_ID, write_thread_handle, translate_thread_handle, plotting_thread_handle, compressed_translation, stop_DAQ_event = None):
+    def __init__(self, name, translate_queue, cmd_interpret, num_line, timestamp, store_dict, binary_only, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.translate_queue = translate_queue
-        self.plot_queue = plot_queue
         self.cmd_interpret = cmd_interpret
         self.num_line = num_line
         self.timestamp = timestamp
         self.store_dict = store_dict
         self.binary_only = binary_only
-        self.make_plots = make_plots
         self.board_ID = board_ID
         self.queue_ch = [deque() for i in range(4)]
         self.link_ch  = ["" for i in range(4)]
         self.write_thread_handle = write_thread_handle
         self.translate_thread_handle = translate_thread_handle
-        self.plotting_thread_handle = plotting_thread_handle
         self.stop_DAQ_event = stop_DAQ_event
         self.hitmap = {i:np.zeros((16,16)) for i in range(4)}
         self.compressed_translation = compressed_translation
@@ -656,12 +611,6 @@ class Translate_data(threading.Thread):
             TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID, self.hitmap, self.compressed_translation)
             if(write_flag==1):
                 pass
-                # if(not self.binary_only): 
-                #     outfile.write("%s\n"%TDC_data)
-                #     file_lines = file_lines + 1
-                # total_lines = total_lines + 1
-                # if(TDC_data[0:6]=='ETROC1'):
-                #     if(self.make_plots): self.plot_queue.put(TDC_data)
             elif(write_flag==2):
                 TDC_len = len(TDC_data)
                 TDC_header_index = -1
@@ -682,200 +631,14 @@ class Translate_data(threading.Thread):
                         else:
                             outfile.write("%s\n"%TDC_line)
                     if(TDC_line[9:13]!='DATA'): continue
-                    if(self.make_plots): self.plot_queue.put(TDC_line)
                 if(TDC_len>0):
                     if(not self.binary_only): file_lines  = file_lines  + TDC_len - 1
                     total_lines = total_lines + (TDC_len-1)
-            if self.translate_thread_handle.is_set():
-                # print("Translate Thread received STOP signal")
-                if not self.plotting_thread_handle.is_set():
-                    print("Sending stop signal to Plotting Thread")
-                    self.plotting_thread_handle.set()
-                # print("Checking Write Thread from Translate Thread")
-                # wait for write thread to die...
-                # while(self.write_thread_handle.is_set() == False):
-                    # time.sleep(1)
-                # self.is_alive = False
-                # break
         
-        print("Translate Thread gracefully sending STOP signal to plotting thread") 
+        print("Translate Thread gracefully ending") 
         self.translate_thread_handle.set()
-        self.plotting_thread_handle.set()
         # self.is_alive = False
         print("%s finished!"%self.getName())
-
-#--------------------------------------------------------------------------#
-class DAQ_Plotting(threading.Thread):
-    def __init__(self, name, queue, timestamp, store_dict, pixel_address, board_type, board_size, plot_queue_time, translate_thread_handle, plotting_thread_handle):
-        threading.Thread.__init__(self, name=name)
-        self.queue = queue
-        self.timestamp = timestamp
-        self.store_dict = store_dict
-        self.pixel_address = pixel_address
-        self.board_type = board_type
-        self.board_size = board_size
-        self.plot_queue_time = plot_queue_time
-        self.translate_thread_handle = translate_thread_handle
-        self.plotting_thread_handle = plotting_thread_handle
-        # self.is_alive = False
-
-    def run(self):
-        t = threading.current_thread()
-        t.alive = True
-        # self.is_alive = True
-
-        ch0 = np.zeros((int(np.sqrt(self.board_size[0])),int(np.sqrt(self.board_size[0])))) 
-        ch1 = np.zeros((int(np.sqrt(self.board_size[1])),int(np.sqrt(self.board_size[1])))) 
-        ch2 = np.zeros((int(np.sqrt(self.board_size[2])),int(np.sqrt(self.board_size[2])))) 
-        ch3 = np.zeros((int(np.sqrt(self.board_size[3])),int(np.sqrt(self.board_size[3])))) 
-
-        plt.ion()
-        # fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2,2, dpi=75)
-        fig = plt.figure(dpi=75, figsize=(5,5))
-        gs = fig.add_gridspec(8,8)
-        ax0 = fig.add_subplot(gs[0:int(np.sqrt(self.board_size[0]))//4, 0:int(np.sqrt(self.board_size[0]))//4])
-        ax1 = fig.add_subplot(gs[4:4+int(np.sqrt(self.board_size[1]))//4, 0:int(np.sqrt(self.board_size[1]))//4])
-        ax2 = fig.add_subplot(gs[0:int(np.sqrt(self.board_size[2]))//4, 4:4+int(np.sqrt(self.board_size[2]))//4])
-        ax3 = fig.add_subplot(gs[4:4+int(np.sqrt(self.board_size[3]))//4, 4:4+int(np.sqrt(self.board_size[3]))//4])
-
-        if(len(self.board_type)>0):
-            ax0.set_title('Channel 0: ETROC {:d}'.format(self.board_type[0]))       
-        if(len(self.board_type)>1):
-            ax1.set_title('Channel 1: ETROC {:d}'.format(self.board_type[1]))
-        if(len(self.board_type)>2):
-            ax2.set_title('Channel 2: ETROC {:d}'.format(self.board_type[2]))
-        if(len(self.board_type)>3):
-            ax3.set_title('Channel 3: ETROC {:d}'.format(self.board_type[3]))
-        
-        img0 = ax0.imshow(ch0, interpolation='none', vmin=1)
-        ax0.set_aspect('equal')
-        img1 = ax1.imshow(ch1, interpolation='none', vmin=1)
-        ax1.set_aspect('equal')
-        img2 = ax2.imshow(ch2, interpolation='none', vmin=1)
-        ax2.set_aspect('equal')
-        img3 = ax3.imshow(ch3, interpolation='none', vmin=1)
-        ax3.set_aspect('equal')
-
-        ax0.get_xaxis().set_visible(False)
-        ax0.get_yaxis().set_visible(False)
-        # ax0.set_frame_on(False)
-        ax1.get_xaxis().set_visible(False)
-        ax1.get_yaxis().set_visible(False)
-        # ax1.set_frame_on(False)
-        ax2.get_xaxis().set_visible(False)
-        ax2.get_yaxis().set_visible(False)
-        # ax2.set_frame_on(False)
-        ax3.get_xaxis().set_visible(False)
-        ax3.get_yaxis().set_visible(False)
-        # ax3.set_frame_on(False)
-
-        divider = make_axes_locatable(ax0)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
-        fig.colorbar(img0, cax=cax, orientation='vertical')
-        divider = make_axes_locatable(ax1)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
-        fig.colorbar(img1, cax=cax, orientation='vertical')
-        divider = make_axes_locatable(ax2)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
-        fig.colorbar(img2, cax=cax, orientation='vertical')
-        divider = make_axes_locatable(ax3)
-        cax = divider.append_axes('right', size='5%', pad=0.05)
-        fig.colorbar(img3, cax=cax, orientation='vertical')
-
-        # plt.tight_layout()
-        # plt.draw()
-        # def init():etroc_translate_binary
-        #     line.set_data([], [])
-        #     return line,
-        # def animate(i):
-        #     x = np.linspace(0, 4, 1000)
-        #     y = np.sin(2 * np.pi * (x - 0.01 * i))
-        #     line.set_data(x, y)
-        #     return line,
-        # anim = FuncAnimation(fig, animate, init_func=init,
-        #                                frames=200, interval=20, blit=False)
-        # anim.save('sine_wave.gif', writer='imagemagick')
-
-        while(True):
-            ch0 = np.zeros((int(np.sqrt(self.board_size[0])),int(np.sqrt(self.board_size[0])))) 
-            ch1 = np.zeros((int(np.sqrt(self.board_size[1])),int(np.sqrt(self.board_size[1])))) 
-            ch2 = np.zeros((int(np.sqrt(self.board_size[2])),int(np.sqrt(self.board_size[2])))) 
-            ch3 = np.zeros((int(np.sqrt(self.board_size[3])),int(np.sqrt(self.board_size[3])))) 
-            img0.set_data(ch0)
-            img0.autoscale()
-            img1.set_data(ch1)
-            img1.autoscale()
-            img2.set_data(ch2)
-            img2.autoscale()
-            img3.set_data(ch3)
-            img3.autoscale()
-            if not t.alive:
-                print("Plotting Thread detected alive=False")
-                # self.is_alive = False
-                break
-            if self.plotting_thread_handle.is_set():
-                print("Plot Thread received STOP signal from Translate Thread")
-                # wait for translate thread to die...
-                # while(self.translate_thread_handle.is_set() == False):
-                    # time.sleep(1)
-                # self.is_alive = False
-                break
-            start_time = time.time()
-            delta_time = 0
-            mem_data = []
-            while(delta_time < self.plot_queue_time):
-                try:
-                    task = self.queue.get(False)                # Empty exception is thrown right away
-                    mem_data.append(task)
-                except queue.Empty:                             # Handle empty queue here
-                    pass
-                # else:                                         # Handle task here and call q.task_done()
-                delta_time = time.time() - start_time
-
-            for line in mem_data:
-                words = line.split()
-                if(words[0]=="ETROC1"):
-                    if(words[1]=="0"):   ch0[(self.pixel_address[0]%4),self.pixel_address[0]//4] += 1
-                    elif(words[1]=="1"): ch1[(self.pixel_address[1]%4),self.pixel_address[1]//4] += 1
-                    elif(words[1]=="2"): ch2[(self.pixel_address[2]%4),self.pixel_address[2]//4] += 1
-                    elif(words[1]=="3"): ch3[(self.pixel_address[3]%4),self.pixel_address[3]//4] += 1
-                elif(words[0]=="ETROC2"):
-                    if(words[2]!="DATA"): continue
-                    if(words[1]=="0"):   ch0[15-int(words[8]),15-int(words[6])] += 1
-                    elif(words[1]=="1"): ch1[15-int(words[8]),15-int(words[6])] += 1
-                    elif(words[1]=="2"): ch2[15-int(words[8]),15-int(words[6])] += 1
-                    elif(words[1]=="3"): ch3[15-int(words[8]),15-int(words[6])] += 1
-                elif(words[0]=="ETROC3"): continue
-                else: continue
-
-            img0.set_data(ch0)
-            img0.autoscale()
-            img1.set_data(ch1)
-            img1.autoscale()
-            img2.set_data(ch2)
-            img2.autoscale()
-            img3.set_data(ch3)
-            img3.autoscale()
-            # ax0.relim()
-            # ax0.autoscale_view()
-            # ax1.relim()
-            # ax1.autoscale_view()
-            # ax2.relim()
-            # ax2.autoscale_view()
-            # ax3.relim()
-            # ax3.autoscale_view()
-            # plt.tight_layout()
-            fig.canvas.draw_idle()
-            plt.pause(0.01)
-            print("This pass of the Plotting function loop parsed {:d} lines of output".format(len(mem_data)))
-
-        plt.ioff()
-        plt.show()
-
-        # Thread then stops running
-        # self.is_alive = False
-        print("Plotting Thread broke out of loop")
-
 
 #--------------------------------------------------------------------------#
 
@@ -994,7 +757,7 @@ def triggerBitDelay(cmd_interpret, key = 0x0400):
 ## Register 7
 ## 4-digit 16 bit hex
 ## LSB 6 bits  - time (s) for FPGA counters
-def counterDuration(cmd_interpret, key = 0x0005): 
+def counterDuration(cmd_interpret, key = 0x0001): 
     cmd_interpret.write_config_reg(7, key)
 
 #--------------------------------------------------------------------------#

@@ -12,7 +12,6 @@ import datetime
 #import heartrate
 from queue import Queue
 import numpy as np
-import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
 from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 from optparse import OptionParser
@@ -56,112 +55,6 @@ def main_process(IPC_queue, options, log_file = None):
     main(options, cmd_interpret, IPC_queue)
     s.close()
 
-def set_trigger_linked(cmd_interpret):
-    reads = 0
-    clears_error = 0
-    clears_fifo = 0
-    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-    print("Register 2 upon checking:", testregister_2)
-    data_error = testregister_2[-1]
-    df_synced = testregister_2[-2]
-    trigger_error = testregister_2[-3]
-    trigger_synced = testregister_2[-4]
-    linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
-    if linked_flag:
-        print("Already Linked:",testregister_2)
-        return True
-    else:
-        while linked_flag is False:
-            time.sleep(1.01)
-            testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-            reads += 1
-            print("Read register:",reads)
-            print("Register after waiting to link",testregister_2)
-            df_synced = testregister_2[-2]
-            data_error = testregister_2[-1]
-            trigger_synced = testregister_2[-4]
-            trigger_error = testregister_2[-3]
-            linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
-            error_flag = (data_error=="0" and trigger_error=="0")
-            print("Linked flag is",linked_flag)
-            print("Error flag is",error_flag)
-            if linked_flag is False:
-                if error_flag is False:
-                    software_clear_error(cmd_interpret)
-                    clears_error += 1
-                    print("Cleared Error:",clears_error)
-                    if clears_error == 4:
-                        software_clear_fifo(cmd_interpret)
-                        clears_fifo += 1
-                        print("Cleared FIFO:",clears_fifo)
-                else:
-                    software_clear_fifo(cmd_interpret)
-                    clears_fifo += 1
-                    print("Cleared FIFO:",clears_fifo)
-    print("Register 2 after trying to link:", testregister_2)
-    return True
-
-def set_linked(cmd_interpret):
-    reads = 0
-    clears = 0
-    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-    print("Register 2 upon checking:", testregister_2)
-    data_error = testregister_2[-1]
-    df_synced = testregister_2[-2]
-    linked_flag = (data_error=="0" and df_synced=="1")
-    if linked_flag:
-        print("Already Linked:",testregister_2)
-        return True
-    else:
-        while linked_flag is False:
-            time.sleep(1.01)
-            testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-            reads += 1
-            print("Read register:",reads)
-            print("Register after waiting to link",testregister_2)
-            df_synced = testregister_2[-2]
-            data_error = testregister_2[-1]
-            linked_flag = (data_error=="0" and df_synced=="1")
-            print("Linked flag is",linked_flag)
-            if linked_flag is False:
-                software_clear_fifo(cmd_interpret)
-                clears += 1
-                print("Cleared FIFO:",clears)
-    print("Register 2 after trying to link:", testregister_2)
-    return True
-
-def check_trigger_linked(cmd_interpret):
-    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-    print("Register 2 upon checking:", testregister_2)
-    data_error = testregister_2[-1]
-    df_synced = testregister_2[-2]
-    trigger_error = testregister_2[-3]
-    trigger_synced = testregister_2[-4]
-    if (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1"):
-        print("All is linked with no errors")
-        return True
-    return False
-
-def check_linked(cmd_interpret):
-    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-    print("Register 2 upon checking:", testregister_2)
-    data_error = testregister_2[-1]
-    df_synced = testregister_2[-2]
-    if (data_error=="0" and df_synced=="1"):
-        print("All is linked with no errors")
-        return True
-    return False
-    
-def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
-    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val)
-    try:
-        fpga_data.start()
-        while fpga_data.is_alive():
-            fpga_data.join(0.8)
-    except KeyboardInterrupt as e:
-        fpga_data.alive = False
-        fpga_data.join()
-
 ## main function
 def main(options, cmd_interpret, IPC_queue = None):
     
@@ -195,8 +88,10 @@ def main(options, cmd_interpret, IPC_queue = None):
         time.sleep(0.1)
         set_linked(cmd_interpret)
 
-    if(options.memo_fc):
-        start_L1A(cmd_interpret)
+    if(options.reset_till_trigger_linked):
+        print("Checking trigger link at beginning")
+        set_trigger_linked(cmd_interpret)
+
     if(options.memo_fc_start_onetime_ws):
         start_onetime_L1A_WS(cmd_interpret)
     if(options.memo_fc_start_periodic_ws):
@@ -262,9 +157,6 @@ def main(options, cmd_interpret, IPC_queue = None):
                 sys.exit(1)
 
     if(options.fpga_data or options.fpga_data_QInj):
-        if(options.reset_till_trigger_linked):
-            print("Checking trigger link at beginning")
-            set_trigger_linked(cmd_interpret)
         get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
         if(options.check_trigger_link_at_end):
             print("Checking trigger link at end")
@@ -282,56 +174,43 @@ def main(options, cmd_interpret, IPC_queue = None):
                 linked_flag = check_linked(cmd_interpret)
 
     if(not options.nodaq):
-        ## start receive_data, write_data, daq_plotting threading
+        ## start receive_data, write_data
         store_dict = userdefine_dir
         read_queue = Queue()
         translate_queue = Queue() 
-        plot_queue = Queue()
         read_thread_handle = threading.Event()    # This is how we stop the read thread
         write_thread_handle = threading.Event()   # This is how we stop the write thread
         translate_thread_handle = threading.Event() # This is how we stop the translate thread (if translate enabled) (set down below...)
-        plotting_thread_handle = threading.Event() # This is how we stop the plotting thread (if plotting enabled) (set down below...)
         stop_DAQ_event = threading.Event()     # This is how we notify the Read thread that we are done taking data
                                                # Kill order is read, write, translate
         receive_data = Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
-        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.binary_only, options.compressed_binary, options.skip_binary, options.make_plots, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
-        if(options.make_plots or (not options.binary_only)):
-            # translate_thread_handle = threading.Event()
-            translate_data = Translate_data('Translate_data', translate_queue, plot_queue, cmd_interpret, options.num_line, options.timestamp, store_dict, options.binary_only, options.make_plots, board_ID, write_thread_handle, translate_thread_handle, plotting_thread_handle, options.compressed_translation, stop_DAQ_event)
-        if(options.make_plots):
-            # plotting_thread_handle = threading.Event()
-            daq_plotting = DAQ_Plotting('DAQ_Plotting', plot_queue, options.timestamp, store_dict, options.pixel_address, board_type, board_size, options.plot_queue_time, translate_thread_handle, plotting_thread_handle)
+        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.binary_only, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
+        translate_data = Translate_data('Translate_data', translate_queue, cmd_interpret, options.num_line, options.timestamp, store_dict, options.binary_only, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event)
         # read_write_data.start()
         try:
             # Start the thread
             receive_data.start()
             write_data.start()
-            if(options.make_plots or (not options.binary_only)): translate_data.start()
-            if(options.make_plots): daq_plotting.start()
+            if(not options.binary_only): translate_data.start()
             # If the child thread is still running
             while receive_data.is_alive():
                 # Try to join the child thread back to parent for 0.5 seconds
                 receive_data.join(0.5)
-            if(options.make_plots or (not options.binary_only)):
+            if(not options.binary_only):
                 while translate_data.is_alive():
                     translate_data.join(0.5)
             while write_data.is_alive():
                 write_data.join(0.5)
-            if(options.make_plots):
-                while daq_plotting.is_alive():
-                    daq_plotting.join(0.5)
         # When ctrl+c is received
         except KeyboardInterrupt as e:
             # Set the alive attribute to false
             receive_data.alive = False
             write_data.alive = False
-            if(options.make_plots or (not options.binary_only)): translate_data.alive = False
-            if(options.make_plots): daq_plotting.alive = False
+            if(not options.binary_only): translate_data.alive = False
             # Block until child thread is joined back to the parent
             receive_data.join()
-            if(options.make_plots or (not options.binary_only)): translate_data.join()
+            if(not options.binary_only): translate_data.join()
             write_data.join()
-            if(options.make_plots): daq_plotting.join()
         # wait for thread to finish before proceeding)
         # read_write_data.join()
 #--------------------------------------------------------------------------#
@@ -355,16 +234,13 @@ def getOptionParser():
     parser.add_option("-s", "--timestamp", type="int",action="store", dest="timestamp", default=0x000C, help="Set timestamp binary, see daq_helpers for more info")
     parser.add_option("-p", "--polarity", type="int",action="store", dest="polarity", default=0x000b, help="Set fc polarity, see daq_helpers for more info")
     parser.add_option("-d", "--trigger_bit_delay", type="int",action="store", dest="trigger_bit_delay", default=0x0400, help="Set trigger bit delay, see daq_helpers for more info")
-    parser.add_option("-c", "--counter_duration", type="int",action="store", dest="counter_duration", default=0x0005, help="LSB 6 bits - Time (s) for FPGA data counting")
+    parser.add_option("-c", "--counter_duration", type="int",action="store", dest="counter_duration", default=0x0001, help="LSB 6 bits - Time (s) for FPGA data counting")
     parser.add_option("--DAC_Val", dest="DAC_Val", action="store", type="int", help="DAC value set for FPGA data taking", default=-1)
     parser.add_option("-v", "--verbose",action="store_true", dest="verbose", default=False, help="Print status messages to stdout")
     parser.add_option("-w", "--overwrite",action="store_true", dest="overwrite", default=False, help="Overwrite previously saved files")
-    parser.add_option("--make_plots",action="store_true", dest="make_plots", default=False, help="Enable plotting of real time hits")
-    parser.add_option("--plot_queue_time", dest="plot_queue_time", action="store", type="float", help="Time (s) used to pop lines off the queue for plotting", default=0.1)
     parser.add_option("--nodaq",action="store_true", dest="nodaq", default=False, help="Switch off DAQ via the FPGA")
     parser.add_option("--useIPC",action="store_true", dest="useIPC", default=False, help="Use Inter Process Communication to control L1A enable/disable")
     parser.add_option("-f", "--firmware",action="store_true", dest="firmware", default=False, help="Configure FPGA firmware settings")
-    parser.add_option("--memo_fc",action="store_true", dest="memo_fc", default=False, help="(DEV ONLY) Do Fast Command with Memory")
     parser.add_option("--reset_till_linked",action="store_true", dest="reset_till_linked", default=False, help="FIFO clear and reset till data frames are synced and no data error is seen (Please ensure LED Pages is set to 011)")
     parser.add_option("--reset_till_trigger_linked",action="store_true", dest="reset_till_trigger_linked", default=False, help="FIFO clear and reset till data frames AND trigger bits are synced and no data error is seen (Please ensure LED Pages is set to 011)")
     parser.add_option("--check_link_at_end",action="store_true", dest="check_link_at_end", default=False, help="Check data link after getting FPGA and if not linked then take FPGA data again)")
@@ -406,7 +282,6 @@ if __name__ == "__main__":
         print("Save FPGA binary data (raw output) in int format: ", options.compressed_binary)
         print("Save only FPGA translated data frames with DATA: ", options.compressed_translation)
         print("DO NOT save binary data (raw output): ", options.skip_binary)
-        print("Enable plotting of real time hits: ", options.make_plots)
         print("--------End of inputs from the USER--------")
         print("-------------------------------------------")
         print("\n")
@@ -419,9 +294,5 @@ if __name__ == "__main__":
         print("-------------------------------------------")
         print("-------------------------------------------")
         print("\n")
-
-    if(options.binary_only==True and options.make_plots==True):
-        print("ERROR! Can't make plots without translating data!")
-        sys.exit(1)
     
     main_process(None, options)

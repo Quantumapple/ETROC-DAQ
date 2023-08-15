@@ -1,2 +1,5 @@
 __pycache__
+process_outputs/*
+process_outputs
+*csv
 *out
