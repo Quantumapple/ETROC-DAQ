@@ -227,6 +227,61 @@ def set_trigger_linked(cmd_interpret):
     print("Register 2 after trying to link:", testregister_2)
     return True
 
+def set_all_trigger_linked(cmd_interpret):
+    print("Resetting links till ALL boards are linked...")
+    register_15 = cmd_interpret.read_config_reg(15)
+    string_15   = format(register_15, '016b')
+    channel_enable = string_15[-4:]
+    for i in range(4):
+        if(channel_enable[3-i]=="0"): continue
+        print("Acting upon channel", i, "...")
+        timestamp(cmd_interpret, key = int('000000000000'+format(i, '02b')+'00', base=2))
+        time.sleep(1.01)
+        reads = 0
+        clears_error = 0
+        clears_fifo = 0
+        testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+        print("Register 2 upon checking:", testregister_2)
+        data_error = testregister_2[-1]
+        df_synced = testregister_2[-2]
+        trigger_error = testregister_2[-3]
+        trigger_synced = testregister_2[-4]
+        linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
+        if linked_flag:
+            print("Already Linked:",testregister_2)
+            continue
+        else:
+            while linked_flag is False:
+                time.sleep(1.01)
+                testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+                reads += 1
+                print("Read register:",reads)
+                print("Register after waiting to link",testregister_2)
+                df_synced = testregister_2[-2]
+                data_error = testregister_2[-1]
+                trigger_synced = testregister_2[-4]
+                trigger_error = testregister_2[-3]
+                linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
+                error_flag = (data_error=="0" and trigger_error=="0")
+                print("Linked flag is",linked_flag)
+                print("Error flag is",error_flag)
+                if linked_flag is False:
+                    if error_flag is False:
+                        software_clear_error(cmd_interpret)
+                        clears_error += 1
+                        print("Cleared Error:",clears_error)
+                        if clears_error == 9:
+                            software_clear_fifo(cmd_interpret)
+                            clears_fifo += 1
+                            clears_error = 0
+                            print("Cleared FIFO:",clears_fifo)
+                    else:
+                        software_clear_fifo(cmd_interpret)
+                        clears_fifo += 1
+                        print("Cleared FIFO:",clears_fifo)
+        print("Register 2 after trying to link:", testregister_2)
+    return True
+
 def set_linked(cmd_interpret):
     reads = 0
     clears = 0
@@ -254,6 +309,27 @@ def set_linked(cmd_interpret):
                 clears += 1
                 print("Cleared FIFO:",clears)
     print("Register 2 after trying to link:", testregister_2)
+    return True
+
+def check_all_trigger_linked(cmd_interpret):
+    print("Checking links of ALL the boards...")
+    register_15 = cmd_interpret.read_config_reg(15)
+    string_15   = format(register_15, '016b')
+    channel_enable = string_15[-4:]
+    for i in range(4):
+        if(channel_enable[3-i]=="0"): continue
+        print("Acting upon channel", i, "...")
+        timestamp(cmd_interpret, key = int('000000000000'+format(i, '02b')+'00', base=2))
+        time.sleep(1.01)
+        testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
+        print("Register 2 upon checking:", testregister_2)
+        data_error = testregister_2[-1]
+        df_synced = testregister_2[-2]
+        trigger_error = testregister_2[-3]
+        trigger_synced = testregister_2[-4]
+        if (not(data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")):
+            print("Link error found!")
+            return False
     return True
 
 def check_trigger_linked(cmd_interpret):
@@ -406,11 +482,26 @@ class Receive_data(threading.Thread):
                         self.stop_DAQ_event.set()
                     elif message == 'link reset':
                         link_reset(self.cmd_interpret)
+                    elif message == 'reset till linked':
+                        set_trigger_linked(self.cmd_interpret)
                     ## Special if condition for delay change during the DAQ
                     ## Example: change delay 0x0421
                     ##   becomes: change delay 1057
                     elif ' '.join(message.split(' ')[:2]) == 'change delay':
                         triggerBitDelay(self.cmd_interpret, int(message.split(' ')[2], base=16))
+                    elif ' '.join(message.split(' ')[:1]) == 'memoFC':
+                        words = message.split(' ')[1:]
+                        QInj=False
+                        L1A=False
+                        BCR=False
+                        Triggerbit=False
+                        Initialize = False
+                        if("QInj" in words): QInj=True
+                        if("L1A" in words): L1A=True
+                        if("BCR" in words): BCR=True
+                        if("Triggerbit" in words): Triggerbit=True
+                        if("Start" in words): Initialize=True
+                        configure_memo_FC(self.cmd_interpret,Initialize=Initialize,QInj=QInj,L1A=L1A,BCR=BCR,Triggerbit=Triggerbit)
                     else:
                         print(f'Unknown message: {message}')
                 except queue.Empty:
@@ -508,10 +599,10 @@ class Write_data(threading.Thread):
                 # self.is_alive = False
                 break
             # Handle the raw (binary) line
-            # if int(mem_data) == 0: continue # Waiting for IPC
-            # if int(mem_data) == 38912: continue # got a Filler
-            # if int(mem_data) == 9961472: continue # got a Filler
-            # if int(mem_data) == 2550136832: continue # got a Filler
+            if int(mem_data) == 0: continue # Waiting for IPC
+            if int(mem_data) == 38912: continue # got a Filler
+            if int(mem_data) == 9961472: continue # got a Filler
+            if int(mem_data) == 2550136832: continue # got a Filler
             binary = format(int(mem_data), '032b')
             if(not self.skip_binary):
                 if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
@@ -634,6 +725,14 @@ class Translate_data(threading.Thread):
                 if(TDC_len>0):
                     if(not self.binary_only): file_lines  = file_lines  + TDC_len - 1
                     total_lines = total_lines + (TDC_len-1)
+            elif(write_flag==3):
+                TDC_len = len(TDC_data)
+                if(not self.compressed_translation and not self.binary_only):
+                    for j,TDC_line in enumerate(TDC_data):
+                        outfile.write("%s\n"%TDC_line)
+                if(TDC_len>0):
+                    if(not self.binary_only): file_lines  = file_lines  + TDC_len - 1
+                    total_lines = total_lines + (TDC_len-1)
         
         print("Translate Thread gracefully ending") 
         self.translate_thread_handle.set()
@@ -702,7 +801,7 @@ def software_clear_fifo(cmd_interpret):
 #--------------------------------------------------------------------------#
 ## software clear error
 def software_clear_error(cmd_interpret):
-    cmd_interpret.write_pulse_reg(0x0006)                                     # trigger pulser_reg[5]
+    cmd_interpret.write_pulse_reg(0x0020)                                     # trigger pulser_reg[5]
 
 #--------------------------------------------------------------------------#
 ## Register 15
@@ -713,6 +812,10 @@ def software_clear_error(cmd_interpret):
 ## Y - ch1
 ## Z - ch0
 ## Note that the input needs to be a 4-digit 16 bit hex, 0x000(WXYZ)
+## Register 15, needs firmware option
+# 0xWXYZ
+# Z is a bit 4 bit binary wxyz Channel Enable (1=Enable)
+# Y is a bit 4 bit binary wxyz Board Type (1=Etroc2)
 def active_channels(cmd_interpret, key = 0x0003): 
     cmd_interpret.write_config_reg(15, key)
 
@@ -757,6 +860,8 @@ def triggerBitDelay(cmd_interpret, key = 0x0400):
 ## Register 7
 ## 4-digit 16 bit hex
 ## LSB 6 bits  - time (s) for FPGA counters
+## Next 4 bits are the channel delay abcd = board: 3,2,1,0. 
+## This delays the trigger bit of set channels by 1 clock cycle
 def counterDuration(cmd_interpret, key = 0x0001): 
     cmd_interpret.write_config_reg(7, key)
 

@@ -28,6 +28,7 @@ def etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compresse
     TDC_data = []
     pattern_3c5c = '0011110001011100'
     trail_found = False
+    filler_found = False
     channel = int(line[2:4], base=2)
     # Discard first 4 bits which are 11+channel
     data = line[4:]
@@ -130,6 +131,7 @@ def etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compresse
                 sys.exit(1)
         elif(last_element[0:18]==pattern_3c5c+'10'):
             # Translating frame filler
+            filler_found = True
             last_line = last_line + "FRAMEFILLER "
             last_line = last_line + "L1COUNTER " + last_element[18:26] + " "
             last_line = last_line + "EBS " + last_element[26:28] + " "
@@ -150,8 +152,9 @@ def etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compresse
                 sys.exit(1)
         elif(last_element[0:18]==pattern_3c5c+'11'):
             # Translating firmware filler
+            filler_found = True
             last_line = last_line + "FIRMWAREFILLER "
-            last_line = last_line + "MISSINGCOUNT " + last_element[18:40]
+            last_line = last_line + "MISSINGCOUNT " + f"{int(last_element[18:40], base=2)}"
             # Expected
             if(links[channel]=="START" or links[channel]=="FILLER" or links[channel]=="TRAILER"): links[channel] = "FILLER"
             # Error in frame, clear queue, reset link, exit function
@@ -209,6 +212,14 @@ def etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compresse
             return TDC_data, 2
         #-----------------------------------------#
         queues[channel].append(last_line)
+        # If we found a filler line, we can dump the deque into our main queue
+        if(filler_found):
+            if(not compressed_translation): TDC_data = list(queues[channel])
+            queues[channel].clear()
+            links[channel]==""
+            hitmap[channel] = np.zeros((16,16))
+            if(len(data)>0): queues[channel].append(data)
+            return TDC_data, 3
         # If we found a trailing line, we can dump the deque into our main queue
         if(trail_found):
             if(not compressed_translation or np.any(hitmap[channel]>0)): TDC_data = list(queues[channel])

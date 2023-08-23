@@ -22,12 +22,6 @@ Any inserted jumpers will flip the bit
 
 '''
 
-## Register 15, needs firmware option
-# 0xWXYZ
-# Z is a bit 4 bit binary wxyz Channel Enable (1=Enable)
-# Y is a bit 4 bit binary wxyz Board Type (1=Etroc2)
-active_channels_key = 0x0011
-
 # Use this to control how many boards are actually attempted for connection
 # ETROC version number
 board_type       = [2, 2, 2, 2]
