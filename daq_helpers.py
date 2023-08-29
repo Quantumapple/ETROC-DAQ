@@ -559,7 +559,7 @@ class Write_data(threading.Thread):
         file_lines = 0
         file_counter = 0
         if (not self.skip_binary):
-            outfile = open("./%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
+            outfile = open("%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
             print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
         else:
             print("{} is reading queue and pushing binary onwards...".format(self.getName()))
@@ -574,7 +574,7 @@ class Write_data(threading.Thread):
                 outfile.close()
                 file_lines=0
                 file_counter = file_counter + 1
-                outfile = open("./%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
+                outfile = open("%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
                 print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
             elif(file_lines>self.num_line):
                 file_lines=0
@@ -659,7 +659,7 @@ class Translate_data(threading.Thread):
         file_lines = 0
         file_counter = 0
         if(not self.binary_only): 
-            outfile = open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
+            outfile = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
             print("{} is reading queue and translating file {}...".format(self.getName(), file_counter))
         else:
             print("{} is reading queue and translating...".format(self.getName()))
@@ -678,7 +678,7 @@ class Translate_data(threading.Thread):
                 outfile.close()
                 file_lines=0
                 file_counter = file_counter + 1
-                outfile = open("./%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
+                outfile = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
                 print("{} is reading queue and translating file {}...".format(self.getName(), file_counter))
             binary = ""
             # Attempt to pop off the translate_queue for 30 secs, fail if nothing found

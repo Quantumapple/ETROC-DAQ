@@ -94,11 +94,24 @@ def main(options, cmd_interpret, IPC_queue = None):
         Enable_FPGA_Descramblber(cmd_interpret, options.polarity)
     
     if(options.clear_fifo):
-        time.sleep(0.1)                                 # delay 1000 milliseconds
-        software_clear_fifo(cmd_interpret)              # clear fifo content
-        time.sleep(0.1)                                 # delay 1000 milliseconds
-        software_clear_fifo(cmd_interpret)              # clear fifo content  
-        print("Cleared FIFO") 
+        # time.sleep(0.1)                                 # delay 1000 milliseconds
+        # software_clear_fifo(cmd_interpret)              # clear fifo content
+        # time.sleep(0.1)                                 # delay 1000 milliseconds
+        # software_clear_fifo(cmd_interpret)              # clear fifo content  
+        # print("Cleared FIFO") 
+        print("Clearing FIFO for ALL boards...")
+        register_15 = cmd_interpret.read_config_reg(15)
+        string_15   = format(register_15, '016b')
+        channel_enable = string_15[-4:]
+        for i in range(4):
+            if(channel_enable[3-i]=="0"): continue
+            print("Acting upon channel", i, "...")
+            timestamp(cmd_interpret, key = int('000000000000'+format(i, '02b')+'00', base=2))
+            time.sleep(2.01)
+            software_clear_fifo(cmd_interpret)              # clear fifo content
+            time.sleep(0.1)                                 # delay 1000 milliseconds
+            software_clear_fifo(cmd_interpret)
+            time.sleep(4.01)  
 
     if(options.clear_error):
         time.sleep(0.1)                                 # delay 1000 milliseconds
