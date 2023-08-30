@@ -420,6 +420,15 @@ class Save_FPGA_data(threading.Thread):
         fpga_header     = int(format(self.cmd_interpret.read_status_reg(6), '016b')+format(self.cmd_interpret.read_status_reg(5), '016b'), base=2)
         fpga_state      = int(format(self.cmd_interpret.read_status_reg(7), '016b'), base=2)
         fpga_triggerbit = int(format(self.cmd_interpret.read_status_reg(9), '016b')+format(self.cmd_interpret.read_status_reg(8), '016b'), base=2)
+        while fpga_state < 1: # keep reading until fpga state is not zero to be sure counter started
+            read_register   = self.cmd_interpret.read_config_reg(7)
+            fpga_duration   = int(format(read_register, '016b')[-6:], base=2)
+            read_register   = self.cmd_interpret.read_config_reg(8)
+            en_L1A          = format(read_register, '016b')[-11]
+            fpga_data       = int(format(self.cmd_interpret.read_status_reg(4), '016b')+format(self.cmd_interpret.read_status_reg(3), '016b'), base=2)
+            fpga_header     = int(format(self.cmd_interpret.read_status_reg(6), '016b')+format(self.cmd_interpret.read_status_reg(5), '016b'), base=2)
+            fpga_state      = int(format(self.cmd_interpret.read_status_reg(7), '016b'), base=2)
+            fpga_triggerbit = int(format(self.cmd_interpret.read_status_reg(9), '016b')+format(self.cmd_interpret.read_status_reg(8), '016b'), base=2)
         outfile.write(f'{fpga_state},{en_L1A},{fpga_duration},{fpga_data},{fpga_header},{fpga_triggerbit},{self.DAC_Val}\n')
         outfile.close()
         configure_memo_FC(self.cmd_interpret,Initialize=False,QInj=False,L1A=False)
