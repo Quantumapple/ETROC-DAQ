@@ -216,9 +216,10 @@ def set_trigger_linked(cmd_interpret):
                     software_clear_error(cmd_interpret)
                     clears_error += 1
                     print("Cleared Error:",clears_error)
-                    if clears_error == 4:
+                    if clears_error == 1:
                         software_clear_fifo(cmd_interpret)
                         clears_fifo += 1
+                        clears_error = 0
                         print("Cleared FIFO:",clears_fifo)
                 else:
                     software_clear_fifo(cmd_interpret)
@@ -236,7 +237,7 @@ def set_all_trigger_linked(cmd_interpret):
         if(channel_enable[3-i]=="0"): continue
         print("Acting upon channel", i, "...")
         timestamp(cmd_interpret, key = int('000000000000'+format(i, '02b')+'00', base=2))
-        time.sleep(1.01)
+        time.sleep(0.01)
         reads = 0
         clears_error = 0
         clears_fifo = 0
@@ -270,7 +271,7 @@ def set_all_trigger_linked(cmd_interpret):
                         software_clear_error(cmd_interpret)
                         clears_error += 1
                         print("Cleared Error:",clears_error)
-                        if clears_error == 9:
+                        if clears_error == 1:
                             software_clear_fifo(cmd_interpret)
                             clears_fifo += 1
                             clears_error = 0
@@ -320,7 +321,7 @@ def check_all_trigger_linked(cmd_interpret):
         if(channel_enable[3-i]=="0"): continue
         print("Acting upon channel", i, "...")
         timestamp(cmd_interpret, key = int('000000000000'+format(i, '02b')+'00', base=2))
-        time.sleep(1.01)
+        time.sleep(0.01)
         testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
         print("Register 2 upon checking:", testregister_2)
         data_error = testregister_2[-1]

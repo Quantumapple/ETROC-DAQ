@@ -107,11 +107,11 @@ def main(options, cmd_interpret, IPC_queue = None):
             if(channel_enable[3-i]=="0"): continue
             print("Acting upon channel", i, "...")
             timestamp(cmd_interpret, key = int('000000000000'+format(i, '02b')+'00', base=2))
-            time.sleep(2.01)
+            # time.sleep(2.01)
             software_clear_fifo(cmd_interpret)              # clear fifo content
             time.sleep(0.1)                                 # delay 1000 milliseconds
             software_clear_fifo(cmd_interpret)
-            time.sleep(4.01)  
+            time.sleep(2.01)  
 
     if(options.clear_error):
         time.sleep(0.1)                                 # delay 1000 milliseconds
