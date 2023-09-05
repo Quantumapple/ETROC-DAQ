@@ -69,7 +69,7 @@ class command_interpret:
         self.ss.sendall(struct.pack('I',data)[::-1])
         data = 0x80140000                                   #read Cnt 32bit memory words
         self.ss.sendall(struct.pack('I',data)[::-1])
-        for i in xrange(Cnt):
+        for i in range(Cnt):
             print(hex(struct.unpack('I', self.ss.recv(4)[::-1])[0]))
 
     ## read_data_fifo
@@ -79,6 +79,14 @@ class command_interpret:
         self.ss.sendall(struct.pack('I', data)[::-1])
         mem_data = []
         for i in range(Cnt-1):
+            try:
+                mem_data += [struct.unpack('I', self.ss.recv(4)[::-1])[0]]
+            except struct.error:
+                print("not enough data in buffer to unpack")
+                return mem_data
+        try:
             mem_data += [struct.unpack('I', self.ss.recv(4)[::-1])[0]]
-        mem_data += [struct.unpack('I', self.ss.recv(4)[::-1])[0]]
+        except struct.error:
+            print("not enough data in buffer to unpack")
+            return mem_data
         return mem_data

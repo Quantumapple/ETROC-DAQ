@@ -198,7 +198,7 @@ def set_trigger_linked(cmd_interpret):
         return True
     else:
         while linked_flag is False:
-            time.sleep(1.01)
+            time.sleep(2.01)
             testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
             reads += 1
             print("Read register:",reads)
@@ -253,7 +253,7 @@ def set_all_trigger_linked(cmd_interpret):
             continue
         else:
             while linked_flag is False:
-                time.sleep(1.01)
+                time.sleep(2.01)
                 testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
                 reads += 1
                 print("Read register:",reads)
@@ -296,7 +296,7 @@ def set_linked(cmd_interpret):
         return True
     else:
         while linked_flag is False:
-            time.sleep(1.01)
+            time.sleep(2.01)
             testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
             reads += 1
             print("Read register:",reads)
@@ -520,6 +520,11 @@ class Receive_data(threading.Thread):
             if self.daq_on:
                 # max allowed by read_memory is 65535
                 mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
+                if mem_data == []:
+                    print("No data in buffer! Will try to read again")
+                    time.sleep(1.01)
+                    mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
+                
                 for mem_line in mem_data:
                     self.queue.put(mem_line) 
             if not t.alive:
