@@ -57,7 +57,7 @@ def start_periodic_L1A_WS(cmd_interpret):
     fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
     time.sleep(0.01)
     
-def start_onetime_L1A_WS(cmd_interpret):
+def start_onetime_WS(cmd_interpret):
     ## 4-digit 16 bit hex, Duration is LSB 12 bits
     ## This tells us how many memory slots to use
     register_11(cmd_interpret, 0x0deb)
@@ -73,21 +73,52 @@ def start_onetime_L1A_WS(cmd_interpret):
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0002)          # This is onetime BC Reset FC
+    register_12(cmd_interpret, 0x0008)          # This is periodic WS start
+    cmd_interpret.write_config_reg(10, 0x0006)
+    cmd_interpret.write_config_reg(9, 0x0006)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0005)          # This is periodic Qinj FC
+    cmd_interpret.write_config_reg(10, 0x0009)
+    cmd_interpret.write_config_reg(9, 0x0009)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0005)          # This is periodic Qinj FC
+    cmd_interpret.write_config_reg(10, 0x000e)
+    cmd_interpret.write_config_reg(9, 0x000e)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0005)          # This is periodic Qinj FC
+    cmd_interpret.write_config_reg(10, 0x0012)
+    cmd_interpret.write_config_reg(9, 0x0012)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0009)          # This is periodic WS stop
+    cmd_interpret.write_config_reg(10, 0x001a)
+    cmd_interpret.write_config_reg(9, 0x001a)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+
+    fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
+    time.sleep(0.01)
+
+def stop_ws(cmd_interpret):
+    register_11(cmd_interpret, 0x0deb)
+    time.sleep(0.01)
+
+    register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
     cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
+    cmd_interpret.write_config_reg(9, 0x0deb)   # 3563
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0005)          # This is onetime Qinj FC
+    register_12(cmd_interpret, 0x0009)          # This is onetime ws_stop
     cmd_interpret.write_config_reg(10, 0x0001)
-    cmd_interpret.write_config_reg(9, 0x0001)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0006)          # This is onetime L1A FC
-    cmd_interpret.write_config_reg(10, 0x01f0)
-    cmd_interpret.write_config_reg(9, 0x01ff)
+    cmd_interpret.write_config_reg(9, 0x0001)   
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
@@ -355,8 +386,8 @@ def check_linked(cmd_interpret):
         return True
     return False
     
-def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
-    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val)
+def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj, isL1A, DAC_Val):
+    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory, isQInj, isL1A, DAC_Val)
     try:
         fpga_data.start()
         while fpga_data.is_alive():
@@ -367,18 +398,21 @@ def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj
 
 # define a threading class for saving data from FPGA Registers only
 class Save_FPGA_data(threading.Thread):
-    def __init__(self, name, cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
+    def __init__(self, name, cmd_interpret, time_limit, overwrite, output_directory, isQInj, isL1A, DAC_Val):
         threading.Thread.__init__(self, name=name)
         self.cmd_interpret = cmd_interpret
         self.time_limit = time_limit
         self.overwrite = overwrite
         self.output_directory = output_directory
         self.isQInj = isQInj
+        self.isL1A = isL1A
         self.DAC_Val = DAC_Val
 
     def run(self):
         if(self.isQInj):
             configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True)
+        elif(self.isL1A):
+            configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=False,L1A=True)
         else:
             configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=False,L1A=False)
         t = threading.current_thread()              # Local reference of THIS thread object
@@ -494,6 +528,10 @@ class Receive_data(threading.Thread):
                         link_reset(self.cmd_interpret)
                     elif message == 'reset till linked':
                         set_trigger_linked(self.cmd_interpret)
+                    elif message == 'start onetime ws':
+                        start_onetime_WS(self.cmd_interpret)
+                    elif message == 'stop ws':
+                        stop_ws(self.cmd_interpret)
                     ## Special if condition for delay change during the DAQ
                     ## Example: change delay 0x0421
                     ##   becomes: change delay 1057
