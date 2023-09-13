@@ -22,17 +22,19 @@ from daq_helpers import *
 from board_details import *
 from config_etroc1 import *
 #========================================================================================#
-freqency = 1000
-duration = 1000
 '''
-@author: Wei Zhang, Murtaza Safdari, Jongho Lee
+@author: Murtaza Safdari
 @date: 2023-03-24
-This script is used for testing ETROC1/2 Array chips. 
-The main function of this script is I2C write and read, Ethernet communication, 
+This script is used for testing ETROC2 Array chips. 
+The main function of this driver script is to facilitate I2C write and read, Ethernet communication, 
 instrument control and so on.
 '''
-# hostname = '192.168.2.7'					# FPGA IP address
 port = 1024									# port number
+board_type       = [2, 2, 2, 2]
+board_size       = [256, 256, 256, 256]
+board_name       = ["F28", "F29", "F30", "F47"]
+# 17F0F =  10111111100001111
+board_ID         = ["10111111100001111","10111111100001111","10111111100001111", "10111111100001111"]
 #--------------------------------------------------------------------------#
 
 def main_process(IPC_queue, options, log_file = None):
