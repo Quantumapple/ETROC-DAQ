@@ -1,131 +1,53 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import time
-#import visa
 import threading
 import numpy as np
 import os
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from queue import Queue
 from collections import deque
 import queue
 from command_interpret import *
-from ETROC1_ArrayReg import *
 from translate_data import *
 import datetime
 #========================================================================================#
 '''
-@author: Wei Zhang, Murtaza Safdari
-@date: 2023-03-24
+@author: Murtaza Safdari
+@date: 2023-09-13
 This script is composed of all the helper functions needed for I2C comms, FPGA, etc
 '''
 #--------------------------------------------------------------------------#
-def start_periodic_L1A_WS(cmd_interpret):
-    ## 4-digit 16 bit hex, Duration is LSB 12 bits
-    ## This tells us how many memory slots to use
-    register_11(cmd_interpret, 0x0deb)
-    time.sleep(0.01)
+def set_all_trigger_linked(cmd_interpret, inspect=False):
+    print("Resetting/Checking links till ALL boards are linked...")
+    register_15 = cmd_interpret.read_config_reg(15)
+    string_15   = format(register_15, '016b')
+    channel_enable = string_15[-4:]
+    linked_flag = False
+    while linked_flag == False:
+        linked_flag = True
+        for i in range(4):
+            if(channel_enable[3-i]=="0"): continue
+            print("Retrieving channel", i, "...")
+            timestamp(cmd_interpret, key = int('000000000000'+format(i, '02b')+'00', base=2))
+            time.sleep(0.01)
+            if(inspect): time.sleep(4)
+            register_2 = format(cmd_interpret.read_status_reg(2), '016b')
+            print("Register 2 upon read:", register_2)
+            data_error = register_2[-1]
+            df_synced = register_2[-2]
+            trigger_error = register_2[-3]
+            trigger_synced = register_2[-4]
+            linked_flag =  linked_flag and (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
+        if(linked_flag == False and inspect == False):
+            software_clear_fifo(cmd_interpret)
+            time.sleep(2.01)
+            print("Cleared FIFO...")
+        elif(inspect): break
+    print("Done!")
+    del register_15,string_15,channel_enable,register_2,data_error,df_synced,trigger_error,trigger_synced,linked_flag
+    return linked_flag
 
-    ## 4-digit 16 bit hex, 0xWXYZ
-    ## WX (8 bit) -  Error Mask
-    ## Y - trigSize[1:0],Period,testTrig
-    ## Z - Input command
-    register_12(cmd_interpret, 0x0030)          # This is periodic Idle FC
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0032)          # This is periodic BC Reset FC
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0035)          # This is periodic Qinj FC
-    cmd_interpret.write_config_reg(10, 0x0001)
-    cmd_interpret.write_config_reg(9, 0x0001)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0036)          # This is periodic L1A FC
-    cmd_interpret.write_config_reg(10, 0x01f0)
-    cmd_interpret.write_config_reg(9, 0x01ff)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
-    time.sleep(0.01)
-    
-def start_onetime_L1A_WS(cmd_interpret):
-    ## 4-digit 16 bit hex, Duration is LSB 12 bits
-    ## This tells us how many memory slots to use
-    register_11(cmd_interpret, 0x0deb)
-    time.sleep(0.01)
-
-    ## 4-digit 16 bit hex, 0xWXYZ
-    ## WX (8 bit) -  Error Mask
-    ## Y - trigSize[1:0],Period,testTrig
-    ## Z - Input command
-    register_12(cmd_interpret, 0x0000)          # This is onetime Idle FC
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0002)          # This is onetime BC Reset FC
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0005)          # This is onetime Qinj FC
-    cmd_interpret.write_config_reg(10, 0x0001)
-    cmd_interpret.write_config_reg(9, 0x0001)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0006)          # This is onetime L1A FC
-    cmd_interpret.write_config_reg(10, 0x01f0)
-    cmd_interpret.write_config_reg(9, 0x01ff)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
-    time.sleep(0.01)
-
-def start_L1A_1MHz(cmd_interpret):
-    register_11(cmd_interpret, 0x0de7)
-    time.sleep(0.01)
-
-    register_12(cmd_interpret, 0x0030)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0de7)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-    
-    register_12(cmd_interpret, 0x0032)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    for index in range(89):
-        register_12(cmd_interpret, 0x0035)
-        cmd_interpret.write_config_reg(10, 0x0001 + index*40)
-        cmd_interpret.write_config_reg(9, 0x0001 + index*40)
-        fc_init_pulse(cmd_interpret)
-        time.sleep(0.01)
-
-        register_12(cmd_interpret, 0x0036)
-        cmd_interpret.write_config_reg(10, 0x019 + index*40)
-        cmd_interpret.write_config_reg(9, 0x019 + index*40)
-        fc_init_pulse(cmd_interpret)
-        time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-    time.sleep(0.01)
-
+#--------------------------------------------------------------------------#
 def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Initialize = True, Triggerbit=True):
     if(Initialize):
         register_11(cmd_interpret, 0x0deb)
@@ -166,195 +88,12 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
 
     time.sleep(0.01)
 
-def stop_L1A_1MHz(cmd_interpret):
-    register_12(cmd_interpret, 0x0030)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0de7)
-    fc_init_pulse(cmd_interpret)
-    time.sleep(0.01)
-
-    fc_signal_start(cmd_interpret)
-    time.sleep(0.01)
-
-    software_clear_fifo(cmd_interpret)
-    time.sleep(0.01)
-
+#--------------------------------------------------------------------------#
 def link_reset(cmd_interpret):
-    software_clear_fifo(cmd_interpret) 
+    software_clear_fifo(cmd_interpret)
+    time.sleep(2.01)
 
-def set_trigger_linked(cmd_interpret):
-    reads = 0
-    clears_error = 0
-    clears_fifo = 0
-    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-    print("Register 2 upon checking:", testregister_2)
-    data_error = testregister_2[-1]
-    df_synced = testregister_2[-2]
-    trigger_error = testregister_2[-3]
-    trigger_synced = testregister_2[-4]
-    linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
-    if linked_flag:
-        print("Already Linked:",testregister_2)
-        return True
-    else:
-        while linked_flag is False:
-            time.sleep(2.01)
-            testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-            reads += 1
-            print("Read register:",reads)
-            print("Register after waiting to link",testregister_2)
-            df_synced = testregister_2[-2]
-            data_error = testregister_2[-1]
-            trigger_synced = testregister_2[-4]
-            trigger_error = testregister_2[-3]
-            linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
-            error_flag = (data_error=="0" and trigger_error=="0")
-            print("Linked flag is",linked_flag)
-            print("Error flag is",error_flag)
-            if linked_flag is False:
-                if error_flag is False:
-                    software_clear_error(cmd_interpret)
-                    clears_error += 1
-                    print("Cleared Error:",clears_error)
-                    if clears_error == 1:
-                        software_clear_fifo(cmd_interpret)
-                        clears_fifo += 1
-                        clears_error = 0
-                        print("Cleared FIFO:",clears_fifo)
-                else:
-                    software_clear_fifo(cmd_interpret)
-                    clears_fifo += 1
-                    print("Cleared FIFO:",clears_fifo)
-    print("Register 2 after trying to link:", testregister_2)
-    return True
-
-def set_all_trigger_linked(cmd_interpret):
-    print("Resetting links till ALL boards are linked...")
-    register_15 = cmd_interpret.read_config_reg(15)
-    string_15   = format(register_15, '016b')
-    channel_enable = string_15[-4:]
-    for i in range(4):
-        if(channel_enable[3-i]=="0"): continue
-        print("Acting upon channel", i, "...")
-        timestamp(cmd_interpret, key = int('000000000000'+format(i, '02b')+'00', base=2))
-        time.sleep(0.01)
-        reads = 0
-        clears_error = 0
-        clears_fifo = 0
-        testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-        print("Register 2 upon checking:", testregister_2)
-        data_error = testregister_2[-1]
-        df_synced = testregister_2[-2]
-        trigger_error = testregister_2[-3]
-        trigger_synced = testregister_2[-4]
-        linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
-        if linked_flag:
-            print("Already Linked:",testregister_2)
-            continue
-        else:
-            while linked_flag is False:
-                time.sleep(2.01)
-                testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-                reads += 1
-                print("Read register:",reads)
-                print("Register after waiting to link",testregister_2)
-                df_synced = testregister_2[-2]
-                data_error = testregister_2[-1]
-                trigger_synced = testregister_2[-4]
-                trigger_error = testregister_2[-3]
-                linked_flag = (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")
-                error_flag = (data_error=="0" and trigger_error=="0")
-                print("Linked flag is",linked_flag)
-                print("Error flag is",error_flag)
-                if linked_flag is False:
-                    if error_flag is False:
-                        software_clear_error(cmd_interpret)
-                        clears_error += 1
-                        print("Cleared Error:",clears_error)
-                        if clears_error == 1:
-                            software_clear_fifo(cmd_interpret)
-                            clears_fifo += 1
-                            clears_error = 0
-                            print("Cleared FIFO:",clears_fifo)
-                    else:
-                        software_clear_fifo(cmd_interpret)
-                        clears_fifo += 1
-                        print("Cleared FIFO:",clears_fifo)
-        print("Register 2 after trying to link:", testregister_2)
-    return True
-
-def set_linked(cmd_interpret):
-    reads = 0
-    clears = 0
-    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-    print("Register 2 upon checking:", testregister_2)
-    data_error = testregister_2[-1]
-    df_synced = testregister_2[-2]
-    linked_flag = (data_error=="0" and df_synced=="1")
-    if linked_flag:
-        print("Already Linked:",testregister_2)
-        return True
-    else:
-        while linked_flag is False:
-            time.sleep(2.01)
-            testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-            reads += 1
-            print("Read register:",reads)
-            print("Register after waiting to link",testregister_2)
-            df_synced = testregister_2[-2]
-            data_error = testregister_2[-1]
-            linked_flag = (data_error=="0" and df_synced=="1")
-            print("Linked flag is",linked_flag)
-            if linked_flag is False:
-                software_clear_fifo(cmd_interpret)
-                clears += 1
-                print("Cleared FIFO:",clears)
-    print("Register 2 after trying to link:", testregister_2)
-    return True
-
-def check_all_trigger_linked(cmd_interpret):
-    print("Checking links of ALL the boards...")
-    register_15 = cmd_interpret.read_config_reg(15)
-    string_15   = format(register_15, '016b')
-    channel_enable = string_15[-4:]
-    for i in range(4):
-        if(channel_enable[3-i]=="0"): continue
-        print("Acting upon channel", i, "...")
-        timestamp(cmd_interpret, key = int('000000000000'+format(i, '02b')+'00', base=2))
-        time.sleep(0.01)
-        testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-        print("Register 2 upon checking:", testregister_2)
-        data_error = testregister_2[-1]
-        df_synced = testregister_2[-2]
-        trigger_error = testregister_2[-3]
-        trigger_synced = testregister_2[-4]
-        if (not(data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1")):
-            print("Link error found!")
-            return False
-    return True
-
-def check_trigger_linked(cmd_interpret):
-    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-    print("Register 2 upon checking:", testregister_2)
-    data_error = testregister_2[-1]
-    df_synced = testregister_2[-2]
-    trigger_error = testregister_2[-3]
-    trigger_synced = testregister_2[-4]
-    if (data_error=="0" and df_synced=="1" and trigger_error=="0" and trigger_synced=="1"):
-        print("All is linked with no errors")
-        return True
-    return False
-
-def check_linked(cmd_interpret):
-    testregister_2 = format(cmd_interpret.read_status_reg(2), '016b')
-    print("Register 2 upon checking:", testregister_2)
-    data_error = testregister_2[-1]
-    df_synced = testregister_2[-2]
-    if (data_error=="0" and df_synced=="1"):
-        print("All is linked with no errors")
-        return True
-    return False
-    
+#--------------------------------------------------------------------------#
 def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
     fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val)
     try:
@@ -369,12 +108,12 @@ def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj
 class Save_FPGA_data(threading.Thread):
     def __init__(self, name, cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
         threading.Thread.__init__(self, name=name)
-        self.cmd_interpret = cmd_interpret
-        self.time_limit = time_limit
-        self.overwrite = overwrite
+        self.cmd_interpret    = cmd_interpret
+        self.time_limit       = time_limit
+        self.overwrite        = overwrite
         self.output_directory = output_directory
-        self.isQInj = isQInj
-        self.DAC_Val = DAC_Val
+        self.isQInj           = isQInj
+        self.DAC_Val          = DAC_Val
 
     def run(self):
         if(self.isQInj):
@@ -434,21 +173,21 @@ class Save_FPGA_data(threading.Thread):
         outfile.close()
         configure_memo_FC(self.cmd_interpret,Initialize=False,QInj=False,L1A=False)
         print("%s finished!"%self.getName())
-#--------------------------------------------------------------------------#
 
-# define a receive data threading class
+#--------------------------------------------------------------------------#
+# Threading class to only READ off the ethernet buffer
 class Receive_data(threading.Thread):
     def __init__(self, name, queue, cmd_interpret, num_fifo_read, read_thread_handle, write_thread_handle, time_limit, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
         threading.Thread.__init__(self, name=name)
-        self.queue = queue
-        self.cmd_interpret = cmd_interpret
-        self.num_fifo_read = num_fifo_read
-        self.read_thread_handle = read_thread_handle
+        self.queue               = queue
+        self.cmd_interpret       = cmd_interpret
+        self.num_fifo_read       = num_fifo_read
+        self.read_thread_handle  = read_thread_handle
         self.write_thread_handle = write_thread_handle
-        self.time_limit = time_limit
-        self.use_IPC = use_IPC
-        self.stop_DAQ_event = stop_DAQ_event
-        self.IPC_queue = IPC_queue
+        self.time_limit          = time_limit
+        self.use_IPC             = use_IPC
+        self.stop_DAQ_event      = stop_DAQ_event
+        self.IPC_queue           = IPC_queue
         if self.use_IPC and self.IPC_queue is None:
             self.use_IPC = False
         if not self.use_IPC:
@@ -460,8 +199,8 @@ class Receive_data(threading.Thread):
             self.stop_DAQ_event.clear()
     
     def run(self):
-        t = threading.current_thread()              # Local reference of THIS thread object
-        t.alive = True                              # Thread is alive by default
+        t = threading.current_thread()
+        t.alive = True
         mem_data = []
         total_start_time = time.time()
         print("{} is reading data and pushing to the queue...".format(self.getName()))
@@ -476,16 +215,12 @@ class Receive_data(threading.Thread):
                         self.daq_on = False
                     elif message == 'start L1A':
                         configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True,BCR=True,Triggerbit=False)
-                    elif message == 'start L1A 1MHz':
-                        start_L1A_1MHz(self.cmd_interpret)
                     elif message == 'start L1A trigger bit':
                         configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True)
                     elif message == 'start L1A trigger bit data':
                         configure_memo_FC(self.cmd_interpret,Initialize=True) #IDLE FC Only
                     elif message == 'stop L1A':
                         configure_memo_FC(self.cmd_interpret,Initialize=False,Triggerbit=False)
-                    elif message == 'stop L1A 1MHz':
-                        stop_L1A_1MHz(self.cmd_interpret)
                     elif message == 'stop L1A trigger bit':
                         configure_memo_FC(self.cmd_interpret,Initialize=False)
                     elif message == 'allow threads to exit':
@@ -516,9 +251,7 @@ class Receive_data(threading.Thread):
                         print(f'Unknown message: {message}')
                 except queue.Empty:
                     pass
-
             if self.daq_on:
-                # max allowed by read_memory is 65535
                 mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
                 if mem_data == []:
                     print("No data in buffer! Will try to read again")
@@ -529,7 +262,6 @@ class Receive_data(threading.Thread):
                     self.queue.put(mem_line) 
             if not t.alive:
                 print("Read Thread detected alive=False")
-                # self.is_alive = False
                 break  
             if self.read_thread_handle.is_set():
                 print("Read Thread received STOP signal")
@@ -537,53 +269,45 @@ class Receive_data(threading.Thread):
                     print("Sending stop signal to Write Thread")
                     self.write_thread_handle.set()
                 print("Stopping Read Thread")
-                # self.is_alive = False
                 break
         print("Read Thread gracefully sending STOP signal to other threads") 
         self.read_thread_handle.set()
-        # self.is_alive = False
         print("Sending stop signal to Write Thread")
         self.write_thread_handle.set()
         print("%s finished!"%self.getName())
+
 #--------------------------------------------------------------------------#
-
-# define a write data class
+# Threading class to only WRITE the raw binary data to disk
 class Write_data(threading.Thread):
-    def __init__(self, name, read_queue, translate_queue, num_line, store_dict, binary_only, compressed_binary, skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event = None):
+    def __init__(self, name, read_queue, translate_queue, num_line, store_dict, skip_translation, compressed_binary, skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
-        self.read_queue = read_queue
-        self.translate_queue = translate_queue
-        self.num_line = num_line
-        self.store_dict = store_dict
-        self.binary_only = binary_only
-        self.compressed_binary = compressed_binary
-        self.skip_binary = skip_binary
-        self.read_thread_handle = read_thread_handle
-        self.write_thread_handle = write_thread_handle
+        self.read_queue              = read_queue
+        self.translate_queue         = translate_queue
+        self.num_line                = num_line
+        self.store_dict              = store_dict
+        self.skip_translation        = skip_translation
+        self.compressed_binary       = compressed_binary
+        self.skip_binary             = skip_binary
+        self.read_thread_handle      = read_thread_handle
+        self.write_thread_handle     = write_thread_handle
         self.translate_thread_handle = translate_thread_handle
-        self.stop_DAQ_event = stop_DAQ_event
-        # self.is_alive = False
-
-    # def check_alive(self):
-    #     return self.is_alive
+        self.stop_DAQ_event          = stop_DAQ_event
 
     def run(self):
-        t = threading.current_thread()              # Local reference of THIS thread object
-        t.alive = True                              # Thread is alive by default
-        # self.is_alive = True
-        file_lines = 0
+        t = threading.current_thread()
+        t.alive      = True
+        file_lines   = 0
         file_counter = 0
         if (not self.skip_binary):
             outfile = open("%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
             print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
         else:
             print("{} is reading queue and pushing binary onwards...".format(self.getName()))
-        retry_count = 0
+        retry_count  = 0
         while (True):
             if not t.alive:
                 print("Write Thread detected alive=False")
                 outfile.close()
-                # self.is_alive = False
                 break 
             if(file_lines>self.num_line and (not self.skip_binary)):
                 outfile.close()
@@ -591,9 +315,6 @@ class Write_data(threading.Thread):
                 file_counter = file_counter + 1
                 outfile = open("%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
                 print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
-            elif(file_lines>self.num_line):
-                file_lines=0
-                file_counter = file_counter + 1
             mem_data = ""
             # Attempt to pop off the read_queue for 30 secs, fail if nothing found
             try:
@@ -610,14 +331,12 @@ class Write_data(threading.Thread):
                 if retry_count < 30:
                     continue
                 print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM READ_QUEUE!!!")
-                # self.read_thread_handle.set()
-                # self.is_alive = False
                 break
             # Handle the raw (binary) line
             if int(mem_data) == 0: continue # Waiting for IPC
-            if int(mem_data) == 38912: continue # got a Filler
-            if int(mem_data) == 9961472: continue # got a Filler
-            if int(mem_data) == 2550136832: continue # got a Filler
+            # if int(mem_data) == 38912: continue # got a Filler
+            # if int(mem_data) == 9961472: continue # got a Filler
+            # if int(mem_data) == 2550136832: continue # got a Filler
             binary = format(int(mem_data), '032b')
             if(not self.skip_binary):
                 if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
@@ -625,71 +344,51 @@ class Write_data(threading.Thread):
             # Increment line counters
             file_lines = file_lines + 1
             # Perform translation related activities if requested
-            if(not self.binary_only):
+            if(not self.skip_translation):
                 self.translate_queue.put(binary)
             if self.write_thread_handle.is_set():
-                # print("Write Thread received STOP signal")
                 if not self.translate_thread_handle.is_set():
                     print("Sending stop signal to Translate Thread")
                     self.translate_thread_handle.set()
-                # print("Checking Read Thread from Write Thread")
-                # wait for read thread to die...
-                # while(self.read_thread_handle.is_set() == False):
-                    # time.sleep(1)
-                # self.is_alive = False
         print("Write Thread gracefully sending STOP signal to translate thread") 
         self.translate_thread_handle.set()
         self.write_thread_handle.set()
-        # self.is_alive = False
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
+# Threading class to only TRANSLATE the binary data and save to disk
 class Translate_data(threading.Thread):
-    def __init__(self, name, translate_queue, cmd_interpret, num_line, timestamp, store_dict, binary_only, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None):
+    def __init__(self, name, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
-        self.translate_queue = translate_queue
-        self.cmd_interpret = cmd_interpret
-        self.num_line = num_line
-        self.timestamp = timestamp
-        self.store_dict = store_dict
-        self.binary_only = binary_only
-        self.board_ID = board_ID
-        self.queue_ch = [deque() for i in range(4)]
-        self.link_ch  = ["" for i in range(4)]
-        self.write_thread_handle = write_thread_handle
+        self.translate_queue         = translate_queue
+        self.cmd_interpret           = cmd_interpret
+        self.num_line                = num_line
+        self.store_dict              = store_dict
+        self.skip_translation        = skip_translation
+        self.board_ID                = board_ID
+        self.write_thread_handle     = write_thread_handle
         self.translate_thread_handle = translate_thread_handle
-        self.stop_DAQ_event = stop_DAQ_event
-        self.hitmap = {i:np.zeros((16,16)) for i in range(4)}
-        self.compressed_translation = compressed_translation
-        # self.is_alive = False
-
-    # def check_alive(self):
-    #     return self.is_alive
+        self.stop_DAQ_event          = stop_DAQ_event
+        self.compressed_translation  = compressed_translation
 
     def run(self):
         t = threading.current_thread()
-        t.alive = True
-        # self.is_alive = True
-        total_lines = 0
-        file_lines = 0
+        t.alive      = True
+        total_lines  = 0
+        file_lines   = 0
         file_counter = 0
-        if(not self.binary_only): 
-            outfile = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
+        if(not self.skip_translation): 
+            outfile  = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
             print("{} is reading queue and translating file {}...".format(self.getName(), file_counter))
         else:
             print("{} is reading queue and translating...".format(self.getName()))
-        retry_count = 0
+        retry_count  = 0
         while True:
             if not t.alive:
                 print("Translate Thread detected alive=False")
-                if(not self.binary_only): outfile.close()
-                # self.is_alive = False
+                if(not self.skip_translation): outfile.close()
                 break 
-            # if self.translate_thread_handle.is_set():
-            #     print("Translate Thread received STOP signal from Write Thread")
-            #     if(not self.binary_only): outfile.close()
-            #     break
-            if((not self.binary_only) and file_lines>self.num_line):
+            if((not self.skip_translation) and file_lines>self.num_line):
                 outfile.close()
                 file_lines=0
                 file_counter = file_counter + 1
@@ -710,9 +409,7 @@ class Translate_data(threading.Thread):
                 retry_count += 1
                 if retry_count < 30:
                     continue
-                print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!! THIS SENDS STOP SIGNAL TO ALL THREADS!!!")
-                # self.read_write_handle.set()
-                # self.is_alive = False
+                print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!!")
                 break
             TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID, self.hitmap, self.compressed_translation)
             if(write_flag==1):
@@ -728,7 +425,7 @@ class Translate_data(threading.Thread):
                             print("ERROR! Found more than two headers in data block!!")
                             sys.exit(1)
                         continue
-                    if(not self.binary_only): 
+                    if(not self.skip_translation): 
                         if(self.compressed_translation):
                             if(TDC_header_index<0):
                                 pass
@@ -738,24 +435,22 @@ class Translate_data(threading.Thread):
                             outfile.write("%s\n"%TDC_line)
                     if(TDC_line[9:13]!='DATA'): continue
                 if(TDC_len>0):
-                    if(not self.binary_only): file_lines  = file_lines  + TDC_len - 1
+                    if(not self.skip_translation): file_lines  = file_lines  + TDC_len - 1
                     total_lines = total_lines + (TDC_len-1)
             elif(write_flag==3):
                 TDC_len = len(TDC_data)
-                if(not self.compressed_translation and not self.binary_only):
+                if(not self.compressed_translation and not self.skip_translation):
                     for j,TDC_line in enumerate(TDC_data):
                         outfile.write("%s\n"%TDC_line)
                 if(TDC_len>0):
-                    if(not self.binary_only): file_lines  = file_lines  + TDC_len - 1
+                    if(not self.skip_translation): file_lines  = file_lines  + TDC_len - 1
                     total_lines = total_lines + (TDC_len-1)
         
         print("Translate Thread gracefully ending") 
         self.translate_thread_handle.set()
-        # self.is_alive = False
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
-
 ## IIC write slave device
 # @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
 # @param slave[7:0] : slave device address
@@ -790,6 +485,7 @@ def iic_read(mode, slave_addr, wr, reg_addr, cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
     time.sleep(0.01)									                      # delay 10ns then to read data
     return cmd_interpret.read_status_reg(0) & 0xff
+
 #--------------------------------------------------------------------------#
 ## Enable FPGA Descrambler
 def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
@@ -802,19 +498,14 @@ def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
     cmd_interpret.write_config_reg(14, val)
 
 #--------------------------------------------------------------------------#
-## simple readout fucntion
-#@param[in]: write_num: BC0 and L1ACC loop number, 0-65535
-def simple_readout(write_num, cmd_interpret):
-    cmd_interpret.write_config_reg(15, 0xffff & write_num)                    # write enable
-    cmd_interpret.write_pulse_reg(0x0080)                                     # trigger pulser_reg[7]
-
-#--------------------------------------------------------------------------#
 ## software clear fifo
+## MSB..10
 def software_clear_fifo(cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0002)                                     # trigger pulser_reg[1]
 
 #--------------------------------------------------------------------------#
 ## software clear error
+## MSB..100000
 def software_clear_error(cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0020)                                     # trigger pulser_reg[5]
 
@@ -882,6 +573,7 @@ def counterDuration(cmd_interpret, key = 0x0001):
 
 #--------------------------------------------------------------------------#
 ## Fast Command Signal Start
+## MSB..100
 def fc_signal_start(cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0004)
 

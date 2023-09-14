@@ -6,23 +6,9 @@ import numpy as np
 #========================================================================================#
 '''
 @author: Murtaza Safdari
-@date: 2023-03-30
+@date: 2023-09-13
 This script is composed of functions to translate binary data into TDC codes
 '''
-#----------------------------------------------------------------------------------------#
-def etroc1_translate(line, timestamp):
-    if(timestamp==1 or timestamp==3): 
-        channel = int(line[0:2], base=2)
-        data = line[2:-1]                               ## Ignore final bit (hitflag =1)
-    else: 
-        channel = int(line[1:3], base=2)
-        data = line[3:]
-    if (len(data)!=29): print("Tried to unpack ETROC1 data with fewer than required data bits", data, " ", type(data), len(data)) 
-    #-------------------------DTYPE CHANNEL TOT TOA CAL----------------------------------#
-    TDC_data = "ETROC1 " + "{:d} ".format(channel) + "{:d} ".format(int(data[0:9], base=2)) 
-    TDC_data = TDC_data + "{:d} ".format(int(data[9:19], base=2)) + "{:d}".format(int(data[19:], base=2))
-    return TDC_data, 1
-
 #----------------------------------------------------------------------------------------#
 def etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compressed_translation):
     TDC_data = []

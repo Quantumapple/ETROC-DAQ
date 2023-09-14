@@ -4,39 +4,28 @@ import os
 import sys
 import copy
 import time
-#import visa
 import struct
 import socket
 import threading
 import datetime
-#import heartrate
-from queue import Queue
-import numpy as np
-from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
-from mpl_toolkits.axes_grid1.inset_locator import mark_inset
-from optparse import OptionParser
-
-from command_interpret import *
-from ETROC1_ArrayReg import *
-from daq_helpers import *
-from board_details import *
-from config_etroc1 import *
+import queue
+import parser_arguments
+import command_interpret
+import daq_helpers
+import platform
 #========================================================================================#
 '''
 @author: Murtaza Safdari
 @date: 2023-03-24
 This script is used for testing ETROC2 Array chips. 
 The main function of this driver script is to facilitate I2C write and read, Ethernet communication, 
-instrument control and so on.
+instrument control and so on, handling the New Event Model (Sept 2023)
 '''
-port = 1024									# port number
-board_type       = [2, 2, 2, 2]
-board_size       = [256, 256, 256, 256]
-board_name       = ["F28", "F29", "F30", "F47"]
-# 17F0F =  10111111100001111
-board_ID         = ["10111111100001111","10111111100001111","10111111100001111", "10111111100001111"]
-#--------------------------------------------------------------------------#
+port = 1024
+# 17F0F  =   10111111100001111
+board_ID = ["10111111100001111","10111111100001111","10111111100001111", "10111111100001111"]
 
+#--------------------------------------------------------------------------#
 def main_process(IPC_queue, options, log_file = None):
     if log_file is not None:
         sys.stdout = open(log_file + ".out", "w")
@@ -53,40 +42,13 @@ def main_process(IPC_queue, options, log_file = None):
     except socket.error:
         print("failed to connect to ip " + options.hostname)
         sys.exit()
-    cmd_interpret = command_interpret(s)
+    cmd_interpret = command_interpret.command_interpret(s)
     main(options, cmd_interpret, IPC_queue)
     s.close()
 
+#--------------------------------------------------------------------------#
 ## main function
 def main(options, cmd_interpret, IPC_queue = None):
-
-    if(options.verbose):
-        print("Verbose Output: ", options.verbose)
-        print("\n")
-        print("-------------------------------------------")
-        print("--------Set of inputs from the USER--------")
-        print("Overwrite previously saved files: ", options.overwrite)
-        print("FPGA IP Address: ", options.hostname)
-        print("Number of lines per file created by DAQ script: ", options.num_line)
-        print("Number of lines read per call of fifo readout: ", options.num_fifo_read)
-        print("Number of seconds to run this code (>0 means effective): ", options.time_limit)
-        print("User defined Output Directory: ", options.output_directory)
-        print("Save only the untranslated FPGA binary data (raw output): ", options.binary_only)
-        print("Save FPGA binary data (raw output) in int format: ", options.compressed_binary)
-        print("Save only FPGA translated data frames with DATA: ", options.compressed_translation)
-        print("DO NOT save binary data (raw output): ", options.skip_binary)
-        print("--------End of inputs from the USER--------")
-        print("-------------------------------------------")
-        print("\n")
-        print("-------------------------------------------")
-        print("-------Inputs that have been pre-set-------")
-        print("ETROC Board Type: ",   board_type)
-        print("ETROC Board Size: ",   board_size)
-        print("ETROC Board Name: ",   board_name)
-        print("ETROC Chip ID: ",      board_ID) 
-        print("-------------------------------------------")
-        print("-------------------------------------------")
-        print("\n")
     
     if(options.firmware):
         print("Setting firmware...")
@@ -94,60 +56,15 @@ def main(options, cmd_interpret, IPC_queue = None):
         timestamp(cmd_interpret, key = options.timestamp)
         triggerBitDelay(cmd_interpret, options.trigger_bit_delay)
         Enable_FPGA_Descramblber(cmd_interpret, options.polarity)
-    
-    if(options.clear_fifo):
-        # time.sleep(0.1)                                 # delay 1000 milliseconds
-        # software_clear_fifo(cmd_interpret)              # clear fifo content
-        # time.sleep(0.1)                                 # delay 1000 milliseconds
-        # software_clear_fifo(cmd_interpret)              # clear fifo content  
-        # print("Cleared FIFO") 
-        print("Clearing FIFO for ALL boards...")
-        register_15 = cmd_interpret.read_config_reg(15)
-        string_15   = format(register_15, '016b')
-        channel_enable = string_15[-4:]
-        for i in range(4):
-            if(channel_enable[3-i]=="0"): continue
-            print("Acting upon channel", i, "...")
-            timestamp(cmd_interpret, key = int('000000000000'+format(i, '02b')+'00', base=2))
-            # time.sleep(2.01)
-            software_clear_fifo(cmd_interpret)              # clear fifo content
-            time.sleep(0.1)                                 # delay 1000 milliseconds
-            software_clear_fifo(cmd_interpret)
-            time.sleep(2.01)  
-
-    if(options.clear_error):
-        time.sleep(0.1)                                 # delay 1000 milliseconds
-        software_clear_error(cmd_interpret)             # clear error content
-        time.sleep(0.1)                                 # delay 1000 milliseconds
-        software_clear_error(cmd_interpret)             # clear error content  
-        print("Cleared Error")  
 
     if(options.counter_duration):
         print("Setting Counter Duration and Channel Delays...")
         counterDuration(cmd_interpret, options.counter_duration)
 
-    # Loop till we create the LED Errors
-    # Please ensure LED Pages is set to 011
-    if(options.reset_till_linked):
-        time.sleep(0.1)
-        set_linked(cmd_interpret)
-
-    if(options.reset_till_trigger_linked):
-        print("Resetting trigger link at beginning")
-        set_trigger_linked(cmd_interpret)
-    
-    if(options.reset_all_till_trigger_linked):
-        print("Resetting trigger link of all boards at beginning")
-        set_all_trigger_linked(cmd_interpret)
-
-    if(options.memo_fc_start_onetime_ws):
-        start_onetime_L1A_WS(cmd_interpret)
-    if(options.memo_fc_start_periodic_ws):
-        start_periodic_L1A_WS(cmd_interpret)
-
     if(options.verbose):
         read_register_7 = cmd_interpret.read_config_reg(7)
         string_7   = format(read_register_7, '016b')
+        print("Written into Reg 7: ", string_7)
         print("Time (s) for counting stats in FPGA: ", string_7[-6:], int(string_7[-6:], base=2))
         print("Enable Channel Trigger Bit 1 clock delay: ", string_7[-10:-6])
         print('\n')
@@ -186,6 +103,22 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("Board Type         : ", string_15[-8:-4])
         print("Data Source        : ", string_15[-16:-8])
         print('\n')
+        del read_register_7,read_register_8,read_register_11,read_register_12,read_register_13,read_register_14,read_register_15
+        del string_7,string_8,string_13,string_14,string_15
+    
+    if(options.clear_fifo):
+        print("Clearing FIFO...")
+        software_clear_fifo(cmd_interpret)
+        time.sleep(2.1)
+
+    if(options.clear_error):
+        print("Clearing Event Counter...") 
+        software_clear_error(cmd_interpret)
+        time.sleep(0.1)
+    
+    if(options.reset_all_till_trigger_linked):
+        print("Resetting/Checking link of all boards...")
+        set_all_trigger_linked(cmd_interpret, options.inpect_links_only)
 
     if(not options.nodaq):
         userdefinedir = options.output_directory
@@ -210,52 +143,36 @@ def main(options, cmd_interpret, IPC_queue = None):
 
     if(options.fpga_data or options.fpga_data_QInj):
         get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
-        if(options.check_trigger_link_at_end):
-            print("Checking trigger link at end")
-            linked_flag = check_trigger_linked(cmd_interpret)
-            while linked_flag is False:
-                set_trigger_linked(cmd_interpret)
-                get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
-                linked_flag = check_trigger_linked(cmd_interpret)
-        elif(options.check_all_trigger_link_at_end):
+        if(options.check_all_trigger_link_at_end):
             print("Checking trigger link of all boards at end")
-            linked_flag = check_all_trigger_linked(cmd_interpret)
+            linked_flag = set_all_trigger_linked(cmd_interpret, True)
             while linked_flag is False:
                 set_all_trigger_linked(cmd_interpret)
                 get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
-                linked_flag = check_all_trigger_linked(cmd_interpret)
-        elif(options.check_link_at_end):
-            print("Checking data link at end")
-            linked_flag = check_linked(cmd_interpret)
-            while linked_flag is False:
-                set_linked(cmd_interpret)
-                get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
-                linked_flag = check_linked(cmd_interpret)
+                linked_flag = set_all_trigger_linked(cmd_interpret, True)
 
     if(not options.nodaq):
-        ## start receive_data, write_data
         store_dict = userdefine_dir
-        read_queue = Queue()
-        translate_queue = Queue() 
-        read_thread_handle = threading.Event()    # This is how we stop the read thread
-        write_thread_handle = threading.Event()   # This is how we stop the write thread
+        read_queue = queue.Queue()
+        translate_queue = queue.Queue() 
+        read_thread_handle = threading.Event()      # This is how we stop the read thread
+        write_thread_handle = threading.Event()     # This is how we stop the write thread
         translate_thread_handle = threading.Event() # This is how we stop the translate thread (if translate enabled) (set down below...)
-        stop_DAQ_event = threading.Event()     # This is how we notify the Read thread that we are done taking data
-                                               # Kill order is read, write, translate
+        stop_DAQ_event = threading.Event()          # This is how we notify the Read thread that we are done taking data
+                                                    # Kill order is read, write, translate
         receive_data = Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
-        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.binary_only, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
-        translate_data = Translate_data('Translate_data', translate_queue, cmd_interpret, options.num_line, options.timestamp, store_dict, options.binary_only, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event)
-        # read_write_data.start()
+        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.skip_translation, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
+        translate_data = Translate_data('Translate_data', translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event)
         try:
             # Start the thread
             receive_data.start()
             write_data.start()
-            if(not options.binary_only): translate_data.start()
+            if(not options.skip_translation): translate_data.start()
             # If the child thread is still running
             while receive_data.is_alive():
                 # Try to join the child thread back to parent for 0.5 seconds
                 receive_data.join(0.5)
-            if(not options.binary_only):
+            if(not options.skip_translation):
                 while translate_data.is_alive():
                     translate_data.join(0.5)
             while write_data.is_alive():
@@ -265,69 +182,33 @@ def main(options, cmd_interpret, IPC_queue = None):
             # Set the alive attribute to false
             receive_data.alive = False
             write_data.alive = False
-            if(not options.binary_only): translate_data.alive = False
+            if(not options.skip_translation): translate_data.alive = False
             # Block until child thread is joined back to the parent
             receive_data.join()
-            if(not options.binary_only): translate_data.join()
+            if(not options.skip_translation): translate_data.join()
             write_data.join()
         # wait for thread to finish before proceeding)
-        # read_write_data.join()
+
 #--------------------------------------------------------------------------#
-## if statement
-
-def getOptionParser():
-    
-    def int_list_callback(option, opt, value, parser):
-        setattr(parser.values, option.dest, list(map(int, value.split(','))))
-
-    parser = OptionParser()
-    parser.add_option("--hostname", dest="hostname", action="store", type="string", help="FPGA IP Address", default="192.168.2.3")
-    parser.add_option("-l", "--num_line", dest="num_line", action="store", type="int", help="Number of lines per file created by DAQ script", default=50000)
-    parser.add_option("-r", "--num_fifo_read", dest="num_fifo_read", action="store", type="int", help="Number of lines read per call of fifo readout", default=50000)
-    parser.add_option("-t", "--time_limit", dest="time_limit", action="store", type="int", help="Number of integer seconds to run this code", default=-1)
-    parser.add_option("-o", "--output_directory", dest="output_directory", action="store", type="string", help="User defined output directory", default="unnamed_output_directory")
-    parser.add_option("--ssd",action="store_true", dest="ssd", default=False, help="Save TDC data to ssd path")
-    parser.add_option("--binary_only",action="store_true", dest="binary_only", default=False, help="Save only the untranslated FPGA binary data (raw output)")
-    parser.add_option("--compressed_binary",action="store_true", dest="compressed_binary", default=False, help="Save FPGA binary data (raw output) in int format")
-    parser.add_option("--skip_binary",action="store_true", dest="skip_binary", default=False, help="DO NOT save (raw) binary outputsto files")
-    parser.add_option("--compressed_translation",action="store_true", dest="compressed_translation", default=False, help="Save only FPGA translated data frames with DATA")
-    parser.add_option("-s", "--timestamp", type="int",action="store", dest="timestamp", default=0x0000, help="Set timestamp binary, see daq_helpers for more info")
-    parser.add_option("-p", "--polarity", type="int",action="store", dest="polarity", default=0x000f, help="Set fc polarity, see daq_helpers for more info")
-    parser.add_option("-d", "--trigger_bit_delay", type="int",action="store", dest="trigger_bit_delay", default=0x0400, help="Set trigger bit delay, see daq_helpers for more info")
-    parser.add_option("-c", "--counter_duration", type="int",action="store", dest="counter_duration", default=None, help="LSB 6 bits - Time (s) for FPGA data counting")
-    parser.add_option("-a", "--active_channel", type="int",action="store", dest="active_channel", default=0x0011, help="LSB 4 bits - Channel Enable")
-    parser.add_option("--DAC_Val", dest="DAC_Val", action="store", type="int", help="DAC value set for FPGA data taking", default=-1)
-    parser.add_option("-v", "--verbose",action="store_true", dest="verbose", default=False, help="Print status messages to stdout")
-    parser.add_option("-w", "--overwrite",action="store_true", dest="overwrite", default=False, help="Overwrite previously saved files")
-    parser.add_option("--nodaq",action="store_true", dest="nodaq", default=False, help="Switch off DAQ via the FPGA")
-    parser.add_option("--useIPC",action="store_true", dest="useIPC", default=False, help="Use Inter Process Communication to control L1A enable/disable")
-    parser.add_option("-f", "--firmware",action="store_true", dest="firmware", default=False, help="Configure FPGA firmware settings")
-    parser.add_option("--reset_till_linked",action="store_true", dest="reset_till_linked", default=False, help="FIFO clear and reset till data frames are synced and no data error is seen (Please ensure LED Pages is set to 011)")
-    parser.add_option("--reset_till_trigger_linked",action="store_true", dest="reset_till_trigger_linked", default=False, help="FIFO clear and reset till data frames AND trigger bits are synced and no data error is seen (Please ensure LED Pages is set to 011)")
-    parser.add_option("--reset_all_till_trigger_linked",action="store_true", dest="reset_all_till_trigger_linked", default=False, help="FIFO clear and reset ALL ENABLED BOARDS till data frames AND trigger bits are synced and no data error is seen")
-    parser.add_option("--check_link_at_end",action="store_true", dest="check_link_at_end", default=False, help="Check data link after getting FPGA and if not linked then take FPGA data again)")
-    parser.add_option("--check_trigger_link_at_end",action="store_true", dest="check_trigger_link_at_end", default=False, help="Check trigger link after getting FPGA and if not linked then take FPGA data again)")
-    parser.add_option("--check_all_trigger_link_at_end",action="store_true", dest="check_all_trigger_link_at_end", default=False, help="Check ALL ENABLED BOARDS trigger link after getting FPGA and if not linked then take FPGA data again)")
-    parser.add_option("--fpga_data_time_limit", dest="fpga_data_time_limit", action="store", type="int", default=5, help="(DEV ONLY) Set time limit in integer seconds for FPGA Data saving thread")
-    parser.add_option("--fpga_data",action="store_true", dest="fpga_data", default=False, help="(DEV ONLY) Save FPGA Register data")
-    parser.add_option("--fpga_data_QInj",action="store_true", dest="fpga_data_QInj", default=False, help="(DEV ONLY) Save FPGA Register data and send QInj")
-    parser.add_option("--clear_fifo",action="store_true", dest="clear_fifo", default=False, help="Clear FIFO at beginning of script")
-    parser.add_option("--clear_error",action="store_true", dest="clear_error", default=False, help="Clear error at beginning of script")
-    parser.add_option("--memo_fc_start_periodic_ws",action="store_true", dest="memo_fc_start_periodic_ws", default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_periodic_L1A_WS() from daq_helpers.py")
-    parser.add_option("--memo_fc_start_onetime_ws", action="store_true", dest="memo_fc_start_onetime_ws" , default=False, help="(WS DEV ONLY) Do Fast Command with Memory, invoke start_onetime_L1A_WS() from daq_helpers.py")
-    return parser
-
 if __name__ == "__main__":
 
-    parser = getOptionParser()
+    parser = parser_arguments.create_parser()
     (options, args) = parser.parse_args()
-    if(options.num_fifo_read>65536):   # See command_interpret.py read_memory()
+
+    # See command_interpret.py read_memory()
+    if(options.num_fifo_read>65536):
         print("Max Number of lines read by fifo capped at 65536, you entered ",options.num_fifo_read,", setting to 65536")
         options.num_fifo_read = 65536
-        
-    import platform
+
+    if(options.time_limit<=0):
+        print("DAQ Runtime <= 0, setting no DAQ mode...")
+        options.nodaq = True
+
+    if(options.verbose): 
+        for option, value in vars(options).items(): print('%s = %s' % (option, value))
+
     system = platform.system()
     if system == 'Windows' or system == '':
         options.useIPC = False
-    
+ 
     main_process(None, options)
