@@ -56,7 +56,7 @@ def start_periodic_L1A_WS(cmd_interpret):
 
     fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
     time.sleep(0.01)
-    
+
 def start_onetime_WS(cmd_interpret):
     ## 4-digit 16 bit hex, Duration is LSB 12 bits
     ## This tells us how many memory slots to use
@@ -118,7 +118,7 @@ def stop_ws(cmd_interpret):
 
     register_12(cmd_interpret, 0x0009)          # This is onetime ws_stop
     cmd_interpret.write_config_reg(10, 0x0001)
-    cmd_interpret.write_config_reg(9, 0x0001)   
+    cmd_interpret.write_config_reg(9, 0x0001)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
@@ -134,7 +134,7 @@ def start_L1A_1MHz(cmd_interpret):
     cmd_interpret.write_config_reg(9, 0x0de7)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
-    
+
     register_12(cmd_interpret, 0x0032)
     cmd_interpret.write_config_reg(10, 0x0000)
     cmd_interpret.write_config_reg(9, 0x0000)
@@ -211,7 +211,7 @@ def stop_L1A_1MHz(cmd_interpret):
     time.sleep(0.01)
 
 def link_reset(cmd_interpret):
-    software_clear_fifo(cmd_interpret) 
+    software_clear_fifo(cmd_interpret)
 
 def set_trigger_linked(cmd_interpret):
     reads = 0
@@ -385,7 +385,7 @@ def check_linked(cmd_interpret):
         print("All is linked with no errors")
         return True
     return False
-    
+
 def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj, isL1A, DAC_Val):
     fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory, isQInj, isL1A, DAC_Val)
     try:
@@ -492,7 +492,7 @@ class Receive_data(threading.Thread):
         else:
             self.daq_on = True
             self.stop_DAQ_event.clear()
-    
+
     def run(self):
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
@@ -562,13 +562,13 @@ class Receive_data(threading.Thread):
                     print("No data in buffer! Will try to read again")
                     time.sleep(1.01)
                     mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
-                
+
                 for mem_line in mem_data:
-                    self.queue.put(mem_line) 
+                    self.queue.put(mem_line)
             if not t.alive:
                 print("Read Thread detected alive=False")
                 # self.is_alive = False
-                break  
+                break
             if self.read_thread_handle.is_set():
                 print("Read Thread received STOP signal")
                 if not self.write_thread_handle.is_set():
@@ -577,7 +577,7 @@ class Receive_data(threading.Thread):
                 print("Stopping Read Thread")
                 # self.is_alive = False
                 break
-        print("Read Thread gracefully sending STOP signal to other threads") 
+        print("Read Thread gracefully sending STOP signal to other threads")
         self.read_thread_handle.set()
         # self.is_alive = False
         print("Sending stop signal to Write Thread")
@@ -622,7 +622,7 @@ class Write_data(threading.Thread):
                 print("Write Thread detected alive=False")
                 outfile.close()
                 # self.is_alive = False
-                break 
+                break
             if(file_lines>self.num_line and (not self.skip_binary)):
                 outfile.close()
                 file_lines=0
@@ -675,7 +675,7 @@ class Write_data(threading.Thread):
                 # while(self.read_thread_handle.is_set() == False):
                     # time.sleep(1)
                 # self.is_alive = False
-        print("Write Thread gracefully sending STOP signal to translate thread") 
+        print("Write Thread gracefully sending STOP signal to translate thread")
         self.translate_thread_handle.set()
         self.write_thread_handle.set()
         # self.is_alive = False
@@ -711,7 +711,7 @@ class Translate_data(threading.Thread):
         total_lines = 0
         file_lines = 0
         file_counter = 0
-        if(not self.binary_only): 
+        if(not self.binary_only):
             outfile = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
             print("{} is reading queue and translating file {}...".format(self.getName(), file_counter))
         else:
@@ -722,7 +722,7 @@ class Translate_data(threading.Thread):
                 print("Translate Thread detected alive=False")
                 if(not self.binary_only): outfile.close()
                 # self.is_alive = False
-                break 
+                break
             # if self.translate_thread_handle.is_set():
             #     print("Translate Thread received STOP signal from Write Thread")
             #     if(not self.binary_only): outfile.close()
@@ -766,7 +766,7 @@ class Translate_data(threading.Thread):
                             print("ERROR! Found more than two headers in data block!!")
                             sys.exit(1)
                         continue
-                    if(not self.binary_only): 
+                    if(not self.binary_only):
                         if(self.compressed_translation):
                             if(TDC_header_index<0):
                                 pass
@@ -786,8 +786,8 @@ class Translate_data(threading.Thread):
                 if(TDC_len>0):
                     if(not self.binary_only): file_lines  = file_lines  + TDC_len - 1
                     total_lines = total_lines + (TDC_len-1)
-        
-        print("Translate Thread gracefully ending") 
+
+        print("Translate Thread gracefully ending")
         self.translate_thread_handle.set()
         # self.is_alive = False
         print("%s finished!"%self.getName())
@@ -869,7 +869,7 @@ def software_clear_error(cmd_interpret):
 # 0xWXYZ
 # Z is a bit 4 bit binary wxyz Channel Enable (1=Enable)
 # Y is a bit 4 bit binary wxyz Board Type (1=Etroc2)
-def active_channels(cmd_interpret, key = 0x0003): 
+def active_channels(cmd_interpret, key = 0x0003):
     cmd_interpret.write_config_reg(15, key)
 
 #--------------------------------------------------------------------------#
@@ -890,7 +890,7 @@ def timestamp(cmd_interpret, key=0x0000):
 ## WX (8 bit) - Duration
 ## Y - N/A,N/A,Period,Hold
 ## Z - Input command
-def register_12(cmd_interpret, key = 0x0000): 
+def register_12(cmd_interpret, key = 0x0000):
     cmd_interpret.write_config_reg(12, key)
 
 #--------------------------------------------------------------------------#
@@ -898,7 +898,7 @@ def register_12(cmd_interpret, key = 0x0000):
 ## 4-digit 16 bit hex, 0xWXYZ
 ## WX (8 bit) - N/A
 ## YZ (8 bit) - Error Mask
-def register_11(cmd_interpret, key = 0x0000): 
+def register_11(cmd_interpret, key = 0x0000):
     cmd_interpret.write_config_reg(11, key)
 
 #--------------------------------------------------------------------------#
@@ -906,16 +906,16 @@ def register_11(cmd_interpret, key = 0x0000):
 ## 4-digit 16 bit hex
 ## LSB 10 bits are delay, LSB 11th bit is delay enabled
 ## 0000||0100||0000||0000 = 0x0400: shift of one clock cycle
-def triggerBitDelay(cmd_interpret, key = 0x0400): 
+def triggerBitDelay(cmd_interpret, key = 0x0400):
     cmd_interpret.write_config_reg(8, key)
 
 #--------------------------------------------------------------------------#
 ## Register 7
 ## 4-digit 16 bit hex
 ## LSB 6 bits  - time (s) for FPGA counters
-## Next 4 bits are the channel delay abcd = board: 3,2,1,0. 
+## Next 4 bits are the channel delay abcd = board: 3,2,1,0.
 ## This delays the trigger bit of set channels by 1 clock cycle
-def counterDuration(cmd_interpret, key = 0x0001): 
+def counterDuration(cmd_interpret, key = 0x0001):
     cmd_interpret.write_config_reg(7, key)
 
 #--------------------------------------------------------------------------#
