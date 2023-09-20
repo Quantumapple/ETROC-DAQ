@@ -8,6 +8,7 @@ def create_parser():
     parser = OptionParser()
     #------------------------------------------------------------------------#
     parser.add_option("--hostname", dest="hostname", action="store", type="string", help="FPGA IP Address", default="192.168.2.3")
+    parser.add_option("--firmware_key", dest="firmware_key", action="store", type="string", help="FPGA Firmware version (4-bit)", default="0001")
     #------------------------------------------------------------------------#
     parser.add_option("-v", "--verbose",action="store_true", dest="verbose", default=False, help="Print status messages to stdout")
     parser.add_option("-w", "--overwrite",action="store_true", dest="overwrite", default=False, help="Overwrite previously saved files")

@@ -17,6 +17,10 @@ import datetime
 This script is composed of all the helper functions needed for I2C comms, FPGA, etc
 '''
 #--------------------------------------------------------------------------#
+def div_ceil(x,y):
+    return -(x//(-y))
+
+#--------------------------------------------------------------------------#
 def set_all_trigger_linked(cmd_interpret, inspect=False):
     print("Resetting/Checking links till ALL boards are linked...")
     register_15 = cmd_interpret.read_config_reg(15)
@@ -177,9 +181,9 @@ class Save_FPGA_data(threading.Thread):
 #--------------------------------------------------------------------------#
 # Threading class to only READ off the ethernet buffer
 class Receive_data(threading.Thread):
-    def __init__(self, name, queue, cmd_interpret, num_fifo_read, read_thread_handle, write_thread_handle, time_limit, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
+    def __init__(self, name, read_queue, cmd_interpret, num_fifo_read, read_thread_handle, write_thread_handle, time_limit, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
         threading.Thread.__init__(self, name=name)
-        self.queue               = queue
+        self.read_queue          = read_queue
         self.cmd_interpret       = cmd_interpret
         self.num_fifo_read       = num_fifo_read
         self.read_thread_handle  = read_thread_handle
@@ -259,7 +263,7 @@ class Receive_data(threading.Thread):
                     mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
                 
                 for mem_line in mem_data:
-                    self.queue.put(mem_line) 
+                    self.read_queue.put(mem_line) 
             if not t.alive:
                 print("Read Thread detected alive=False")
                 break  
@@ -292,43 +296,43 @@ class Write_data(threading.Thread):
         self.write_thread_handle     = write_thread_handle
         self.translate_thread_handle = translate_thread_handle
         self.stop_DAQ_event          = stop_DAQ_event
+        self.file_lines              = 0
+        self.file_counter            = 0
+        self.retry_count             = 0
 
     def run(self):
         t = threading.current_thread()
         t.alive      = True
-        file_lines   = 0
-        file_counter = 0
-        if (not self.skip_binary):
-            outfile = open("%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
-            print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
+        if(not self.skip_binary):
+            outfile = open("%s/TDC_Data_%d.dat"%(self.store_dict, self.file_counter), 'w')
+            print("{} is reading queue and writing file {}...".format(self.getName(), self.file_counter))
         else:
             print("{} is reading queue and pushing binary onwards...".format(self.getName()))
-        retry_count  = 0
         while (True):
             if not t.alive:
                 print("Write Thread detected alive=False")
                 outfile.close()
                 break 
-            if(file_lines>self.num_line and (not self.skip_binary)):
+            if(self.file_lines>self.num_line and (not self.skip_binary)):
                 outfile.close()
-                file_lines=0
-                file_counter = file_counter + 1
-                outfile = open("%s/TDC_Data_%d.dat"%(self.store_dict, file_counter), 'w')
-                print("{} is reading queue and writing file {}...".format(self.getName(), file_counter))
+                self.file_lines   = 0
+                self.file_counter = self.file_counter + 1
+                outfile = open("%s/TDC_Data_%d.dat"%(self.store_dict, self.file_counter), 'w')
+                print("{} is reading queue and writing file {}...".format(self.getName(), self.file_counter))
             mem_data = ""
             # Attempt to pop off the read_queue for 30 secs, fail if nothing found
             try:
                 mem_data = self.read_queue.get(True, 1)
-                retry_count = 0
+                self.retry_count = 0
             except queue.Empty:
                 if not self.stop_DAQ_event.is_set():
-                    retry_count = 0
+                    self.retry_count = 0
                     continue
                 if self.write_thread_handle.is_set():
                     print("Write Thread received STOP signal AND ran out of data to write")
                     break
-                retry_count += 1
-                if retry_count < 30:
+                self.retry_count += 1
+                if self.retry_count < 30:
                     continue
                 print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM READ_QUEUE!!!")
                 break
@@ -342,7 +346,7 @@ class Write_data(threading.Thread):
                 if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
                 else: outfile.write('%s\n'%binary)
             # Increment line counters
-            file_lines = file_lines + 1
+            self.file_lines = self.file_lines + 1
             # Perform translation related activities if requested
             if(not self.skip_translation):
                 self.translate_queue.put(binary)
@@ -350,16 +354,20 @@ class Write_data(threading.Thread):
                 if not self.translate_thread_handle.is_set():
                     print("Sending stop signal to Translate Thread")
                     self.translate_thread_handle.set()
+            del binary, mem_data
         print("Write Thread gracefully sending STOP signal to translate thread") 
         self.translate_thread_handle.set()
         self.write_thread_handle.set()
+        del t
+        if(not self.skip_binary): outfile.close()
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
 # Threading class to only TRANSLATE the binary data and save to disk
 class Translate_data(threading.Thread):
-    def __init__(self, name, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None):
+    def __init__(self, name, firmware_key, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
+        self.firmware_key            = firmware_key
         self.translate_queue         = translate_queue
         self.cmd_interpret           = cmd_interpret
         self.num_line                = num_line
@@ -370,84 +378,124 @@ class Translate_data(threading.Thread):
         self.translate_thread_handle = translate_thread_handle
         self.stop_DAQ_event          = stop_DAQ_event
         self.compressed_translation  = compressed_translation
+        self.translate_deque         = deque()
+        self.valid_data              = False
+        self.header_pattern          = format(0xc3a3c3a, "028b")
+        self.trailer_pattern         = format(0xb, "06b")
+        self.file_lines              = 0
+        self.file_counter            = 0
+        self.retry_count             = 0
+        self.in_event                = False
+        self.eth_words_in_event      = -1
+        self.words_in_event          = -1
+        self.current_word            = -1
+        self.event_number            = -1
+
+    def reset_params(self):
+        self.translate_deque.clear()
+        self.in_event           = False
+        self.eth_words_in_event = -1
+        self.words_in_event     = -1
+        self.current_word       = -1
+        self.event_number       = -1
 
     def run(self):
         t = threading.current_thread()
         t.alive      = True
-        total_lines  = 0
-        file_lines   = 0
-        file_counter = 0
+        
         if(not self.skip_translation): 
-            outfile  = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
-            print("{} is reading queue and translating file {}...".format(self.getName(), file_counter))
+            outfile  = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
+            print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
         else:
             print("{} is reading queue and translating...".format(self.getName()))
-        retry_count  = 0
         while True:
             if not t.alive:
                 print("Translate Thread detected alive=False")
                 if(not self.skip_translation): outfile.close()
                 break 
-            if((not self.skip_translation) and file_lines>self.num_line):
+            if((not self.skip_translation) and self.file_lines>self.num_line):
                 outfile.close()
-                file_lines=0
-                file_counter = file_counter + 1
-                outfile = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, file_counter), 'w')
-                print("{} is reading queue and translating file {}...".format(self.getName(), file_counter))
+                self.file_lines   = 0
+                self.file_counter = self.file_counter + 1
+                outfile = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
+                print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
             binary = ""
             # Attempt to pop off the translate_queue for 30 secs, fail if nothing found
             try:
                 binary = self.translate_queue.get(True, 1)
-                retry_count = 0
+                self.retry_count = 0
             except queue.Empty:
                 if not self.stop_DAQ_event.is_set:
-                    retry_count = 0
+                    self.retry_count = 0
                     continue
                 if self.translate_thread_handle.is_set():
                     print("Translate Thread received STOP signal AND ran out of data to translate")
                     break
-                retry_count += 1
-                if retry_count < 30:
+                self.retry_count += 1
+                if self.retry_count < 30:
                     continue
                 print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!!")
                 break
-            TDC_data, write_flag = etroc_translate_binary(binary, self.timestamp, self.queue_ch, self.link_ch, self.board_ID, self.hitmap, self.compressed_translation)
-            if(write_flag==1):
-                pass
-            elif(write_flag==2):
-                TDC_len = len(TDC_data)
-                TDC_header_index = -1
-                for j,TDC_line in enumerate(TDC_data):
-                    if(TDC_line=="HEADER_KEY"):
-                        if(TDC_header_index<0):
-                            TDC_header_index = j
-                        else:
-                            print("ERROR! Found more than two headers in data block!!")
-                            sys.exit(1)
-                        continue
-                    if(not self.skip_translation): 
-                        if(self.compressed_translation):
-                            if(TDC_header_index<0):
-                                pass
-                            else:
-                                outfile.write("%s\n"%TDC_line)
-                        else:
-                            outfile.write("%s\n"%TDC_line)
-                    if(TDC_line[9:13]!='DATA'): continue
-                if(TDC_len>0):
-                    if(not self.skip_translation): file_lines  = file_lines  + TDC_len - 1
-                    total_lines = total_lines + (TDC_len-1)
-            elif(write_flag==3):
-                TDC_len = len(TDC_data)
-                if(not self.compressed_translation and not self.skip_translation):
-                    for j,TDC_line in enumerate(TDC_data):
-                        outfile.write("%s\n"%TDC_line)
-                if(TDC_len>0):
-                    if(not self.skip_translation): file_lines  = file_lines  + TDC_len - 1
-                    total_lines = total_lines + (TDC_len-1)
+            # Event Header Found
+            if(binary[0:28]==self.header_pattern):
+                self.reset_params()
+                self.in_event   = True
+                self.translate_deque.append(binary)
+                continue
+            # Event Header Line Two Found
+            elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]==self.firmware_key)):
+                self.current_word       = 0
+                self.event_number       = int(binary[ 4:20], base=2)
+                self.words_in_event     = int(binary[20:30], base=2)
+                self.eth_words_in_event = div_ceil(40*words_in_event,32)
+                # TODO EVENT TYPE?
+                self.translate_deque.append(binary)
+                # Set valid_data to true once we see fresh data
+                if(event_number==0): self.valid_data = True
+                continue
+            # Event Header Line Two NOT Found after the Header
+            elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]!=self.firmware_key)):
+                self.reset_params()
+                continue
+            # Trailer NOT Found
+            elif(self.in_event and (self.eth_words_in_event==-1 or self.eth_words_in_event<self.current_word)):
+                self.reset_params()
+                continue
+            # Trailer NOT Found
+            elif(self.in_event and (self.eth_words_in_event==self.current_word) and (binary[0:6]!=self.trailer_pattern)):
+                self.reset_params()
+                continue
+            # Trailer Found - DO NOT CONTINUE
+            elif(self.in_event and (self.eth_words_in_event==self.current_word) and (binary[0:6]==self.trailer_pattern)):
+                self.translate_deque.append(binary)
+            # Event Data Word
+            elif(self.in_event):
+                self.translate_deque.append(binary)
+                self.current_word += 1
+                continue
+            # Ethernet Line not inside Event, Skip it
+            else: continue
+
+            # We only come here if we saw a Trailer, but let's put a failsafe regardless
+            if(len(self.translate_deque)!=self.eth_words_in_event+3): 
+                self.reset_params()
+                continue
+
+            TDC_data = etroc_translate_binary(self.translate_deque, self.valid_data, self.board_ID, self.compressed_translation, self.header_pattern, self.trailer_pattern)
+            TDC_len = len(TDC_data)
+            if((not self.skip_translation) and (TDC_len>0)): 
+                for TDC_line in TDC_data:
+                    outfile.write("%s\n"%TDC_line)
+                self.file_lines  = self.file_lines  + TDC_len
+
+            # Reset all params before moving onto the next line
+            del TDC_data, TDC_len, binary
+            self.reset_params()
         
         print("Translate Thread gracefully ending") 
         self.translate_thread_handle.set()
+        del t
+        if(not self.skip_translation): outfile.close()
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#

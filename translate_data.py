@@ -10,9 +10,43 @@ import numpy as np
 This script is composed of functions to translate binary data into TDC codes
 '''
 #----------------------------------------------------------------------------------------#
-def etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compressed_translation):
+def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_translation, header_pattern, trailer_pattern):
     TDC_data = []
-    pattern_3c5c = '0011110001011100'
+    if(not valid_data): return TDC_data
+
+    header_1 = translate_deque.popleft()
+    header_2 = translate_deque.popleft()
+    trailer  = translate_deque.pop()
+
+    event_mask = header_1[-4:]
+    version    = header_2[0:4]
+    event_num  = int(header_2[4:20],  base=2)
+    num_words  = int(header_2[20:30], base=2)
+    event_type = header_2[-2:]
+    hits_count = trailer[6:18]
+    crc        = trailer[-8:]
+    # TODO Bad Data count, Overflow data count, Hamming Error Count
+
+    # TODO Add to TDC_data Header stuff
+
+    # TODO Default channel to the first active channel
+
+    current_word = 0
+    running_word = ""
+    etroc_word   = ""
+    while current_word<num_words:
+        running_word += translate_deque.popleft()
+        if(len(running_word)<40): running_word += translate_deque.popleft()
+        etroc_word   = running_word[0:40]
+        running_word = running_word[40:]
+
+        # TODO advance channel when new header found
+
+        # Decode binary and add to to TDC_data
+
+        current_word += 1
+
+
     trail_found = False
     filler_found = False
     channel = int(line[2:4], base=2)
@@ -216,35 +250,3 @@ def etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compresse
 
     return TDC_data, 2
 
-#----------------------------------------------------------------------------------------#
-def control_translate(line, timestamp):
-    if(line[2:4]=='00'):
-        time_code = line[4:6]
-        data = line[6:]
-        if (len(data)!=26): print("Tried to unpack ETROC1 timestamp with fewer than required data bits", data, " ", type(data), len(data)) 
-        #------------------Time_TYPE Time_Measurememt (clock cycles)----------------------#
-        #--NORMTRIG is 26 bit counter, MSBTIME is also 26 bit counter cathes NORMTRIG overflows--#
-        # --25ns per counter cycle, and 25*32 ns per NORMTRIG increment in Qing operations --#
-        if(time_code=='00'):   TDC_data = "NORMTRIG "   + "{:d}".format(int(data, base=2))
-        elif(time_code=='01'): TDC_data = "RANDTRIG "   + "{:d}".format(int(data, base=2))
-        elif(time_code=='10'): TDC_data = "FILLERTIME " + "0"
-        elif(time_code=='11'): TDC_data = "MSBTIME "    + "{:d}".format(int(data, base=2))
-    elif(line[2:6]=='0110'): TDC_data = "FILLER"
-    else: TDC_data = ""
-    return TDC_data, 1
-
-#----------------------------------------------------------------------------------------#
-def etroc_translate_binary(line, timestamp, queues, links, board_ID, hitmap, compressed_translation):
-    data_type = ''
-    if(timestamp==1): data_type = 'etroc1'              ## timestamp 0x0001: Disable Testmode & Disable TimeStamp: OLD DATA
-    ########################################## CHECK IF TEST ON AND TIME OFF IS OLD DATA
-    elif(line[0]=='0'): data_type = 'etroc1'
-    elif(line[0]=='1'): 
-        if(line[1]=='0'): data_type = 'control'
-        elif(line[1]=='1'): data_type = 'etroc2'
-
-    if(data_type == 'etroc1'): TDC_data = etroc1_translate(line, timestamp)
-    elif(data_type == 'etroc2'): TDC_data = etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compressed_translation)
-    elif(data_type == 'control'): TDC_data = control_translate(line, timestamp)
-
-    return TDC_data

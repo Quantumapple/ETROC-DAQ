@@ -3,3 +3,4 @@ process_outputs/*
 process_outputs
 *csv
 *out
+*.DS_Store
