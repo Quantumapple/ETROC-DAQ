@@ -13,6 +13,7 @@ from command_interpret import *
 from ETROC1_ArrayReg import *
 from translate_data import *
 import datetime
+from math import floor
 #========================================================================================#
 '''
 @author: Wei Zhang, Murtaza Safdari
@@ -157,15 +158,25 @@ def start_L1A_1MHz(cmd_interpret):
     fc_signal_start(cmd_interpret)
     time.sleep(0.01)
 
-def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Initialize = True, Triggerbit=True):
+def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Initialize = True, Triggerbit=True, QInjPeriod=None, memoLength=None):
+    if memoLength is None:
+        memoLength = 0x0dec  # length is the last address + 1, last address: 0x0deb
+    L1Aposition = 0x01fd
+    QInjposition = 0x0005
+
+    if L1A and memoLength < L1Aposition + 1:
+        memoLength = L1Aposition + 1
+    elif QInj and memoLength < QInjposition + 1:
+        memoLength = QInjposition + 1
+
     if(Initialize):
-        register_11(cmd_interpret, 0x0deb)
+        register_11(cmd_interpret, memoLength - 1)
         time.sleep(0.01)
 
     # IDLE
     register_12(cmd_interpret, 0x0070 if Triggerbit else 0x0030)
     cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
+    cmd_interpret.write_config_reg(9, memoLength - 1)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
@@ -178,18 +189,28 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
         time.sleep(0.01)
 
     # QInj FC
-    if(QInj):
+    if(QInj and QInjPeriod is None):
         register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
-        cmd_interpret.write_config_reg(10, 0x0005)
-        cmd_interpret.write_config_reg(9, 0x0005)
+        cmd_interpret.write_config_reg(10, QInjposition)
+        cmd_interpret.write_config_reg(9, QInjposition)
         fc_init_pulse(cmd_interpret)
         time.sleep(0.01)
+
+    if(QInj and QInjPeriod is not None):
+        register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
+
+        QInjCount = floor(memoLength/QInjPeriod)
+        for idx in range(QInjCount):
+            cmd_interpret.write_config_reg(10, 0x0005 + idx * QInjPeriod)
+            cmd_interpret.write_config_reg(9, 0x0005 + idx * QInjPeriod)
+            fc_init_pulse(cmd_interpret)
+            time.sleep(0.01)
 
     ### Send L1A
     if(L1A):
         register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
-        cmd_interpret.write_config_reg(10, 0x01fd)
-        cmd_interpret.write_config_reg(9, 0x01fd)
+        cmd_interpret.write_config_reg(10, L1Aposition)
+        cmd_interpret.write_config_reg(9, L1Aposition)
         fc_init_pulse(cmd_interpret)
         time.sleep(0.01)
 
@@ -544,12 +565,19 @@ class Receive_data(threading.Thread):
                         BCR=False
                         Triggerbit=False
                         Initialize = False
+                        QInjPeriod = None
+                        memoLength = None
                         if("QInj" in words): QInj=True
                         if("L1A" in words): L1A=True
                         if("BCR" in words): BCR=True
                         if("Triggerbit" in words): Triggerbit=True
                         if("Start" in words): Initialize=True
-                        configure_memo_FC(self.cmd_interpret,Initialize=Initialize,QInj=QInj,L1A=L1A,BCR=BCR,Triggerbit=Triggerbit)
+                        for command in words:
+                            if "QInjPeriod" in command:
+                                QInjPeriod = int(command[10:])
+                            if "memoLength" in command:
+                                memoLength = int(command[10:])
+                        configure_memo_FC(self.cmd_interpret,Initialize=Initialize,QInj=QInj,L1A=L1A,BCR=BCR,Triggerbit=Triggerbit,QInjPeriod=QInjPeriod,memoLength=memoLength)
                     else:
                         print(f'Unknown message: {message}')
                 except queue.Empty:
