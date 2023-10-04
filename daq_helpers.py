@@ -73,21 +73,33 @@ def start_onetime_WS(cmd_interpret):
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0002)          # This is onetime BC Reset FC
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0000)
+    register_12(cmd_interpret, 0x0008)          # This is onetime WS start 
+    cmd_interpret.write_config_reg(10, 0x0006)
+    cmd_interpret.write_config_reg(9, 0x0006)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
     register_12(cmd_interpret, 0x0005)          # This is onetime Qinj FC
-    cmd_interpret.write_config_reg(10, 0x0001)
-    cmd_interpret.write_config_reg(9, 0x0001)
+    cmd_interpret.write_config_reg(10, 0x0009)
+    cmd_interpret.write_config_reg(9, 0x0009)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+    
+    register_12(cmd_interpret, 0x0005)          # This is onetime Qinj FC
+    cmd_interpret.write_config_reg(10, 0x000e)
+    cmd_interpret.write_config_reg(9, 0x000e)
+    fc_init_pulse(cmd_interpret)
+    time.sleep(0.01)
+    
+    register_12(cmd_interpret, 0x0005)          # This is onetime Qinj FC
+    cmd_interpret.write_config_reg(10, 0x0012)
+    cmd_interpret.write_config_reg(9, 0x0012)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
-    register_12(cmd_interpret, 0x0006)          # This is onetime L1A FC
-    cmd_interpret.write_config_reg(10, 0x01f0)
-    cmd_interpret.write_config_reg(9, 0x01ff)
+    register_12(cmd_interpret, 0x0009)          # This is onetime WS stop 
+    cmd_interpret.write_config_reg(10, 0x001a)
+    cmd_interpret.write_config_reg(9, 0x001a)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
