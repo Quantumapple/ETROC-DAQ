@@ -57,7 +57,7 @@ def start_periodic_L1A_WS(cmd_interpret):
     fc_signal_start(cmd_interpret)              # This initializes the memory and starts the FC cycles
     time.sleep(0.01)
     
-def start_onetime_L1A_WS(cmd_interpret):
+def start_onetime_WS(cmd_interpret):
     ## 4-digit 16 bit hex, Duration is LSB 12 bits
     ## This tells us how many memory slots to use
     register_11(cmd_interpret, 0x0deb)
@@ -494,6 +494,8 @@ class Receive_data(threading.Thread):
                         link_reset(self.cmd_interpret)
                     elif message == 'reset till linked':
                         set_trigger_linked(self.cmd_interpret)
+                    elif message == 'start onetime ws':
+                        start_onetime_WS(self.cmd_interpret)
                     ## Special if condition for delay change during the DAQ
                     ## Example: change delay 0x0421
                     ##   becomes: change delay 1057
