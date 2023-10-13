@@ -111,7 +111,7 @@ def main(options, cmd_interpret, IPC_queue = None):
         software_clear_fifo(cmd_interpret)
         time.sleep(2.1)
 
-    if(options.clear_error):
+    if(options.clear_error or options.check_valid_data_start):
         print("Clearing Event Counter...") 
         software_clear_error(cmd_interpret)
         time.sleep(0.1)
@@ -162,7 +162,7 @@ def main(options, cmd_interpret, IPC_queue = None):
                                                     # Kill order is read, write, translate
         receive_data = Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
         write_data = Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.skip_translation, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
-        translate_data = Translate_data('Translate_data', options.firmware_key, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event)
+        translate_data = Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event)
         try:
             # Start the thread
             receive_data.start()

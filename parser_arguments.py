@@ -46,6 +46,8 @@ def create_parser():
     parser.add_option("--DAC_Val", dest="DAC_Val", action="store", type="int", help="DAC value set for FPGA data taking", default=-1)
     #------------------------------------------------------------------------#
     parser.add_option("--clear_fifo",action="store_true", dest="clear_fifo", default=False, help="Clear FIFO at beginning of script")
-    parser.add_option("--clear_error",action="store_true", dest="clear_error", default=False, help="Clear error at beginning of script")
+    parser.add_option("--clear_error",action="store_true", dest="clear_error", default=False, help="Reset the event counter")
+    parser.add_option("--check_valid_data_start",action="store_true", dest="check_valid_data_start", default=False, help="Save data from Event=0 Only, must be used with clear_error")
+
 
     return parser

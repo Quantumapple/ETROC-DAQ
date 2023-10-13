@@ -363,199 +363,39 @@ class Write_data(threading.Thread):
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
-# Threading class to only TRANSLATE the binary data and save to disk
-class Translate_data(threading.Thread):
-    def __init__(self, name, firmware_key, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None):
-        threading.Thread.__init__(self, name=name)
-        self.firmware_key            = firmware_key
-        self.translate_queue         = translate_queue
-        self.cmd_interpret           = cmd_interpret
-        self.num_line                = num_line
-        self.store_dict              = store_dict
-        self.skip_translation        = skip_translation
-        self.board_ID                = board_ID
-        self.write_thread_handle     = write_thread_handle
-        self.translate_thread_handle = translate_thread_handle
-        self.stop_DAQ_event          = stop_DAQ_event
-        self.compressed_translation  = compressed_translation
-        self.translate_deque         = deque()
-        self.valid_data              = False
-        self.header_pattern          = format(0xc3a3c3a, "028b")
-        self.trailer_pattern         = format(0xb, "06b")
-        self.file_lines              = 0
-        self.file_counter            = 0
-        self.retry_count             = 0
-        self.in_event                = False
-        self.eth_words_in_event      = -1
-        self.words_in_event          = -1
-        self.current_word            = -1
-        self.event_number            = -1
-
-    def reset_params(self):
-        self.translate_deque.clear()
-        self.in_event           = False
-        self.eth_words_in_event = -1
-        self.words_in_event     = -1
-        self.current_word       = -1
-        self.event_number       = -1
-
-    def run(self):
-        t = threading.current_thread()
-        t.alive      = True
-        
-        if(not self.skip_translation): 
-            outfile  = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
-            print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
-        else:
-            print("{} is reading queue and translating...".format(self.getName()))
-        while True:
-            if not t.alive:
-                print("Translate Thread detected alive=False")
-                if(not self.skip_translation): outfile.close()
-                break 
-            if((not self.skip_translation) and self.file_lines>self.num_line):
-                outfile.close()
-                self.file_lines   = 0
-                self.file_counter = self.file_counter + 1
-                outfile = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
-                print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
-            binary = ""
-            # Attempt to pop off the translate_queue for 30 secs, fail if nothing found
-            try:
-                binary = self.translate_queue.get(True, 1)
-                self.retry_count = 0
-            except queue.Empty:
-                if not self.stop_DAQ_event.is_set:
-                    self.retry_count = 0
-                    continue
-                if self.translate_thread_handle.is_set():
-                    print("Translate Thread received STOP signal AND ran out of data to translate")
-                    break
-                self.retry_count += 1
-                if self.retry_count < 30:
-                    continue
-                print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!!")
-                break
-            # Event Header Found
-            if(binary[0:28]==self.header_pattern):
-                self.reset_params()
-                self.in_event   = True
-                self.translate_deque.append(binary)
-                continue
-            # Event Header Line Two Found
-            elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]==self.firmware_key)):
-                self.current_word       = 0
-                self.event_number       = int(binary[ 4:20], base=2)
-                self.words_in_event     = int(binary[20:30], base=2)
-                self.eth_words_in_event = div_ceil(40*words_in_event,32)
-                # TODO EVENT TYPE?
-                self.translate_deque.append(binary)
-                # Set valid_data to true once we see fresh data
-                if(event_number==0): self.valid_data = True
-                continue
-            # Event Header Line Two NOT Found after the Header
-            elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]!=self.firmware_key)):
-                self.reset_params()
-                continue
-            # Trailer NOT Found
-            elif(self.in_event and (self.eth_words_in_event==-1 or self.eth_words_in_event<self.current_word)):
-                self.reset_params()
-                continue
-            # Trailer NOT Found
-            elif(self.in_event and (self.eth_words_in_event==self.current_word) and (binary[0:6]!=self.trailer_pattern)):
-                self.reset_params()
-                continue
-            # Trailer Found - DO NOT CONTINUE
-            elif(self.in_event and (self.eth_words_in_event==self.current_word) and (binary[0:6]==self.trailer_pattern)):
-                self.translate_deque.append(binary)
-            # Event Data Word
-            elif(self.in_event):
-                self.translate_deque.append(binary)
-                self.current_word += 1
-                continue
-            # Ethernet Line not inside Event, Skip it
-            else: continue
-
-            # We only come here if we saw a Trailer, but let's put a failsafe regardless
-            if(len(self.translate_deque)!=self.eth_words_in_event+3): 
-                self.reset_params()
-                continue
-
-            TDC_data = etroc_translate_binary(self.translate_deque, self.valid_data, self.board_ID, self.compressed_translation, self.header_pattern, self.trailer_pattern)
-            TDC_len = len(TDC_data)
-            if((not self.skip_translation) and (TDC_len>0)): 
-                for TDC_line in TDC_data:
-                    outfile.write("%s\n"%TDC_line)
-                self.file_lines  = self.file_lines  + TDC_len
-
-            # Reset all params before moving onto the next line
-            del TDC_data, TDC_len, binary
-            self.reset_params()
-        
-        print("Translate Thread gracefully ending") 
-        self.translate_thread_handle.set()
-        del t
-        if(not self.skip_translation): outfile.close()
-        print("%s finished!"%self.getName())
+## software clear fifo
+## MSB..10, i.e., trigger pulser_reg[1]
+def software_clear_fifo(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0002)
 
 #--------------------------------------------------------------------------#
-## IIC write slave device
-# @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
-# @param slave[7:0] : slave device address
-# @param wr: 1-bit '0' is write, '1' is read
-# @param reg_addr[7:0] : register address
-# @param data[7:0] : 8-bit write data
-def iic_write(mode, slave_addr, wr, reg_addr, data, cmd_interpret):
-    val = mode << 24 | slave_addr << 17 | wr << 16 | reg_addr << 8 | data
-    cmd_interpret.write_config_reg(4, 0xffff & val)
-    cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
-    time.sleep(0.01)
-    cmd_interpret.write_pulse_reg(0x0001)                                     # reset ddr3 data fifo
-    time.sleep(0.01)
+## software clear error. This should now clear the event counter
+## MSB..100000, i.e., trigger pulser_reg[5]
+def software_clear_error(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0020)
 
 #--------------------------------------------------------------------------#
-## IIC read slave device
-# @param mode[1:0] : '0'is 1 bytes read or wirte, '1' is 2 bytes read or write, '2' is 3 bytes read or write
-# @param slave[6:0]: slave device address
-# @param wr: 1-bit '0' is write, '1' is read
-# @param reg_addr[7:0] : register address
-def iic_read(mode, slave_addr, wr, reg_addr, cmd_interpret):
-    val = mode << 24 | slave_addr << 17 |  0 << 16 | reg_addr << 8 | 0x00	  # write device addr and reg addr
-    cmd_interpret.write_config_reg(4, 0xffff & val)
-    cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
-    time.sleep(0.01)
-    cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
+## Fast Command Signal Start
+## MSB..100, i.e., trigger pulser_reg[2]
+def fc_signal_start(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0004)
 
-    val = mode << 24 | slave_addr << 17 | wr << 16 | reg_addr << 8 | 0x00	  # write device addr and read one byte
-    cmd_interpret.write_config_reg(4, 0xffff & val)
-    cmd_interpret.write_config_reg(5, 0xffff & (val>>16))
-    time.sleep(0.01)
-    cmd_interpret.write_pulse_reg(0x0001)				                      # Sent a pulse to IIC module
-    time.sleep(0.01)									                      # delay 10ns then to read data
-    return cmd_interpret.read_status_reg(0) & 0xff
+#--------------------------------------------------------------------------#
+## Fast Command Initialize pulse
+## MSB..10000, i.e., trigger pulser_reg[4]
+def fc_init_pulse(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0010)
 
 #--------------------------------------------------------------------------#
 ## Enable FPGA Descrambler
+## 0xWXYZ
+## Z is a bit 4 bit binary wxyz
+## z is the enable descrambler
+## y is disable GTX
+## x is polarity
+## w is the memo FC (active high)
 def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
-    # 0xWXYZ
-    # Z is a bit 4 bit binary wxyz
-    # z is the enable descrambler
-    # y is disable GTX
-    # x is polarity
-#    w is the memo FC (active high)
     cmd_interpret.write_config_reg(14, val)
-
-#--------------------------------------------------------------------------#
-## software clear fifo
-## MSB..10
-def software_clear_fifo(cmd_interpret):
-    cmd_interpret.write_pulse_reg(0x0002)                                     # trigger pulser_reg[1]
-
-#--------------------------------------------------------------------------#
-## software clear error
-## MSB..100000
-def software_clear_error(cmd_interpret):
-    cmd_interpret.write_pulse_reg(0x0020)                                     # trigger pulser_reg[5]
 
 #--------------------------------------------------------------------------#
 ## Register 15
@@ -580,7 +420,7 @@ def active_channels(cmd_interpret, key = 0x0003):
 ## 0000: Enable  Testmode & Enable TimeStamp
 ## 0001: Enable  Testmode & Disable TimeStamp
 ## 0010: Disable Testmode & Enable TimeStamp
-## 0011: Disable Testmode & Disable TimeStamp                  ##BUGGED as of 03-04-2023
+## 0011: Disable Testmode & Disable TimeStamp  ##BUGGED as of 03-04-2023
 ## Note that the input needs to be a 4-digit 16 bit hex, 0x000(WXYZ)
 def timestamp(cmd_interpret, key=0x0000):
     cmd_interpret.write_config_reg(13, key)
@@ -618,15 +458,3 @@ def triggerBitDelay(cmd_interpret, key = 0x0400):
 ## This delays the trigger bit of set channels by 1 clock cycle
 def counterDuration(cmd_interpret, key = 0x0001): 
     cmd_interpret.write_config_reg(7, key)
-
-#--------------------------------------------------------------------------#
-## Fast Command Signal Start
-## MSB..100
-def fc_signal_start(cmd_interpret):
-    cmd_interpret.write_pulse_reg(0x0004)
-
-#--------------------------------------------------------------------------#
-## Fast Command Initialize pulse
-## MSB..10000
-def fc_init_pulse(cmd_interpret):
-    cmd_interpret.write_pulse_reg(0x0010)

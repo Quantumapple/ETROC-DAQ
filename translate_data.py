@@ -3,21 +3,163 @@
 import sys
 from collections import deque
 import numpy as np
+import time
+import threading
+import os
+from queue import Queue
+import queue
+import datetime
 #========================================================================================#
 '''
 @author: Murtaza Safdari
 @date: 2023-09-13
 This script is composed of functions to translate binary data into TDC codes
 '''
+#--------------------------------------------------------------------------#
+# Threading class to only TRANSLATE the binary data and save to disk
+class Translate_data(threading.Thread):
+    def __init__(self, name, firmware_key, check_valid_data_start, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None):
+        threading.Thread.__init__(self, name=name)
+        self.firmware_key            = firmware_key
+        self.check_valid_data_start  = check_valid_data_start
+        self.translate_queue         = translate_queue
+        self.cmd_interpret           = cmd_interpret
+        self.num_line                = num_line
+        self.store_dict              = store_dict
+        self.skip_translation        = skip_translation
+        self.board_ID                = board_ID
+        self.write_thread_handle     = write_thread_handle
+        self.translate_thread_handle = translate_thread_handle
+        self.stop_DAQ_event          = stop_DAQ_event
+        self.compressed_translation  = compressed_translation
+        self.translate_deque         = deque()
+        self.valid_data              = False if check_valid_data_start else True
+        self.header_pattern          = format(0xc3a3c3a, "028b")
+        self.trailer_pattern         = format(0xb, "06b")
+        self.channel_header_pattern  = format(0x3c5c, "016b")
+        self.file_lines              = 0
+        self.file_counter            = 0
+        self.retry_count             = 0
+        self.in_event                = False
+        self.eth_words_in_event      = -1
+        self.words_in_event          = -1
+        self.current_word            = -1
+        self.event_number            = -1
+
+    def reset_params(self):
+        self.translate_deque.clear()
+        self.in_event           = False
+        self.eth_words_in_event = -1
+        self.words_in_event     = -1
+        self.current_word       = -1
+        self.event_number       = -1
+
+    def run(self):
+        t = threading.current_thread()
+        t.alive      = True
+        
+        if(not self.skip_translation): 
+            outfile  = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
+            print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
+        else:
+            print("{} is reading queue and translating...".format(self.getName()))
+        while True:
+            if not t.alive:
+                print("Translate Thread detected alive=False")
+                if(not self.skip_translation): outfile.close()
+                break 
+            if((not self.skip_translation) and self.file_lines>self.num_line):
+                outfile.close()
+                self.file_lines   = 0
+                self.file_counter = self.file_counter + 1
+                outfile = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
+                print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
+            binary = ""
+            # Attempt to pop off the translate_queue for 30 secs, fail if nothing found
+            try:
+                binary = self.translate_queue.get(True, 1)
+                self.retry_count = 0
+            except queue.Empty:
+                if not self.stop_DAQ_event.is_set:
+                    self.retry_count = 0
+                    continue
+                if self.translate_thread_handle.is_set():
+                    print("Translate Thread received STOP signal AND ran out of data to translate")
+                    break
+                self.retry_count += 1
+                if self.retry_count < 30:
+                    continue
+                print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!!")
+                break
+            # Event Header Found
+            if(binary[0:28]==self.header_pattern):
+                self.reset_params()
+                self.in_event = True
+                self.translate_deque.append(binary)
+                continue
+            # Event Header Line Two Found
+            elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]==self.firmware_key)):
+                self.current_word       = 0
+                self.event_number       = int(binary[ 4:20], base=2)
+                self.words_in_event     = int(binary[20:30], base=2)
+                self.eth_words_in_event = div_ceil(40*words_in_event,32)
+                # TODO EVENT TYPE?
+                self.translate_deque.append(binary)
+                # Set valid_data to true once we see fresh data
+                if(event_number==0): self.valid_data = True
+                continue
+            # Event Header Line Two NOT Found after the Header
+            elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]!=self.firmware_key)):
+                self.reset_params()
+                continue
+            # Trailer NOT Found but we already read more words then we were supposed to
+            # elif(self.in_event and (self.eth_words_in_event==-1 or self.eth_words_in_event<self.current_word)):
+            #     self.reset_params()
+            #     continue
+            # Trailer NOT Found after the required number of ethernet words was read
+            elif(self.in_event and (self.eth_words_in_event==self.current_word) and (binary[0:6]!=self.trailer_pattern)):
+                self.reset_params()
+                continue
+            # Trailer Found - DO NOT CONTINUE
+            elif(self.in_event and (self.eth_words_in_event==self.current_word) and (binary[0:6]==self.trailer_pattern)):
+                self.translate_deque.append(binary)
+            # Event Data Word
+            elif(self.in_event):
+                self.translate_deque.append(binary)
+                self.current_word += 1
+                continue
+            # Ethernet Line not inside Event, Skip it
+            else: continue
+
+            # We only come here if we saw a Trailer, but let's put a failsafe regardless
+            if(len(self.translate_deque)!=self.eth_words_in_event+3): 
+                self.reset_params()
+                continue
+
+            TDC_data = etroc_translate_binary(self.translate_deque, self.valid_data, self.board_ID, self.compressed_translation, self.channel_header_pattern, self.header_pattern, self.trailer_pattern)
+            TDC_len = len(TDC_data)
+            if((not self.skip_translation) and (TDC_len>0)): 
+                for TDC_line in TDC_data:
+                    outfile.write("%s\n"%TDC_line)
+                self.file_lines  = self.file_lines  + TDC_len
+
+            # Reset all params before moving onto the next line
+            del TDC_data, TDC_len, binary
+            self.reset_params()
+        
+        print("Translate Thread gracefully ending") 
+        self.translate_thread_handle.set()
+        del t
+        if(not self.skip_translation): outfile.close()
+        print("%s finished!"%self.getName())
+
 #----------------------------------------------------------------------------------------#
-def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_translation, header_pattern, trailer_pattern):
+def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_translation, channel_header_pattern, header_pattern, trailer_pattern, debug=False):
     TDC_data = []
     if(not valid_data): return TDC_data
-
     header_1 = translate_deque.popleft()
     header_2 = translate_deque.popleft()
     trailer  = translate_deque.pop()
-
     event_mask = header_1[-4:]
     version    = header_2[0:4]
     event_num  = int(header_2[4:20],  base=2)
@@ -25,228 +167,41 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
     event_type = header_2[-2:]
     hits_count = trailer[6:18]
     crc        = trailer[-8:]
+    TDC_data.append(f"EH {version} {event_num} {hits_count}")
     # TODO Bad Data count, Overflow data count, Hamming Error Count
-
-    # TODO Add to TDC_data Header stuff
-
-    # TODO Default channel to the first active channel
-
+    active_channels = []
+    for idx in range(4):
+        if(event_mask[3-idx]=="1"): active_channels.append(idx)
+    active_channels = deque(active_channels)
+    # TODO Handle deletion of variables created in this method
     current_word = 0
     running_word = ""
     etroc_word   = ""
+    current_channel = -1
+    # pattern_3c5c = '0011110001011100'
     while current_word<num_words:
         running_word += translate_deque.popleft()
         if(len(running_word)<40): running_word += translate_deque.popleft()
         etroc_word   = running_word[0:40]
         running_word = running_word[40:]
-
-        # TODO advance channel when new header found
-
-        # Decode binary and add to to TDC_data
-
         current_word += 1
-
-
-    trail_found = False
-    filler_found = False
-    channel = int(line[2:4], base=2)
-    # Discard first 4 bits which are 11+channel
-    data = line[4:]
-    if (len(data)!=28): print("Tried to unpack ETROC2 data with fewer than required data bits / line", data, " ", type(data), len(data))
-    # append new line to the right of deque if deque is empty, or is linked and previously translated
-    # If the link is not established and deque was empty, check if you're adding a line with the fixed pattern in it and if so only keep relevant part of the stream
-    # Function returns empty list
-    if (len(queues[channel])==0): 
-        if(len(links[channel])>0):
-            queues[channel].append(data)
-        else:
-            if(pattern_3c5c in data):
-                links[channel] = "START"
-                staring_index = data.find(pattern_3c5c)
-                queues[channel].append(data[staring_index:])
-            else: queues[channel].append(data)
-        return TDC_data, 2
-    if(len(links[channel])>0):
-        if(queues[channel][-1][0]!='0' and queues[channel][-1][0]!='1'): 
-            queues[channel].append(data)
-            return TDC_data, 2
-    # else unpack last element to complete lines
-    last_element = queues[channel].pop()
-    # If not linked yet, check for fixed pattern in the old + new data
-    if(len(links[channel])==0):
-        new_line = last_element + data
-        # If not found, discard old element and return empty list
-        if(not pattern_3c5c in new_line):
-            queues[channel].append(data)
-            return TDC_data, 2
-        # If found, prepare last_element and data with 40 bit words + residual if possible, proceed to attempt translation
-        else:
-            links[channel] = "START"
-            staring_index = new_line.find(pattern_3c5c)
-            new_line = new_line[staring_index:]
-            nl_res_len = 40 - len(new_line)
-            last_element = new_line[0:40]
-            if(nl_res_len>=0): data = ""
-            else: data = new_line[nl_res_len:]
-    # If linked already, prepare last_element and data with 40 bit words + residual if possible, proceed to attempt translation
-    else:
-        # ETROC2 word length is 40 bits
-        residual_len = 40 - len(last_element)
-        # Note overspills are handled correctly in Python 3.6.8
-        last_element = last_element + data[0:residual_len]
-        data = data[residual_len:]
-    if(len(last_element)>40): 
-        print("ERROR! MORE THAN 40 BITS BEING TREATED AS A WORD!")
-        sys.exit(1)
-    # If last_element is less than 40 bits, push back and hope for new data
-    elif(len(last_element)< 40): queues[channel].append(last_element)
-    # If it is 40 bits, we can translate!
-    elif(len(last_element)==40):
-        #-------Translate 40bit ETROC word--------#
-        last_line = "ETROC2 " + "{:d} ".format(channel)
-        if(last_element[0:18]==pattern_3c5c+'00'):
-            # Translating frame header
-            # We add a unique element here to track how many data lines there are in this block
-            queues[channel].append("HEADER_KEY")
-            last_line = last_line + "HEADER "
-            last_line = last_line + "L1COUNTER " + last_element[18:26] + " "
-            last_line = last_line + "TYPE " + last_element[26:28] + " "
-            # last_line = last_line + "BCID " + last_element[28:40]
-            last_line = last_line + "BCID " + f"{int(last_element[28:40], base=2)}"
-            # Expected
-            if(links[channel]=="START" or links[channel]=="FILLER" or links[channel]=="TRAILER"): links[channel] = "HEADER"
-            # Error in frame, clear queue, reset link, exit function
-            elif(links[channel]=="DATA" or links[channel]=="HEADER"):
-                # print("QD at HEADER, because found after",links[channel])
-                # print(list(queues[channel]))
-                queues[channel].clear()
-                links[channel]==""
-                hitmap[channel] = np.zeros((16,16))
-                return TDC_data, 2
-            # Unexpected invalid link state
-            else: 
-                print("ERROR! LINKS[CH] in invalid state at HEADER")
-                sys.exit(1)
-        elif(last_element[0:18]=='0'+board_ID[channel]):
-            # Translating frame trailer
-            trail_found = True
-            last_line = last_line + "TRAILER "
-            last_line = last_line + "CHIPID " + f"{hex(int(last_element[1:18], base=2))}" + " "
-            last_line = last_line + "STATUS " + last_element[18:24] + " "
-            last_line = last_line + "HITS " + f"{int(last_element[24:32], base=2)}" + " "
-            last_line = last_line + "CRC " + last_element[32:40]
-            # Expected
-            if(links[channel]=="HEADER" or links[channel]=="DATA"): links[channel] = "TRAILER"
-            # Error in frame, clear queue, reset link, exit function
-            elif(links[channel]=="TRAILER" or links[channel]=="FILLER" or links[channel]=="START"):
-                # print("QD at Trailer, because found after",links[channel])
-                # print(list(queues[channel]))
-                queues[channel].clear()
-                links[channel]==""
-                hitmap[channel] = np.zeros((16,16))
-                return TDC_data, 2
-            # Unexpected invalid link state
-            else: 
-                print("ERROR! LINKS[CH] in invalid state at TRAILER")
-                sys.exit(1)
-        elif(last_element[0:18]==pattern_3c5c+'10'):
-            # Translating frame filler
-            filler_found = True
-            last_line = last_line + "FRAMEFILLER "
-            last_line = last_line + "L1COUNTER " + last_element[18:26] + " "
-            last_line = last_line + "EBS " + last_element[26:28] + " "
-            last_line = last_line + "BCID " + f"{int(last_element[28:40], base=2)}"
-            # Expected
-            if(links[channel]=="START" or links[channel]=="FILLER" or links[channel]=="TRAILER"): links[channel] = "FILLER"
-            # Error in frame, clear queue, reset link, exit function
-            elif(links[channel]=="DATA" or links[channel]=="HEADER"):
-                # print("QD at FF, because found after",links[channel])
-                # print(list(queues[channel]))
-                queues[channel].clear()
-                links[channel]==""
-                hitmap[channel] = np.zeros((16,16))
-                return TDC_data, 2
-            # Unexpected invalid link state
-            else: 
-                print("ERROR! LINKS[CH] in invalid state at FRAME FILLER")
-                sys.exit(1)
-        elif(last_element[0:18]==pattern_3c5c+'11'):
-            # Translating firmware filler
-            filler_found = True
-            last_line = last_line + "FIRMWAREFILLER "
-            last_line = last_line + "MISSINGCOUNT " + f"{int(last_element[18:40], base=2)}"
-            # Expected
-            if(links[channel]=="START" or links[channel]=="FILLER" or links[channel]=="TRAILER"): links[channel] = "FILLER"
-            # Error in frame, clear queue, reset link, exit function
-            elif(links[channel]=="DATA" or links[channel]=="HEADER"):
-                # print("QD at F, because found after",links[channel])
-                # print(list(queues[channel]))
-                queues[channel].clear()
-                links[channel]==""
-                hitmap[channel] = np.zeros((16,16))
-                return TDC_data, 2
-            # Unexpected invalid link state
-            else: 
-                print("ERROR! LINKS[CH] in invalid state at FIRMWARE FILLER")
-                sys.exit(1)
-        elif(last_element[0]=='1'):
-            # Translating data
-            last_line = last_line + "DATA "
-            last_line = last_line + "EA " + last_element[1:3] + " "
-            last_line = last_line + "COL " + "{:d} ".format(int(last_element[3:7], base=2))
-            last_line = last_line + "ROW " + "{:d} ".format(int(last_element[7:11], base=2))
-            last_line = last_line + "TOA " + "{:d} ".format(int(last_element[11:21], base=2))
-            last_line = last_line + "TOT " + "{:d} ".format(int(last_element[21:30], base=2))
-            last_line = last_line + "CAL " + "{:d} ".format(int(last_element[30:40], base=2))
-            # last_line = last_line + last_element[11:11+4] + " " + last_element[15:15+4] + " "
-            # last_line = last_line + last_element[19:19+12] + " " + last_element[31:40]
-            # Expected
-            if(links[channel]=="HEADER" or links[channel]=="DATA"): links[channel] = "DATA"
-            # Error in frame, clear queue, reset link, exit function
-            elif(links[channel]=="TRAILER" or links[channel]=="FILLER" or links[channel]=="START"):
-                # print("QD at Data, because found after",links[channel])
-                # print(list(queues[channel]))
-                queues[channel].clear()
-                links[channel]==""
-                hitmap[channel] = np.zeros((16,16))
-                return TDC_data, 2
-            # Unexpected invalid link state
-            else: 
-                print("ERROR! LINKS[CH] in invalid state at DATA")
-                sys.exit(1)
-            # Check for the hitmap's integrity, clear if >1 hit from the same pixel
-            if(hitmap[channel][int(last_element[7:11], base=2),int(last_element[3:7], base=2)]>0):
-                print("Dumped at hitmap")
-                queues[channel].clear()
-                links[channel]==""
-                hitmap[channel] = np.zeros((16,16))
-                return TDC_data, 2
-            else: hitmap[channel][int(last_element[7:11], base=2),int(last_element[3:7], base=2)] += 1
-
-        # When the 40 bit word is none of the above, clear queue, reset link, exit function
-        else:
-            # print("QD at INVALID 40 Word")
-            queues[channel].clear()
-            links[channel]==""
-            hitmap[channel] = np.zeros((16,16))
-            return TDC_data, 2
-        #-----------------------------------------#
-        queues[channel].append(last_line)
-        # If we found a filler line, we can dump the deque into our main queue
-        if(filler_found):
-            if(not compressed_translation): TDC_data = list(queues[channel])
-            queues[channel].clear()
-            links[channel]==""
-            hitmap[channel] = np.zeros((16,16))
-            if(len(data)>0): queues[channel].append(data)
-            return TDC_data, 3
-        # If we found a trailing line, we can dump the deque into our main queue
-        if(trail_found):
-            if(not compressed_translation or np.any(hitmap[channel]>0)): TDC_data = list(queues[channel])
-            queues[channel].clear()
-            links[channel]==""
-            hitmap[channel] = np.zeros((16,16))
-        if(len(data)>0): queues[channel].append(data)
-
-    return TDC_data, 2
+        if(debug): 
+            TDC_data.append(f"{etroc_word}")
+            continue
+        # HEADER "H {channel} {L1Counter} {Type} {BCID}"
+        if(etroc_word[0:18]==channel_header_pattern+'00'):
+            try:
+              current_channel=active_channels.popleft()
+            except IndexError:
+              print("The active_channels deque is empty, more headers found than event mask can allow")
+              TDC_data.append(f"THIS IS A BROKEN EVENT SINCE MORE HEADERS THAN MASK FOUND")
+            TDC_data.append(f"H {current_channel} {int(etroc_word[18:26], base=2)} {etroc_word[26:28]} {int(etroc_word[28:40], base=2)}")
+        # DATA "D {channel} {EA} {COL} {ROW} {TOA} {TOT} {CAL}"
+        elif(etroc_word[0]=='1'):
+            TDC_data.append(f"D {current_channel} {int(etroc_word[1:3], base=2)} {int(etroc_word[3:7], base=2)} {int(etroc_word[7:11], base=2)} {int(etroc_word[11:21], base=2)} {int(etroc_word[21:30], base=2)} {int(etroc_word[30:40], base=2)}")
+        # TRAILER "T {channel} {Status} {Hits} {CRC}"
+        elif(etroc_word[0:18]=='0'+board_ID[int(current_channel)]):
+            TDC_data.append(f"T {current_channel} {int(etroc_word[18:24], base=2)} {int(etroc_word[24:32], base=2)} {int(etroc_word[32:40], base=2)}")
+    TDC_data.append(f"ET {event_num} {event_type} {crc}")
+    return TDC_data
 
