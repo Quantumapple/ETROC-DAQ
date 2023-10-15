@@ -35,7 +35,7 @@ class Translate_data(threading.Thread):
         self.translate_deque         = deque()
         self.valid_data              = False if check_valid_data_start else True
         self.header_pattern          = format(0xc3a3c3a, "028b")
-        self.trailer_pattern         = format(0xb, "06b")
+        self.trailer_pattern         = '001101'
         self.channel_header_pattern  = format(0x3c5c, "016b")
         self.file_lines              = 0
         self.file_counter            = 0
@@ -98,10 +98,10 @@ class Translate_data(threading.Thread):
                 self.translate_deque.append(binary)
                 continue
             # Event Header Line Two Found
-            elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]==self.firmware_key)):
+            elif(self.in_event and (self.words_in_event==-1) and (binary[-4:]==self.firmware_key)):
                 self.current_word       = 0
-                self.event_number       = int(binary[ 4:20], base=2)
-                self.words_in_event     = int(binary[20:30], base=2)
+                self.event_number       = int(binary[ 0:16], base=2)
+                self.words_in_event     = int(binary[16:26], base=2)
                 self.eth_words_in_event = div_ceil(40*words_in_event,32)
                 # TODO EVENT TYPE?
                 self.translate_deque.append(binary)
@@ -109,7 +109,7 @@ class Translate_data(threading.Thread):
                 if(event_number==0): self.valid_data = True
                 continue
             # Event Header Line Two NOT Found after the Header
-            elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]!=self.firmware_key)):
+            elif(self.in_event and (self.words_in_event==-1) and (binary[-4:]!=self.firmware_key)):
                 self.reset_params()
                 continue
             # Trailer NOT Found but we already read more words then we were supposed to
@@ -161,12 +161,14 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
     header_2 = translate_deque.popleft()
     trailer  = translate_deque.pop()
     event_mask = header_1[-4:]
-    version    = header_2[0:4]
-    event_num  = int(header_2[4:20],  base=2)
-    num_words  = int(header_2[20:30], base=2)
-    event_type = header_2[-2:]
+    version    = header_2[-4:]
+    event_num  = int(header_2[0:16],  base=2)
+    num_words  = int(header_2[16:26], base=2)
+    event_type = header_2[26:28]
     hits_count = trailer[6:18]
     crc        = trailer[-8:]
+    overflow_count = trailer[18:21]
+    hamming_count  = trailer[21:24]
     TDC_data.append(f"EH {version} {event_num} {hits_count}")
     # TODO Bad Data count, Overflow data count, Hamming Error Count
     active_channels = []
@@ -202,6 +204,6 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
         # TRAILER "T {channel} {Status} {Hits} {CRC}"
         elif(etroc_word[0:18]=='0'+board_ID[int(current_channel)]):
             TDC_data.append(f"T {current_channel} {int(etroc_word[18:24], base=2)} {int(etroc_word[24:32], base=2)} {int(etroc_word[32:40], base=2)}")
-    TDC_data.append(f"ET {event_num} {event_type} {crc}")
+    TDC_data.append(f"ET {event_num} {event_type} {overflow_count} {hamming_count} {crc}")
     return TDC_data
 
