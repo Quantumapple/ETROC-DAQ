@@ -52,14 +52,14 @@ def main(options, cmd_interpret, IPC_queue = None):
     
     if(options.firmware):
         print("Setting firmware...")
-        active_channels(cmd_interpret, key = options.active_channel)
-        timestamp(cmd_interpret, key = options.timestamp)
-        triggerBitDelay(cmd_interpret, options.trigger_bit_delay)
-        Enable_FPGA_Descramblber(cmd_interpret, options.polarity)
+        daq_helpers.active_channels(cmd_interpret, key = options.active_channel)
+        daq_helpers.timestamp(cmd_interpret, key = options.timestamp)
+        daq_helpers.triggerBitDelay(cmd_interpret, options.trigger_bit_delay)
+        daq_helpers.Enable_FPGA_Descramblber(cmd_interpret, options.polarity)
 
     if(options.counter_duration):
         print("Setting Counter Duration and Channel Delays...")
-        counterDuration(cmd_interpret, options.counter_duration)
+        daq_helpers.counterDuration(cmd_interpret, options.counter_duration)
 
     if(options.verbose):
         read_register_7 = cmd_interpret.read_config_reg(7)
@@ -80,24 +80,24 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("Written into Reg 11: ", format(read_register_11, '016b'))
         print("Written into Reg 12: ", format(read_register_12, '016b'))
         print('\n')
-        register_13 = cmd_interpret.read_config_reg(13)
-        string_13   = format(register_13, '016b')
+        read_register_13 = cmd_interpret.read_config_reg(13)
+        string_13   = format(read_register_13, '016b')
         print("Written into Reg 13: ", string_13)
         print("Data Rate              : ", string_13[-7:-5])
         print("LED pages              : ", string_13[-5:-2])
         print("Testmode               : ", string_13[-2])
         print("Timestamp (active low) : ", string_13[-1])
         print('\n')
-        register_14 = cmd_interpret.read_config_reg(14)
-        string_14   = format(register_14, '016b')
+        read_register_14 = cmd_interpret.read_config_reg(14)
+        string_14   = format(read_register_14, '016b')
         print("Written into Reg 14: ", string_14)
         print("Enable Memo FC mode: ", string_14[-4])
         print("Polarity           : ", string_14[-3])
         print("Disable GTX        : ", string_14[-2])
         print("Enable Descrambler : ", string_14[-1])
         print('\n')
-        register_15 = cmd_interpret.read_config_reg(15)
-        string_15   = format(register_15, '016b')
+        read_register_15 = cmd_interpret.read_config_reg(15)
+        string_15   = format(read_register_15, '016b')
         print("Written into Reg 15: ", string_15)
         print("Channel Enable     : ", string_15[-4:])
         print("Board Type         : ", string_15[-8:-4])
@@ -108,17 +108,17 @@ def main(options, cmd_interpret, IPC_queue = None):
     
     if(options.clear_fifo):
         print("Clearing FIFO...")
-        software_clear_fifo(cmd_interpret)
+        daq_helpers.software_clear_fifo(cmd_interpret)
         time.sleep(2.1)
 
     if(options.clear_error or options.check_valid_data_start):
         print("Clearing Event Counter...") 
-        software_clear_error(cmd_interpret)
+        daq_helpers.software_clear_error(cmd_interpret)
         time.sleep(0.1)
     
     if(options.reset_all_till_trigger_linked):
         print("Resetting/Checking link of all boards...")
-        set_all_trigger_linked(cmd_interpret, options.inpect_links_only)
+        daq_helpers.set_all_trigger_linked(cmd_interpret, options.inpect_links_only)
 
     if(not options.nodaq):
         userdefinedir = options.output_directory
@@ -142,14 +142,14 @@ def main(options, cmd_interpret, IPC_queue = None):
                 sys.exit(1)
 
     if(options.fpga_data or options.fpga_data_QInj):
-        get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
+        daq_helpers.get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
         if(options.check_all_trigger_link_at_end):
             print("Checking trigger link of all boards at end")
-            linked_flag = set_all_trigger_linked(cmd_interpret, True)
+            linked_flag = daq_helpers.set_all_trigger_linked(cmd_interpret, True)
             while linked_flag is False:
-                set_all_trigger_linked(cmd_interpret)
-                get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
-                linked_flag = set_all_trigger_linked(cmd_interpret, True)
+                daq_helpers.set_all_trigger_linked(cmd_interpret)
+                daq_helpers.get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
+                linked_flag = daq_helpers.set_all_trigger_linked(cmd_interpret, True)
 
     if(not options.nodaq):
         store_dict = userdefine_dir
@@ -160,9 +160,9 @@ def main(options, cmd_interpret, IPC_queue = None):
         translate_thread_handle = threading.Event() # This is how we stop the translate thread (if translate enabled) (set down below...)
         stop_DAQ_event = threading.Event()          # This is how we notify the Read thread that we are done taking data
                                                     # Kill order is read, write, translate
-        receive_data = Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
-        write_data = Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.skip_translation, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
-        translate_data = Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event)
+        receive_data = daq_helpers.Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
+        write_data = daq_helpers.Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.skip_translation, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
+        translate_data = daq_helpers.Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event)
         try:
             # Start the thread
             receive_data.start()

@@ -209,6 +209,7 @@ class Receive_data(threading.Thread):
         total_start_time = time.time()
         print("{} is reading data and pushing to the queue...".format(self.getName()))
         while ((time.time()-total_start_time<=self.time_limit)):
+            print("while looped...")
             if self.use_IPC:
                 try:
                     message = self.IPC_queue.get(False)
@@ -231,8 +232,8 @@ class Receive_data(threading.Thread):
                         self.stop_DAQ_event.set()
                     elif message == 'link reset':
                         link_reset(self.cmd_interpret)
-                    elif message == 'reset till linked':
-                        set_trigger_linked(self.cmd_interpret)
+                    # elif message == 'reset till linked':
+                    #     set_trigger_linked(self.cmd_interpret)
                     ## Special if condition for delay change during the DAQ
                     ## Example: change delay 0x0421
                     ##   becomes: change delay 1057
@@ -264,6 +265,7 @@ class Receive_data(threading.Thread):
                 
                 for mem_line in mem_data:
                     self.read_queue.put(mem_line) 
+                print("memdata added to queue:", mem_data)
             if not t.alive:
                 print("Read Thread detected alive=False")
                 break  
