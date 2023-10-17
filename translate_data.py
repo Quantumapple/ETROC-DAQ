@@ -15,6 +15,10 @@ import datetime
 @date: 2023-09-13
 This script is composed of functions to translate binary data into TDC codes
 '''
+
+def div_ceil(x,y):
+    return -(x//(-y))
+
 #--------------------------------------------------------------------------#
 # Threading class to only TRANSLATE the binary data and save to disk
 class Translate_data(threading.Thread):
@@ -102,11 +106,11 @@ class Translate_data(threading.Thread):
                 self.current_word       = 0
                 self.event_number       = int(binary[ 0:16], base=2)
                 self.words_in_event     = int(binary[16:26], base=2)
-                self.eth_words_in_event = div_ceil(40*words_in_event,32)
+                self.eth_words_in_event = div_ceil(40*self.words_in_event,32)
                 # TODO EVENT TYPE?
                 self.translate_deque.append(binary)
                 # Set valid_data to true once we see fresh data
-                if(event_number==0): self.valid_data = True
+                if(self.event_number==0): self.valid_data = True
                 continue
             # Event Header Line Two NOT Found after the Header
             elif(self.in_event and (self.words_in_event==-1) and (binary[-4:]!=self.firmware_key)):

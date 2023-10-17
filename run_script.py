@@ -12,6 +12,7 @@ import queue
 import parser_arguments
 import command_interpret
 import daq_helpers
+import translate_data
 import platform
 #========================================================================================#
 '''
@@ -162,19 +163,20 @@ def main(options, cmd_interpret, IPC_queue = None):
                                                     # Kill order is read, write, translate
         receive_data = daq_helpers.Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
         write_data = daq_helpers.Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.skip_translation, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
-        translate_data = daq_helpers.Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event)
+        translate_data_thread = translate_data.Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event)
+
         try:
             # Start the thread
             receive_data.start()
             write_data.start()
-            if(not options.skip_translation): translate_data.start()
+            if(not options.skip_translation): translate_data_thread.start()
             # If the child thread is still running
             while receive_data.is_alive():
                 # Try to join the child thread back to parent for 0.5 seconds
                 receive_data.join(0.5)
             if(not options.skip_translation):
-                while translate_data.is_alive():
-                    translate_data.join(0.5)
+                while translate_data_thread.is_alive():
+                    translate_data_thread.join(0.5)
             while write_data.is_alive():
                 write_data.join(0.5)
         # When ctrl+c is received
@@ -182,10 +184,10 @@ def main(options, cmd_interpret, IPC_queue = None):
             # Set the alive attribute to false
             receive_data.alive = False
             write_data.alive = False
-            if(not options.skip_translation): translate_data.alive = False
+            if(not options.skip_translation): translate_data_thread.alive = False
             # Block until child thread is joined back to the parent
             receive_data.join()
-            if(not options.skip_translation): translate_data.join()
+            if(not options.skip_translation): translate_data_thread.join()
             write_data.join()
         # wait for thread to finish before proceeding)
 
