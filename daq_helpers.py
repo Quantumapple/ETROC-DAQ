@@ -89,8 +89,8 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
         time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
-
     time.sleep(0.01)
+    print("Done with memoFC configuration")
 
 #--------------------------------------------------------------------------#
 def link_reset(cmd_interpret):
@@ -257,6 +257,7 @@ class Receive_data(threading.Thread):
                 except queue.Empty:
                     pass
             if self.daq_on:
+                print("In loop and daq_on, attempting to access read_data_fifo")
                 mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
                 if mem_data == []:
                     print("No data in buffer! Will try to read again")
@@ -266,9 +267,11 @@ class Receive_data(threading.Thread):
                 for mem_line in mem_data:
                     self.read_queue.put(mem_line) 
                 print("memdata added to queue:", mem_data)
+            print("In loop, attempting to test alive condition")
             if not t.alive:
                 print("Read Thread detected alive=False")
                 break  
+            print("In loop, attempting to test read_handle condition")
             if self.read_thread_handle.is_set():
                 print("Read Thread received STOP signal")
                 if not self.write_thread_handle.is_set():
@@ -340,9 +343,9 @@ class Write_data(threading.Thread):
                 break
             # Handle the raw (binary) line
             if int(mem_data) == 0: continue # Waiting for IPC
-            # if int(mem_data) == 38912: continue # got a Filler
-            # if int(mem_data) == 9961472: continue # got a Filler
-            # if int(mem_data) == 2550136832: continue # got a Filler
+            if int(mem_data) == 38912: continue # got a Filler
+            if int(mem_data) == 9961472: continue # got a Filler
+            if int(mem_data) == 2550136832: continue # got a Filler
             binary = format(int(mem_data), '032b')
             if(not self.skip_binary):
                 if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))

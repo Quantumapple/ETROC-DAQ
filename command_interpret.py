@@ -29,6 +29,9 @@ class command_interpret:
     def read_config_reg(self, Addr):
         data = 0x80200000 + (Addr << 16)
         self.ss.sendall(struct.pack('I', data)[::-1])
+        #print("HERE0")
+        #print(struct.unpack('I', self.ss.recv(4)[::-1])[0])
+        #print("HERE1")
         return struct.unpack('I', self.ss.recv(4)[::-1])[0]
 
     ## write pulse_reg
@@ -76,17 +79,22 @@ class command_interpret:
     # @param[in] Cnt read data counts 0-65535
     def read_data_fifo(self, Cnt):
         data = 0x00190000 + (Cnt -1)                        #write sDataFifoHigh address = 25
+        print("before sendall() in read fifo()...")
         self.ss.sendall(struct.pack('I', data)[::-1])
+        print("after sendall() in read fifo()...")
         mem_data = []
         for i in range(Cnt-1):
+            print(f"inside loop {i} to recv but before first recv this loop...")
             try:
                 mem_data += [struct.unpack('I', self.ss.recv(4)[::-1])[0]]
             except struct.error:
-                print("not enough data in buffer to unpack")
+                print("not enough data in buffer to unpack...")
                 return mem_data
+            print(f"after iteration {i} in read fifo...")
         try:
             mem_data += [struct.unpack('I', self.ss.recv(4)[::-1])[0]]
         except struct.error:
-            print("not enough data in buffer to unpack")
+            print("not enough data in buffer to unpack...")
             return mem_data
+        print(f"after final recv in read fifo...")
         return mem_data
