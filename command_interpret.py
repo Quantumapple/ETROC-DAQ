@@ -90,7 +90,7 @@ class command_interpret:
             except struct.error:
                 print("not enough data in buffer to unpack...")
                 return mem_data
-            print(f"after iteration {i} in read fifo...")
+            print("Data fetched in this iteration: ", mem_data[-1])
         try:
             mem_data += [struct.unpack('I', self.ss.recv(4)[::-1])[0]]
         except struct.error:

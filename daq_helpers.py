@@ -342,10 +342,10 @@ class Write_data(threading.Thread):
                 print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM READ_QUEUE!!!")
                 break
             # Handle the raw (binary) line
-            if int(mem_data) == 0: continue # Waiting for IPC
-            if int(mem_data) == 38912: continue # got a Filler
-            if int(mem_data) == 9961472: continue # got a Filler
-            if int(mem_data) == 2550136832: continue # got a Filler
+            # if int(mem_data) == 0: continue # Waiting for IPC
+            # if int(mem_data) == 38912: continue # got a Filler
+            # if int(mem_data) == 9961472: continue # got a Filler
+            # if int(mem_data) == 2550136832: continue # got a Filler
             binary = format(int(mem_data), '032b')
             if(not self.skip_binary):
                 if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
