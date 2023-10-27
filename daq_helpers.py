@@ -416,6 +416,7 @@ def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
 # Z is a bit 4 bit binary wxyz Channel Enable (1=Enable)
 # Y is a bit 4 bit binary wxyz Board Type (1=Etroc2)
 def active_channels(cmd_interpret, key = 0x0003): 
+    print(f"writing: {bin(key)} into register 15")
     cmd_interpret.write_config_reg(15, key)
 
 #--------------------------------------------------------------------------#
