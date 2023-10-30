@@ -88,6 +88,7 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("LED pages              : ", string_13[-5:-2])
         print("Testmode               : ", string_13[-2])
         print("Timestamp (active low) : ", string_13[-1])
+        print("DEV Status Page        : ", string_13[-2:])
         print('\n')
         read_register_14 = cmd_interpret.read_config_reg(14)
         string_14   = format(read_register_14, '016b')
@@ -104,6 +105,39 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("Board Type         : ", string_15[-8:-4])
         print("Data Source        : ", string_15[-16:-8])
         print('\n')
+
+    # {68'd0,debug_data_word2,debug_data_word,debug_isHeader,enableCh,debug_emptyETROC2FIFOCh,debug_sortMask,hold_L1A,hold_L1A_cmd,debug_readToken,debug_chip_data_buffer_empty,snapshot,debug_pre_state,debug_data_sort_state};
+
+        if(string_13[-2:]!='00'):
+            print("Data from Status Registers for debugging...")
+            temp_reg = format(cmd_interpret.read_status_reg(0), '016b')
+            print("debug_data_sort_state        :", temp_reg[-3:])
+            print("debug_pre_state              :", temp_reg[-6:-3])
+            print("snapshot                     :", temp_reg[-7:-6])
+            print("debug_chip_data_buffer_empty :", temp_reg[-8:-7])
+            print("debug_read_token             :", temp_reg[-10:-8])
+            print("hold_L1A_cmd                 :", temp_reg[-11:-10])
+            print("hold_L1A                     :", temp_reg[-12:-11])
+            print("debug_sort_mask              :", temp_reg[-16:-12])
+            temp_reg = format(cmd_interpret.read_status_reg(1), '016b')
+            print("debug_emptyETROC2FIFOCh      :", temp_reg[-4:])
+            print("enableCh                     :", temp_reg[-8:-4])
+            print("debug_isHeader               :", temp_reg[-12:-8])
+            debug_data_word = "" + temp_reg[-16:-12]
+            temp_reg = format(cmd_interpret.read_status_reg(2), '016b')
+            debug_data_word = temp_reg +  debug_data_word
+            temp_reg = format(cmd_interpret.read_status_reg(3), '016b')
+            debug_data_word = temp_reg +  debug_data_word
+            temp_reg = format(cmd_interpret.read_status_reg(4), '016b')
+            debug_data_word = temp_reg[-4:] +  debug_data_word
+            print("debug data word         :", debug_data_word)
+            debug_data_word = "" + temp_reg[-16:-4]
+            temp_reg = format(cmd_interpret.read_status_reg(5), '016b')
+            debug_data_word = temp_reg +  debug_data_word
+            temp_reg = format(cmd_interpret.read_status_reg(6), '016b')
+            debug_data_word = temp_reg[-12:] +  debug_data_word
+            print("debug data word2        :", debug_data_word)
+            del temp_reg, debug_data_word
         del read_register_7,read_register_8,read_register_11,read_register_12,read_register_13,read_register_14,read_register_15
         del string_7,string_8,string_13,string_14,string_15
     
