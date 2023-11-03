@@ -209,7 +209,7 @@ class Receive_data(threading.Thread):
         total_start_time = time.time()
         print("{} is reading data and pushing to the queue...".format(self.getName()))
         while ((time.time()-total_start_time<=self.time_limit)):
-            print("while looped...")
+            # print("while looped...")
             if self.use_IPC:
                 try:
                     message = self.IPC_queue.get(False)
@@ -257,7 +257,7 @@ class Receive_data(threading.Thread):
                 except queue.Empty:
                     pass
             if self.daq_on:
-                print("In loop and daq_on, attempting to access read_data_fifo")
+                # print("In loop and daq_on, attempting to access read_data_fifo")
                 mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
                 if mem_data == []:
                     print("No data in buffer! Will try to read again")
@@ -266,12 +266,12 @@ class Receive_data(threading.Thread):
                 
                 for mem_line in mem_data:
                     self.read_queue.put(mem_line) 
-                print("memdata added to queue:", mem_data)
-            print("In loop, attempting to test alive condition")
+                # print("memdata added to queue:", mem_data)
+            # print("In loop, attempting to test alive condition")
             if not t.alive:
                 print("Read Thread detected alive=False")
                 break  
-            print("In loop, attempting to test read_handle condition")
+            # print("In loop, attempting to test read_handle condition")
             if self.read_thread_handle.is_set():
                 print("Read Thread received STOP signal")
                 if not self.write_thread_handle.is_set():

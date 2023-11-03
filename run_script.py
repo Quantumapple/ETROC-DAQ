@@ -50,7 +50,6 @@ def main_process(IPC_queue, options, log_file = None):
 #--------------------------------------------------------------------------#
 ## main function
 def main(options, cmd_interpret, IPC_queue = None):
-    
     if(options.firmware):
         print("Setting firmware...")
         daq_helpers.active_channels(cmd_interpret, key = options.active_channel)
@@ -106,8 +105,6 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("Data Source        : ", string_15[-16:-8])
         print('\n')
 
-    # {68'd0,debug_data_word2,debug_data_word,debug_isHeader,enableCh,debug_emptyETROC2FIFOCh,debug_sortMask,hold_L1A,hold_L1A_cmd,debug_readToken,debug_chip_data_buffer_empty,snapshot,debug_pre_state,debug_data_sort_state};
-
         if(string_13[-2:]!='00'):
             print("Data from Status Registers for debugging...")
             temp_reg = format(cmd_interpret.read_status_reg(0), '016b')
@@ -137,7 +134,31 @@ def main(options, cmd_interpret, IPC_queue = None):
             temp_reg = format(cmd_interpret.read_status_reg(6), '016b')
             debug_data_word = temp_reg[-12:] +  debug_data_word
             print("debug data word2        :", debug_data_word)
-            del temp_reg, debug_data_word
+            for i in range(3):
+                temp_reg = format(cmd_interpret.read_status_reg(7), '016b')
+                print("reset_counter           :", temp_reg)
+                if(i!=2):
+                    print("Waiting 1 seconds...")
+                    time.sleep(1)
+            debug_state_seq = "" + format(cmd_interpret.read_status_reg(8), '016b')
+            temp_reg = format(cmd_interpret.read_status_reg(9), '016b')
+            debug_state_seq = temp_reg +  debug_state_seq
+            temp_reg = format(cmd_interpret.read_status_reg(10), '016b')
+            debug_state_seq = temp_reg +  debug_state_seq
+            for i in range(16):
+                print(fr"State {16-i}: {debug_state_seq[-3*(i+1):(-3*i if i!=0 else 48)]}")
+            for i in range(3):
+                debug_state_seq = "" + format(cmd_interpret.read_status_reg(8), '016b')
+                temp_reg = format(cmd_interpret.read_status_reg(9), '016b')
+                debug_state_seq = temp_reg +  debug_state_seq
+                temp_reg = format(cmd_interpret.read_status_reg(10), '016b')
+                debug_state_seq = temp_reg +  debug_state_seq
+                print("debug_state_seq         :", debug_state_seq)
+                if(i!=2):
+                    print("Waiting 1 seconds...")
+                    time.sleep(1)
+            # print("debug_state_seq         :", debug_state_seq)
+            del temp_reg, debug_data_word, debug_state_seq
         del read_register_7,read_register_8,read_register_11,read_register_12,read_register_13,read_register_14,read_register_15
         del string_7,string_8,string_13,string_14,string_15
     
@@ -204,7 +225,7 @@ def main(options, cmd_interpret, IPC_queue = None):
                                                     # Kill order is read, write, translate
         receive_data = daq_helpers.Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
         write_data = daq_helpers.Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.skip_translation, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
-        translate_data_thread = translate_data.Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event)
+        translate_data_thread = translate_data.Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation)
 
         try:
             # Start the thread

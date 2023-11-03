@@ -25,6 +25,7 @@ def create_parser():
     parser.add_option("--skip_binary",action="store_true", dest="skip_binary", default=False, help="DO NOT save (raw) binary outputs to files")
     parser.add_option("--compressed_translation",action="store_true", dest="compressed_translation", default=False, help="Save only FPGA translated data frames with DATA")
     parser.add_option("--skip_translation",action="store_true", dest="skip_translation", default=False, help="DO NOT Save the translated FPGA data to files")
+    parser.add_option("--debug_event_translation",action="store_true", dest="debug_event_translation", default=False, help="DEV dump ETROC raw data in each event")
     #------------------------------------------------------------------------#
     parser.add_option("-f", "--firmware",action="store_true", dest="firmware", default=False, help="Set FPGA Config Registers")
     parser.add_option("-s", "--timestamp", type="int",action="store", dest="timestamp", default=0x0000, help="Set FPGA Config Register 13, see daq_helpers for more info")

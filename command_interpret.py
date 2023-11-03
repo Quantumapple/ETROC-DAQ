@@ -79,22 +79,22 @@ class command_interpret:
     # @param[in] Cnt read data counts 0-65535
     def read_data_fifo(self, Cnt):
         data = 0x00190000 + (Cnt -1)                        #write sDataFifoHigh address = 25
-        print("before sendall() in read fifo()...")
+        # print("before sendall() in read fifo()...")
         self.ss.sendall(struct.pack('I', data)[::-1])
-        print("after sendall() in read fifo()...")
+        # print("after sendall() in read fifo()...")
         mem_data = []
         for i in range(Cnt-1):
-            print(f"inside loop {i} to recv but before first recv this loop...")
+            # print(f"inside loop {i} to recv but before first recv this loop...")
             try:
                 mem_data += [struct.unpack('I', self.ss.recv(4)[::-1])[0]]
             except struct.error:
                 print("not enough data in buffer to unpack...")
                 return mem_data
-            print("Data fetched in this iteration: ", mem_data[-1])
+            # print("Data fetched in this iteration: ", mem_data[-1])
         try:
             mem_data += [struct.unpack('I', self.ss.recv(4)[::-1])[0]]
         except struct.error:
             print("not enough data in buffer to unpack...")
             return mem_data
-        print(f"after final recv in read fifo...")
+        # print(f"after final recv in read fifo...")
         return mem_data
