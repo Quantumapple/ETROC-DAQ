@@ -121,7 +121,7 @@ def main(options, cmd_interpret, IPC_queue = None):
             print("Data from Status Registers for debugging, printed from latest state to oldest state:")
             for status_page in ["01","10","11"]:
                 modified_timestamp = format(options.timestamp, '016b')
-                modified_timestamp[-2:] = status_page
+                modified_timestamp = modified_timestamp[:-2] + status_page
                 daq_helpers.timestamp(cmd_interpret, key = int(modified_timestamp, base=2))
                 time.sleep(1.1)
                 print("Waited for 1 sec")
