@@ -374,6 +374,12 @@ def software_clear_fifo(cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0002)
 
 #--------------------------------------------------------------------------#
+## Reset and Resume state machine after exception in Debug Mode
+## MSB..10, i.e., trigger pulser_reg[7]
+def resume_in_debug_mode(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0080)
+
+#--------------------------------------------------------------------------#
 ## software clear error. This should now clear the event counter
 ## MSB..100000, i.e., trigger pulser_reg[5]
 def software_clear_error(cmd_interpret):
@@ -398,7 +404,7 @@ def fc_init_pulse(cmd_interpret):
 ## z is the enable descrambler
 ## y is disable GTX
 ## x is polarity
-## w is the memo FC (active high)
+## w is the Enable debug mode flag
 def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
     cmd_interpret.write_config_reg(14, val)
 

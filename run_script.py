@@ -92,7 +92,7 @@ def main(options, cmd_interpret, IPC_queue = None):
         read_register_14 = cmd_interpret.read_config_reg(14)
         string_14   = format(read_register_14, '016b')
         print("Written into Reg 14: ", string_14)
-        print("Enable Memo FC mode: ", string_14[-4])
+        print("Enable Dumping mode: ", string_14[-4])
         print("Polarity           : ", string_14[-3])
         print("Disable GTX        : ", string_14[-2])
         print("Enable Descrambler : ", string_14[-1])
@@ -104,61 +104,47 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("Board Type         : ", string_15[-8:-4])
         print("Data Source        : ", string_15[-16:-8])
         print('\n')
-
         if(string_13[-2:]!='00'):
-            print("Data from Status Registers for debugging...")
-            temp_reg = format(cmd_interpret.read_status_reg(0), '016b')
-            print("debug_data_sort_state        :", temp_reg[-3:])
-            print("debug_pre_state              :", temp_reg[-6:-3])
-            print("snapshot                     :", temp_reg[-7:-6])
-            print("debug_chip_data_buffer_empty :", temp_reg[-8:-7])
-            print("debug_read_token             :", temp_reg[-10:-8])
-            print("hold_L1A_cmd                 :", temp_reg[-11:-10])
-            print("hold_L1A                     :", temp_reg[-12:-11])
-            print("debug_sort_mask              :", temp_reg[-16:-12])
-            temp_reg = format(cmd_interpret.read_status_reg(1), '016b')
-            print("debug_emptyETROC2FIFOCh      :", temp_reg[-4:])
-            print("enableCh                     :", temp_reg[-8:-4])
-            print("debug_isHeader               :", temp_reg[-12:-8])
-            debug_data_word = "" + temp_reg[-16:-12]
-            temp_reg = format(cmd_interpret.read_status_reg(2), '016b')
-            debug_data_word = temp_reg +  debug_data_word
-            temp_reg = format(cmd_interpret.read_status_reg(3), '016b')
-            debug_data_word = temp_reg +  debug_data_word
-            temp_reg = format(cmd_interpret.read_status_reg(4), '016b')
-            debug_data_word = temp_reg[-4:] +  debug_data_word
-            print("debug data word         :", debug_data_word)
-            debug_data_word = "" + temp_reg[-16:-4]
-            temp_reg = format(cmd_interpret.read_status_reg(5), '016b')
-            debug_data_word = temp_reg +  debug_data_word
-            temp_reg = format(cmd_interpret.read_status_reg(6), '016b')
-            debug_data_word = temp_reg[-12:] +  debug_data_word
-            print("debug data word2        :", debug_data_word)
-            for i in range(3):
-                temp_reg = format(cmd_interpret.read_status_reg(7), '016b')
-                print("reset_counter           :", temp_reg)
-                if(i!=2):
-                    print("Waiting 1 seconds...")
-                    time.sleep(1)
-            debug_state_seq = "" + format(cmd_interpret.read_status_reg(8), '016b')
-            temp_reg = format(cmd_interpret.read_status_reg(9), '016b')
-            debug_state_seq = temp_reg +  debug_state_seq
-            temp_reg = format(cmd_interpret.read_status_reg(10), '016b')
-            debug_state_seq = temp_reg +  debug_state_seq
-            for i in range(16):
-                print(fr"State {16-i}: {debug_state_seq[-3*(i+1):(-3*i if i!=0 else 48)]}")
-            for i in range(3):
-                debug_state_seq = "" + format(cmd_interpret.read_status_reg(8), '016b')
-                temp_reg = format(cmd_interpret.read_status_reg(9), '016b')
-                debug_state_seq = temp_reg +  debug_state_seq
-                temp_reg = format(cmd_interpret.read_status_reg(10), '016b')
-                debug_state_seq = temp_reg +  debug_state_seq
-                print("debug_state_seq         :", debug_state_seq)
-                if(i!=2):
-                    print("Waiting 1 seconds...")
-                    time.sleep(1)
-            # print("debug_state_seq         :", debug_state_seq)
-            del temp_reg, debug_data_word, debug_state_seq
+            def unpack_state_history(dumped_data):
+                print("State! ->")
+                print("chip_data_buffer_din         :", dumped_data[-40:])
+                print("state (state machine)        :", dumped_data[-43:-40])
+                print("chip_data_ready              :", dumped_data[-44:-43])
+                print("sortMask                     :", dumped_data[-48:-44])
+                print("readToken                    :", dumped_data[-50:-48])
+                print("chip_data_buffer_empty       :", dumped_data[-51:-50])
+                print("chip_data_buffer_full        :", dumped_data[-52:-51])
+                print("chip_data_buffer_wren        :", dumped_data[-53:-52])
+                print("isHeader[readToken]          :", dumped_data[-54:-53])
+                print("emptyETROC2FIFOCh[readToken] :", dumped_data[-55:-54])
+                print("rdenETROC2FIFOCh[readToken]  :", dumped_data[-56:-55])
+            print("Data from Status Registers for debugging, printed from latest state to oldest state:")
+            for status_page in ["01","10","11"]:
+                modified_timestamp = format(options.timestamp, '016b')
+                modified_timestamp[-2:] = status_page
+                daq_helpers.timestamp(cmd_interpret, key = int(modified_timestamp, base=2))
+                time.sleep(1.1)
+                print("Waited for 1 sec")
+                print(fr"Status Page {status_page} Set, data as follows ->")
+                temp_reg = ""
+                temp_reg = format(cmd_interpret.read_status_reg(0), '016b') + temp_reg
+                temp_reg = format(cmd_interpret.read_status_reg(1), '016b') + temp_reg
+                temp_reg = format(cmd_interpret.read_status_reg(2), '016b') + temp_reg
+                temp_reg = format(cmd_interpret.read_status_reg(3), '016b')[-8:] + temp_reg
+                unpack_state_history(temp_reg)
+                temp_reg = ""
+                temp_reg = format(cmd_interpret.read_status_reg(3), '016b')[-16:-8] + temp_reg
+                temp_reg = format(cmd_interpret.read_status_reg(4), '016b') + temp_reg
+                temp_reg = format(cmd_interpret.read_status_reg(5), '016b') + temp_reg
+                temp_reg = format(cmd_interpret.read_status_reg(6), '016b') + temp_reg
+                unpack_state_history(temp_reg)
+                temp_reg = ""
+                temp_reg = format(cmd_interpret.read_status_reg(7), '016b') + temp_reg
+                temp_reg = format(cmd_interpret.read_status_reg(8), '016b') + temp_reg
+                temp_reg = format(cmd_interpret.read_status_reg(9), '016b') + temp_reg
+                temp_reg = format(cmd_interpret.read_status_reg(10), '016b')[-8:] + temp_reg
+                unpack_state_history(temp_reg)
+            del temp_reg, modified_timestamp
         del read_register_7,read_register_8,read_register_11,read_register_12,read_register_13,read_register_14,read_register_15
         del string_7,string_8,string_13,string_14,string_15
     
@@ -166,11 +152,18 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("Clearing FIFO...")
         daq_helpers.software_clear_fifo(cmd_interpret)
         time.sleep(2.1)
+        print("Waited for 2 secs")
 
     if(options.clear_error or options.check_valid_data_start):
         print("Clearing Event Counter...") 
         daq_helpers.software_clear_error(cmd_interpret)
         time.sleep(0.1)
+
+    if(options.resume_in_debug_mode):
+        print("Resetting and Resuming State Machine in Debug Mode..")
+        daq_helpers.resume_in_debug_mode(cmd_interpret)
+        time.sleep(2.1)
+        print("Waited for 2 secs")
     
     if(options.reset_all_till_trigger_linked):
         print("Resetting/Checking link of all boards...")

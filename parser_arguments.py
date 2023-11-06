@@ -49,6 +49,7 @@ def create_parser():
     parser.add_option("--clear_fifo",action="store_true", dest="clear_fifo", default=False, help="Clear FIFO at beginning of script")
     parser.add_option("--clear_error",action="store_true", dest="clear_error", default=False, help="Reset the event counter")
     parser.add_option("--check_valid_data_start",action="store_true", dest="check_valid_data_start", default=False, help="Save data from Event=0 Only, must be used with clear_error")
+    parser.add_option("--resume_in_debug_mode",action="store_true", dest="resume_in_debug_mode", default=False, help="Reset and Resume State Machine in Debug Mode")
     #------------------------------------------------------------------------#
     parser.add_option("--start_dev_qinj_fc",action="store_true", dest="start_dev_qinj_fc", default=False, help="Turn on QInj and Ext L1A")
     parser.add_option("--stop_dev_qinj_fc",action="store_true", dest="stop_dev_qinj_fc", default=False, help="Turn off QInj and Ext L1A")
