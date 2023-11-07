@@ -177,7 +177,7 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
     crc        = trailer[-8:]
     overflow_count = trailer[18:21]
     hamming_count  = trailer[21:24]
-    TDC_data.append(f"EH {version} {event_num} {hits_count}")
+    TDC_data.append(f"EH {version} {event_num} {hits_count} {num_words}")
     # TODO Bad Data count, Overflow data count, Hamming Error Count
     active_channels = []
     for idx in range(4):
@@ -190,8 +190,15 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
     current_channel = -1
     # pattern_3c5c = '0011110001011100'
     while translate_deque:
-        running_word = running_word + translate_deque.popleft()
-        if(len(running_word)<40): running_word = running_word + translate_deque.popleft()
+        try:
+            running_word = running_word + translate_deque.popleft()
+        except IndexError:
+            print("Empty queue in while loop")
+        if(len(running_word)<40): 
+            try:
+                running_word = running_word + translate_deque.popleft()
+            except IndexError:
+                print("Empty queue when reading twice in the same loop")
         etroc_word   = running_word[0:40]
         running_word = running_word[40:]
         current_word += 1
