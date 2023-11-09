@@ -22,7 +22,7 @@ def div_ceil(x,y):
 #--------------------------------------------------------------------------#
 # Threading class to only TRANSLATE the binary data and save to disk
 class Translate_data(threading.Thread):
-    def __init__(self, name, firmware_key, check_valid_data_start, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None, debug_event_translation = False):
+    def __init__(self, name, firmware_key, check_valid_data_start, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None, debug_event_translation = False, lock_translation_numwords = False):
         threading.Thread.__init__(self, name=name)
         self.firmware_key            = firmware_key
         self.check_valid_data_start  = check_valid_data_start
@@ -37,6 +37,7 @@ class Translate_data(threading.Thread):
         self.stop_DAQ_event          = stop_DAQ_event
         self.compressed_translation  = compressed_translation
         self.debug_event_translation = debug_event_translation
+        self.lock_translation_numwords = lock_translation_numwords
         self.translate_deque         = deque()
         self.valid_data              = False if check_valid_data_start else True
         self.header_pattern          = format(0xc3a3c3a, "028b")
@@ -130,7 +131,8 @@ class Translate_data(threading.Thread):
                 self.translate_deque.append(binary)
             # Trailer Found - Debug is true
             elif(self.in_event and (binary[0:6]==self.trailer_pattern) and (self.debug_event_translation)):
-                self.translate_deque.append(binary)
+                if((self.eth_words_in_event==self.current_word and self.lock_translation_numwords) or (not self.lock_translation_numwords)):
+                    self.translate_deque.append(binary)
             # Event Data Word
             elif(self.in_event):
                 self.translate_deque.append(binary)
