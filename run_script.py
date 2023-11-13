@@ -172,6 +172,9 @@ def main(options, cmd_interpret, IPC_queue = None):
     if(options.start_dev_qinj_fc):
         print("Starting QInj + Ext L1A train...")
         daq_helpers.configure_memo_FC(cmd_interpret,Initialize=True,QInj=True,L1A=True,BCR=True,Triggerbit=True)
+    if(options.start_dev_qinj_selftrig_fc):
+        print("Starting QInj Without Ext L1A train...")
+        daq_helpers.configure_memo_FC(cmd_interpret,Initialize=True,QInj=True,L1A=False,BCR=True,Triggerbit=True)
     if(options.stop_dev_qinj_fc):
         print("Stopping QInj + Ext L1A train...")
         daq_helpers.configure_memo_FC(cmd_interpret,Initialize=False,QInj=False,L1A=False,BCR=False,Triggerbit=True)

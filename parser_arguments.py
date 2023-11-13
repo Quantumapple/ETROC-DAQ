@@ -53,6 +53,7 @@ def create_parser():
     parser.add_option("--resume_in_debug_mode",action="store_true", dest="resume_in_debug_mode", default=False, help="Reset and Resume State Machine in Debug Mode")
     #------------------------------------------------------------------------#
     parser.add_option("--start_dev_qinj_fc",action="store_true", dest="start_dev_qinj_fc", default=False, help="Turn on QInj and Ext L1A")
+    parser.add_option("--start_dev_qinj_selftrig_fc",action="store_true", dest="start_dev_qinj_selftrig_fc", default=False, help="Turn on QInj Without Ext L1A")
     parser.add_option("--stop_dev_qinj_fc",action="store_true", dest="stop_dev_qinj_fc", default=False, help="Turn off QInj and Ext L1A")
 
     #------------------------------------------------------------------------#
