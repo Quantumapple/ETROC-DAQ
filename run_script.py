@@ -144,6 +144,11 @@ def main(options, cmd_interpret, IPC_queue = None):
                 temp_reg = format(cmd_interpret.read_status_reg(9), '016b') + temp_reg
                 temp_reg = format(cmd_interpret.read_status_reg(10), '016b')[-8:] + temp_reg
                 unpack_state_history(temp_reg)
+                if(status_page=="10"):
+                    print("Special registers start ->")
+                    print("Buffer almost full : ", format(cmd_interpret.read_status_reg(10), '016b')[-10:-9])
+                    print("Hold L1A           : ", format(cmd_interpret.read_status_reg(10), '016b')[-9 :-8])
+                    print("Special registers end")
             del temp_reg, modified_timestamp
         del read_register_7,read_register_8,read_register_11,read_register_12,read_register_13,read_register_14,read_register_15
         del string_7,string_8,string_13,string_14,string_15
