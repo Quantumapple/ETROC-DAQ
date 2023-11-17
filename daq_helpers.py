@@ -48,7 +48,7 @@ def set_all_trigger_linked(cmd_interpret, inspect=False):
             print("Cleared FIFO...")
         elif(inspect): break
     print("Done!")
-    del register_15,string_15,channel_enable,register_2,data_error,df_synced,trigger_error,trigger_synced,linked_flag
+    del register_15,string_15,channel_enable,register_2,data_error,df_synced,trigger_error,trigger_synced
     return linked_flag
 
 #--------------------------------------------------------------------------#
@@ -342,6 +342,7 @@ class Write_data(threading.Thread):
                 print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM READ_QUEUE!!!")
                 break
             # Handle the raw (binary) line
+            if int(mem_data) == 1431655765: continue # Ethernet Filler Line
             # if int(mem_data) == 0: continue # Waiting for IPC
             # if int(mem_data) == 38912: continue # got a Filler
             # if int(mem_data) == 9961472: continue # got a Filler
@@ -405,6 +406,7 @@ def fc_init_pulse(cmd_interpret):
 ## y is disable GTX
 ## x is polarity
 ## w is the Enable debug mode flag
+## {12'bxxxxxxxxx,add_ethernet_filler,debug_mode,dumping_mode,notGTXPolarity,notGTX,enableAutoSync} 
 def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
     cmd_interpret.write_config_reg(14, val)
 

@@ -112,7 +112,7 @@ class Translate_data(threading.Thread):
                 # TODO EVENT TYPE?
                 self.translate_deque.append(binary)
                 # Set valid_data to true once we see fresh data
-                if(self.event_number==0): self.valid_data = True
+                if(self.event_number==1): self.valid_data = True
                 continue
             # Event Header Line Two NOT Found after the Header
             elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]!=self.firmware_key)):
@@ -179,7 +179,7 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
     crc        = trailer[-8:]
     overflow_count = trailer[18:21]
     hamming_count  = trailer[21:24]
-    TDC_data.append(f"EH {version} {event_num} {hits_count} {num_words}")
+    TDC_data.append(f"EH {version} {event_num} {int(hits_count, base=2)} {num_words}")
     # TODO Bad Data count, Overflow data count, Hamming Error Count
     active_channels = []
     for idx in range(4):
@@ -222,6 +222,7 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
         # TRAILER "T {channel} {Status} {Hits} {CRC}"
         elif(etroc_word[0:18]=='0'+board_ID[int(current_channel)]):
             TDC_data.append(f"T {current_channel} {int(etroc_word[18:24], base=2)} {int(etroc_word[24:32], base=2)} {int(etroc_word[32:40], base=2)}")
-    TDC_data.append(f"ET {event_num} {event_type} {overflow_count} {hamming_count} {crc}")
+    # TDC_data.append(f"ET {event_num} {event_type} {overflow_count} {hamming_count} {crc}")
+    TDC_data.append(f"ET {event_num}")
     return TDC_data
 
