@@ -95,6 +95,52 @@ class Translate_ws_data(threading.Thread):
         todaystr = "../ETROC-Data/" + today.isoformat() + "_Array_Test_Results/"
         base_dir = Path(todaystr)
         base_dir.mkdir(exist_ok=True)
+        # Perform Auto-calibration on WS pixel (Row0, Col14)
+        # Reset the maps
+        baseLine = 0
+        noiseWidth = 0
+        row_indexer_handle,_,_ = self.chip.get_indexer("row")
+        column_indexer_handle,_,_ = self.chip.get_indexer("column")
+        row = 0
+        col = 14
+        column_indexer_handle.set(col)
+        row_indexer_handle.set(row)
+        # Disable TDC
+        self.pixel_decoded_register_write("enable_TDC", "0")
+        # Enable THCal clock and buffer, disable bypass
+        self.pixel_decoded_register_write("CLKEn_THCal", "1")
+        self.pixel_decoded_register_write("BufEn_THCal", "1")
+        self.pixel_decoded_register_write("Bypass_THCal", "0")
+        self.pixel_decoded_register_write("TH_offset", format(0x07, '06b'))
+        # Reset the calibration block (active low)
+        self.pixel_decoded_register_write("RSTn_THCal", "0")
+        self.pixel_decoded_register_write("RSTn_THCal", "1")
+        # Start and Stop the calibration, (25ns x 2**15 ~ 800 us, ACCumulator max is 2**15)
+        self.pixel_decoded_register_write("ScanStart_THCal", "1")
+        self.pixel_decoded_register_write("ScanStart_THCal", "0")
+        # Check the calibration done correctly
+        if(pixel_decoded_register_read("ScanDone", "Status")!="1"): print("!!!ERROR!!! Scan not done!!!")
+        baseLine = self.pixel_decoded_register_read("BL", "Status", need_int=True)
+        noiseWidth = self.pixel_decoded_register_read("NW", "Status", need_int=True)
+        # Disable clock and buffer before charge injection
+        self.pixel_decoded_register_write("CLKEn_THCal", "0")
+        self.pixel_decoded_register_write("BufEn_THCal", "0")
+        # Set Charge Inj Q to 15 fC
+        self.pixel_decoded_register_write("QSel", format(0x0e, '05b'))
+        ### Print BL and NW from automatic calibration
+        print(f"Calibrated (R,C)=(0,14) with BL: {baseLine}, NW: {noiseWidth}")
+        ### Disable all pixel readouts before doing anything
+        # row_indexer_handle,_,_ = chip.get_indexer("row")
+        # column_indexer_handle,_,_ = chip.get_indexer("column")
+        # column_indexer_handle.set(0)
+        # row_indexer_handle.set(0)
+        # broadcast_handle,_,_ = chip.get_indexer("broadcast")
+        # broadcast_handle.set(True)
+        # pixel_decoded_register_write("disDataReadout", "1")
+        # broadcast_handle.set(True)
+        # pixel_decoded_register_write("QInjEn", "0")
+        # broadcast_handle.set(True)
+        # pixel_decoded_register_write("disTrigPath", "1")
 
     def pixel_decoded_register_write(self, decodedRegisterName, data_to_write):
         bit_depth = register_decoding["ETROC2"]["Register Blocks"]["Pixel Config"][decodedRegisterName]["bits"]
@@ -164,41 +210,6 @@ class Translate_ws_data(threading.Thread):
     def run(self):
         t = threading.current_thread()
         t.alive      = True
-
-        # Perform Auto-calibration on WS pixel (Row0, Col14)
-        # # Reset the maps
-        # baseLine = 0
-        # noiseWidth = 0
-        row_indexer_handle,_,_ = self.chip.get_indexer("row")
-        column_indexer_handle,_,_ = self.chip.get_indexer("column")
-        row = 0
-        col = 14
-        column_indexer_handle.set(col)
-        row_indexer_handle.set(row)
-        # # Disable TDC
-        # self.pixel_decoded_register_write("enable_TDC", "0")
-        # # Enable THCal clock and buffer, disable bypass
-        # self.pixel_decoded_register_write("CLKEn_THCal", "1")
-        # self.pixel_decoded_register_write("BufEn_THCal", "1")
-        # self.pixel_decoded_register_write("Bypass_THCal", "0")
-        # self.pixel_decoded_register_write("TH_offset", format(0x07, '06b'))
-        # # Reset the calibration block (active low)
-        # self.pixel_decoded_register_write("RSTn_THCal", "0")
-        # self.pixel_decoded_register_write("RSTn_THCal", "1")
-        # # Start and Stop the calibration, (25ns x 2**15 ~ 800 us, ACCumulator max is 2**15)
-        # self.pixel_decoded_register_write("ScanStart_THCal", "1")
-        # self.pixel_decoded_register_write("ScanStart_THCal", "0")
-        # # Check the calibration done correctly
-        # if(pixel_decoded_register_read("ScanDone", "Status")!="1"): print("!!!ERROR!!! Scan not done!!!")
-        # baseLine = self.pixel_decoded_register_read("BL", "Status", need_int=True)
-        # noiseWidth = self.pixel_decoded_register_read("NW", "Status", need_int=True)
-        # # Disable clock and buffer before charge injection
-        # self.pixel_decoded_register_write("CLKEn_THCal", "0")
-        # self.pixel_decoded_register_write("BufEn_THCal", "0")
-        # # Set Charge Inj Q to 15 fC
-        # self.pixel_decoded_register_write("QSel", format(0x0e, '05b'))
-        # ### Print BL and NW from automatic calibration
-        # print(f"BL: {baseLine}, NW: {noiseWidth}")
 
         self.chip.read_all_address_space("Waveform Sampler") # Read all registers of WS
         rd_addr_handle = self.chip.get_decoded_display_var("Waveform Sampler", "Config", "rd_addr")
