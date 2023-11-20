@@ -33,7 +33,7 @@ def create_parser():
     parser.add_option("-p", "--polarity", type="int",action="store", dest="polarity", default=0x000f, help="Set FPGA Config Register 14, see daq_helpers for more info")
     parser.add_option("-d", "--trigger_bit_delay", type="int",action="store", dest="trigger_bit_delay", default=0x0400, help="Set FPGA Config Register 8, see daq_helpers for more info")
     parser.add_option("-c", "--counter_duration", type="int",action="store", dest="counter_duration", default=None, help="Set FPGA Config Register 7, see daq_helpers for more info")
-    parser.add_option("-a", "--active_channel", type="int",action="store", dest="active_channel", default=0x0011, help="LSB 4 bits - Channel Enable")
+    parser.add_option("-a", "--active_channel", type="int",action="store", dest="active_channel", default=0x0001, help="LSB 4 bits - Channel Enable")
     #------------------------------------------------------------------------#
     parser.add_option("--nodaq",action="store_true", dest="nodaq", default=False, help="Switch off DAQ via the FPGA")
     parser.add_option("--useIPC",action="store_true", dest="useIPC", default=False, help="Use Inter Process Communication to control L1A enable/disable")
@@ -55,7 +55,14 @@ def create_parser():
     parser.add_option("--start_dev_qinj_fc",action="store_true", dest="start_dev_qinj_fc", default=False, help="Turn on QInj and Ext L1A")
     parser.add_option("--start_dev_qinj_selftrig_fc",action="store_true", dest="start_dev_qinj_selftrig_fc", default=False, help="Turn on QInj Without Ext L1A")
     parser.add_option("--stop_dev_qinj_fc",action="store_true", dest="stop_dev_qinj_fc", default=False, help="Turn off QInj and Ext L1A")
-
+    #------------------------------------------------------------------------#
+    parser.add_option("--ws_testing",action="store_true", dest="ws_testing", default=False, help="Perform WS Testing rather than usual DAQ")
+    parser.add_argument('--ws_chipname',metavar = 'NAME',type = str,help = 'Board label',dest = 'ws_chipname',default="chipname_NA")
+    parser.add_argument('--ws_ip_address',metavar = 'NAME',type = str,help = 'KC705 FPGA IP address',default="192.168.2.3",dest = 'ws_ip_address')
+    parser.add_argument('--ws_i2c_port',metavar = 'NAME',type = str,help = 'USB ISS port name',default='/dev/ttyACM0',dest = 'ws_i2c_port')
+    parser.add_option("--ws_chip_address", type="int",action="store", dest="ws_chip_address", default=0x0060, help="Chip I2C Address for WS Testing Purposes")
+    parser.add_option("--ws_address", type="int",action="store", dest="ws_address", default=0x0040, help="Chip WS I2C Address for WS Testing Purposes")
+    # parser.add_argument('--ws_read_mode',metavar='MODE',type = str,choices=["WS", "I2C", "High Level"],default='WS',help='The read mode algorithm to use for reading the WS. Options are: WS - to read with the WS controller; I2C - to read with the I2C controller; High Level - to use the high level functions. Default: WS')
     #------------------------------------------------------------------------#
 
 

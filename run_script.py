@@ -13,6 +13,7 @@ import parser_arguments
 import command_interpret
 import daq_helpers
 import translate_data
+import ws_testing
 import platform
 #========================================================================================#
 '''
@@ -103,8 +104,8 @@ def main(options, cmd_interpret, IPC_queue = None):
         string_15   = format(read_register_15, '016b')
         print("Written into Reg 15: ", string_15)
         print("Channel Enable     : ", string_15[-4:])
-        print("Board Type         : ", string_15[-8:-4])
-        print("Data Source        : ", string_15[-16:-8])
+        print("WS Trig Stop Delay : ", string_15[-7:-4])
+        print("Enable WS Trigger  : ", string_15[-8:-7])
         print('\n')
         if(string_13[-2:]!='00'):
             def unpack_state_history(dumped_data):
@@ -228,8 +229,10 @@ def main(options, cmd_interpret, IPC_queue = None):
                                                     # Kill order is read, write, translate
         receive_data = daq_helpers.Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
         write_data = daq_helpers.Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.skip_translation, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
-        translate_data_thread = translate_data.Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords)
-
+        if(not options.ws_testing): 
+            translate_data_thread = translate_data.Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords)
+        else: 
+            translate_data_thread = ws_testing.Translate_ws_data('Translate_ws_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords)
         try:
             # Start the thread
             receive_data.start()

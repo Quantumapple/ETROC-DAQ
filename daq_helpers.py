@@ -387,6 +387,12 @@ def software_clear_error(cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0020)
 
 #--------------------------------------------------------------------------#
+## ws clear trigger block.
+## i.e., trigger pulser_reg[6]
+def software_clear_ws_trig_block(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0040)
+
+#--------------------------------------------------------------------------#
 ## Fast Command Signal Start
 ## MSB..100, i.e., trigger pulser_reg[2]
 def fc_signal_start(cmd_interpret):
