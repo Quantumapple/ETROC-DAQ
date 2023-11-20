@@ -39,9 +39,31 @@ def div_ceil(x,y):
     return -(x//(-y))
 
 #--------------------------------------------------------------------------#
+def return_initialized_ws_chip(ws_i2c_port, ws_chip_address, ws_address):
+    # I2C Device Setup
+    i2c_gui.__no_connect__       = False
+    i2c_gui.__no_connect_type__  = "echo"
+    log_level                    = 30
+    logging.basicConfig(format='%(asctime)s - %(levelname)s:%(name)s:%(message)s')
+    logger                       = logging.getLogger("Script_Logger")
+    Script_Helper           = i2c_gui.ScriptHelper(logger)
+    conn                    = i2c_gui.Connection_Controller(Script_Helper)
+    conn.connection_type    = "USB-ISS"
+    conn.handle: USB_ISS_Helper
+    conn.handle.port        = ws_i2c_port
+    conn.handle.clk         = 100
+    conn.connect()
+    chip = i2c_gui.chips.ETROC2_Chip(parent=Script_Helper, i2c_controller=conn)
+    chip.config_i2c_address(ws_chip_address)
+    chip.config_waveform_sampler_i2c_address(ws_address)
+    logger.setLevel(log_level)
+    chip.read_all_address_space("Waveform Sampler") # Read all registers of WS
+    return chip
+
+#--------------------------------------------------------------------------#
 # Threading class to only TRANSLATE the binary data and save to disk
 class Translate_ws_data(threading.Thread):
-    def __init__(self, name, firmware_key, check_valid_data_start, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None, debug_event_translation = False, lock_translation_numwords = False, ws_chipname, ws_i2c_port, ws_chip_address, ws_address):
+    def __init__(self, name, firmware_key, check_valid_data_start, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None, debug_event_translation = False, lock_translation_numwords = False, ws_chip=None, ws_chipname=None, ws_i2c_port=None, ws_chip_address=None, ws_address=None):
         threading.Thread.__init__(self, name=name)
         self.firmware_key            = firmware_key
         self.check_valid_data_start  = check_valid_data_start
@@ -49,6 +71,7 @@ class Translate_ws_data(threading.Thread):
         self.cmd_interpret           = cmd_interpret
         self.num_line                = num_line
         self.store_dict              = store_dict
+        self.base_dir                = store_dict
         self.skip_translation        = skip_translation
         self.board_ID                = board_ID
         self.write_thread_handle     = write_thread_handle
@@ -74,61 +97,47 @@ class Translate_ws_data(threading.Thread):
         self.ws_i2c_port             = ws_i2c_port
         self.ws_chip_address         = ws_chip_address
         self.ws_address              = ws_address
-        # I2C Device Setup
-        i2c_gui.__no_connect__       = False
-        i2c_gui.__no_connect_type__  = "echo"
-        log_level                    = 30
-        logging.basicConfig(format='%(asctime)s - %(levelname)s:%(name)s:%(message)s')
-        logger                       = logging.getLogger("Script_Logger")
-        self.Script_Helper           = i2c_gui.ScriptHelper(logger)
-        self.conn                    = i2c_gui.Connection_Controller(self.Script_Helper)
-        self.conn.connection_type    = "USB-ISS"
-        self.conn.handle: USB_ISS_Helper
-        self.conn.handle.port        = self.ws_i2c_port
-        self.conn.handle.clk         = 100
-        self.conn.connect()
-        self.chip = i2c_gui.chips.ETROC2_Chip(parent=Script_Helper, i2c_controller=self.conn)
-        self.chip.config_i2c_address(self.ws_chip_address)
-        self.chip.config_waveform_sampler_i2c_address(self.ws_address)
-        logger.setLevel(log_level)
-        today = datetime.date.today()
-        todaystr = "../ETROC-Data/" + today.isoformat() + "_Array_Test_Results/"
-        base_dir = Path(todaystr)
-        base_dir.mkdir(exist_ok=True)
+        self.chip                    = ws_chip
+        self.start_ws_sampling()
+
+        # today = datetime.date.today()
+        # todaystr = "../ETROC-Data/" + today.isoformat() + "_Array_Test_Results/"
+        # self.base_dir = Path(todaystr)
+        # self.base_dir.mkdir(exist_ok=True)
         # Perform Auto-calibration on WS pixel (Row0, Col14)
         # Reset the maps
-        baseLine = 0
-        noiseWidth = 0
-        row_indexer_handle,_,_ = self.chip.get_indexer("row")
-        column_indexer_handle,_,_ = self.chip.get_indexer("column")
-        row = 0
-        col = 14
-        column_indexer_handle.set(col)
-        row_indexer_handle.set(row)
-        # Disable TDC
-        self.pixel_decoded_register_write("enable_TDC", "0")
-        # Enable THCal clock and buffer, disable bypass
-        self.pixel_decoded_register_write("CLKEn_THCal", "1")
-        self.pixel_decoded_register_write("BufEn_THCal", "1")
-        self.pixel_decoded_register_write("Bypass_THCal", "0")
-        self.pixel_decoded_register_write("TH_offset", format(0x07, '06b'))
-        # Reset the calibration block (active low)
-        self.pixel_decoded_register_write("RSTn_THCal", "0")
-        self.pixel_decoded_register_write("RSTn_THCal", "1")
-        # Start and Stop the calibration, (25ns x 2**15 ~ 800 us, ACCumulator max is 2**15)
-        self.pixel_decoded_register_write("ScanStart_THCal", "1")
-        self.pixel_decoded_register_write("ScanStart_THCal", "0")
-        # Check the calibration done correctly
-        if(pixel_decoded_register_read("ScanDone", "Status")!="1"): print("!!!ERROR!!! Scan not done!!!")
-        baseLine = self.pixel_decoded_register_read("BL", "Status", need_int=True)
-        noiseWidth = self.pixel_decoded_register_read("NW", "Status", need_int=True)
-        # Disable clock and buffer before charge injection
-        self.pixel_decoded_register_write("CLKEn_THCal", "0")
-        self.pixel_decoded_register_write("BufEn_THCal", "0")
-        # Set Charge Inj Q to 15 fC
-        self.pixel_decoded_register_write("QSel", format(0x0e, '05b'))
-        ### Print BL and NW from automatic calibration
-        print(f"Calibrated (R,C)=(0,14) with BL: {baseLine}, NW: {noiseWidth}")
+        # baseLine = 0
+        # noiseWidth = 0
+        # row_indexer_handle,_,_ = self.chip.get_indexer("row")
+        # column_indexer_handle,_,_ = self.chip.get_indexer("column")
+        # row = 0
+        # col = 14
+        # column_indexer_handle.set(col)
+        # row_indexer_handle.set(row)
+        # # Disable TDC
+        # self.pixel_decoded_register_write("enable_TDC", "0")
+        # # Enable THCal clock and buffer, disable bypass
+        # self.pixel_decoded_register_write("CLKEn_THCal", "1")
+        # self.pixel_decoded_register_write("BufEn_THCal", "1")
+        # self.pixel_decoded_register_write("Bypass_THCal", "0")
+        # self.pixel_decoded_register_write("TH_offset", format(0x07, '06b'))
+        # # Reset the calibration block (active low)
+        # self.pixel_decoded_register_write("RSTn_THCal", "0")
+        # self.pixel_decoded_register_write("RSTn_THCal", "1")
+        # # Start and Stop the calibration, (25ns x 2**15 ~ 800 us, ACCumulator max is 2**15)
+        # self.pixel_decoded_register_write("ScanStart_THCal", "1")
+        # self.pixel_decoded_register_write("ScanStart_THCal", "0")
+        # # Check the calibration done correctly
+        # if(self.pixel_decoded_register_read("ScanDone", "Status")!="1"): print("!!!ERROR!!! Scan not done!!!")
+        # baseLine = self.pixel_decoded_register_read("BL", "Status", need_int=True)
+        # noiseWidth = self.pixel_decoded_register_read("NW", "Status", need_int=True)
+        # # Disable clock and buffer before charge injection
+        # self.pixel_decoded_register_write("CLKEn_THCal", "0")
+        # self.pixel_decoded_register_write("BufEn_THCal", "0")
+        # # Set Charge Inj Q to 15 fC
+        # self.pixel_decoded_register_write("QSel", format(0x0e, '05b'))
+        # ### Print BL and NW from automatic calibration
+        # print(f"Calibrated (R,C)=(0,14) with BL: {baseLine}, NW: {noiseWidth}")
         ### Disable all pixel readouts before doing anything
         # row_indexer_handle,_,_ = chip.get_indexer("row")
         # column_indexer_handle,_,_ = chip.get_indexer("column")
@@ -178,14 +187,19 @@ class Translate_ws_data(threading.Thread):
 
     def ws_decoded_register_write(self, decodedRegisterName, data_to_write):
         bit_depth = register_decoding["Waveform Sampler"]["Register Blocks"]["Config"][decodedRegisterName]["bits"]
+        print("Got bit depth")
         handle = self.chip.get_decoded_display_var("Waveform Sampler", "Config", decodedRegisterName)
+        print("GOt handle")
         self.chip.read_decoded_value("Waveform Sampler", "Config", decodedRegisterName)
+        print("Read decoded value")
         if len(data_to_write)!=bit_depth: print("Binary data_to_write is of incorrect length for",decodedRegisterName, "with bit depth", bit_depth)
         data_hex_modified = hex(int(data_to_write, base=2))
         if(bit_depth>1): handle.set(data_hex_modified)
         elif(bit_depth==1): handle.set(data_to_write)
         else: print(decodedRegisterName, "!!!ERROR!!! Bit depth <1, how did we get here...")
+        print("handle set")
         self.chip.write_decoded_value("Waveform Sampler", "Config", decodedRegisterName)
+        print("wrote decoded value")
 
     def ws_decoded_config_read(self, decodedRegisterName, need_int=False):
         handle = self.chip.get_decoded_display_var("Waveform Sampler", f"Config", decodedRegisterName)
@@ -199,6 +213,19 @@ class Translate_ws_data(threading.Thread):
         if(need_int): return int(handle.get(), base=16)
         else: return handle.get()
 
+    def start_ws_sampling(self):
+        regOut1F_handle = self.chip.get_display_var("Waveform Sampler", "Config", "regOut1F")
+        regOut1F_handle.set("0x22")
+        self.chip.write_register("Waveform Sampler", "Config", "regOut1F")
+        regOut1F_handle.set("0x0b")
+        self.chip.write_register("Waveform Sampler", "Config", "regOut1F")
+        # ws_decoded_register_write("mem_rstn", "0")                      # 0: reset memory
+        # ws_decoded_register_write("clk_gen_rstn", "0")                  # 0: reset clock generation
+        # ws_decoded_register_write("sel1", "0")                          # 0: Bypass mode, 1: VGA mode
+        self.ws_decoded_register_write("DDT", format(0, '016b'))             # Time Skew Calibration set to 0
+        self.ws_decoded_register_write("CTRL", format(0x2, '02b'))           # CTRL default = 0x10 for regOut0D
+        self.ws_decoded_register_write("comp_cali", format(0, '03b'))        # Comparator calibration should be off
+
     def reset_params(self):
         self.translate_deque.clear()
         self.in_event           = False
@@ -211,10 +238,6 @@ class Translate_ws_data(threading.Thread):
         t = threading.current_thread()
         t.alive      = True
 
-        self.chip.read_all_address_space("Waveform Sampler") # Read all registers of WS
-        rd_addr_handle = self.chip.get_decoded_display_var("Waveform Sampler", "Config", "rd_addr")
-        dout_handle = self.chip.get_decoded_display_var("Waveform Sampler", "Status", "dout")
-        
         if(not self.skip_translation): 
             outfile  = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
             print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
@@ -293,22 +316,35 @@ class Translate_ws_data(threading.Thread):
                 self.reset_params()
                 continue
 
+            # This is where we translate the TDC data from this data frame
+            TDC_data = translate_data.etroc_translate_binary(self.translate_deque, self.valid_data, self.board_ID, self.compressed_translation, self.channel_header_pattern, self.header_pattern, self.trailer_pattern, self.debug_event_translation)
+            TDC_len = len(TDC_data)
+            print(TDC_data)
+            if((not self.skip_translation) and (TDC_len>0)): 
+                for TDC_line in TDC_data:
+                    outfile.write("%s\n"%TDC_line)
+                self.file_lines  = self.file_lines  + TDC_len
+
             # This is where we do the WS I2C stuff
+            print("Entering WS I2C Reading...")
             ### Read from WS memory
             self.ws_decoded_register_write("rd_en_I2C", "1")
+            print("rd_en_I2C set to 1")
             max_steps = 1024  # Size of the data buffer inside the WS
             lastUpdateTime = time.time_ns()
             base_data = []
             coeff = 0.05/5*8.5  # This number comes from the example script in the manual
             time_coeff = 1/2.56  # 2.56 GHz WS frequency
-            ws_address_space_controller: Address_Space_Controller = self.chip._address_space["Waveform Sampler"]
             i2c_controller: I2C_Connection_Helper = self.chip._i2c_controller
             addr_regs = [0x00, 0x00]  # regOut1C and regOut1D
             for address in range(max_steps):
+                print(f'Address Loop {address}')
                 addr_regs[0] = ((address & 0b11) << 6)          # 0x1C
                 addr_regs[1] = ((address & 0b1111111100) >> 2)  # 0x1D
-                i2c_controller.write_device_memory(ws_address, 0x1C, addr_regs, 8)
-                tmp_data = i2c_controller.read_device_memory(ws_address, 0x20, 2, 8)
+                i2c_controller.write_device_memory(self.ws_address, 0x1C, addr_regs, 8)
+                print("i2c controler write device memory done")
+                tmp_data = i2c_controller.read_device_memory(self.ws_address, 0x20, 2, 8)
+                print("i2c controller read device memory done")
                 data = hex((tmp_data[0] >> 2) + (tmp_data[1] << 6))
                 binary_data = bin(int(data, 0))[2:].zfill(14)  # because dout is 14 bits long
                 Dout_S1 = int('0b'+binary_data[1:7], 0)
@@ -330,6 +366,7 @@ class Translate_ws_data(threading.Thread):
                         "Dout": Dout_S1 - coeff * Dout_S2,
                     }
                 )
+            print("Done with Address Loop")
             df = pd.DataFrame(base_data)
             df_length = len(df)
             channels = 8
@@ -354,68 +391,63 @@ class Translate_ws_data(threading.Thread):
             df.sort_index(inplace=True)
             # Disable reading data from WS:
             self.ws_decoded_register_write("rd_en_I2C", "0")
+            # Restart the WS Sampler
+            self.start_ws_sampling()
 
             output = f"rawdataWS_{self.ws_chipname}_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M") + ".csv"
-            outfile = base_dir / output
+            outfile = self.base_dir / output
             df.to_csv(outfile)
             df['Aout'] = -(df['Dout']-(31.5-coeff*31.5)*1.2)/32
             output = f"rawdataWS_{self.ws_chipname}_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M") + ".png"
-            outfile = base_dir / output
+            outfile = self.base_dir / output
             fig, ax = plt.subplots(figsize=(20, 8))
             ax.plot(df['Time [ns]'], df['Dout'])
             ax.set_xlabel('Time [ns]', fontsize=15)
             plt.savefig(outfile)
 
-            fig_aout = px.line(
-                df,
-                x="Time [ns]",
-                y="Aout",
-                labels = {
-                    "Time [ns]": "Time [ns]",
-                    "Aout": "",
-                },
-                title = "Waveform (Aout) from the board {}".format(self.ws_chipname),
-                markers=True
-            )
-            fig_dout = px.line(
-                df,
-                x="Time [ns]",
-                y="Dout",
-                labels = {
-                    "Time [ns]": "Time [ns]",
-                    "Dout": "",
-                },
-                title = "Waveform (Dout) from the board {}".format(self.ws_chipname),
-                markers=True
-            )
-            # todaystr = "../ETROC-figures/" + today.isoformat() + "_Array_Test_Results/"
-            # base_dir = Path(todaystr)
-            # base_dir.mkdir(exist_ok=True)
-            fig_aout.write_html(
-                base_dir / f'WS_Aout_{self.ws_chipname}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")}.html',
-                full_html = False,
-                include_plotlyjs = 'cdn',
-            )
-            fig_dout.write_html(
-                base_dir / f'WS_Dout_{self.ws_chipname}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")}.html',
-                full_html = False,
-                include_plotlyjs = 'cdn',
-            )
+            # fig_aout = px.line(
+            #     df,
+            #     x="Time [ns]",
+            #     y="Aout",
+            #     labels = {
+            #         "Time [ns]": "Time [ns]",
+            #         "Aout": "",
+            #     },
+            #     title = "Waveform (Aout) from the board {}".format(self.ws_chipname),
+            #     markers=True
+            # )
+            # fig_dout = px.line(
+            #     df,
+            #     x="Time [ns]",
+            #     y="Dout",
+            #     labels = {
+            #         "Time [ns]": "Time [ns]",
+            #         "Dout": "",
+            #     },
+            #     title = "Waveform (Dout) from the board {}".format(self.ws_chipname),
+            #     markers=True
+            # )
+            # # todaystr = "../ETROC-figures/" + today.isoformat() + "_Array_Test_Results/"
+            # # base_dir = Path(todaystr)
+            # # base_dir.mkdir(exist_ok=True)
+            # fig_aout.write_html(
+            #     self.base_dir / f'WS_Aout_{self.ws_chipname}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")}.html',
+            #     full_html = False,
+            #     include_plotlyjs = 'cdn',
+            # )
+            # fig_dout.write_html(
+            #     self.base_dir / f'WS_Dout_{self.ws_chipname}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")}.html',
+            #     full_html = False,
+            #     include_plotlyjs = 'cdn',
+            # )
 
-            # This is where we translate the TDC data from this data frame
-            TDC_data = translate_data.etroc_translate_binary(self.translate_deque, self.valid_data, self.board_ID, self.compressed_translation, self.channel_header_pattern, self.header_pattern, self.trailer_pattern, self.debug_event_translation)
-            TDC_len = len(TDC_data)
-            if((not self.skip_translation) and (TDC_len>0)): 
-                for TDC_line in TDC_data:
-                    outfile.write("%s\n"%TDC_line)
-                self.file_lines  = self.file_lines  + TDC_len
+            # Clear WS Trig Block
+            daq_helpers.software_clear_ws_trig_block(self.cmd_interpret)
+            print("Done with WS I2C Reading")
 
             # Reset all params before moving onto the next line
             del TDC_data, TDC_len, binary
             self.reset_params()
-
-            # Clear WS Trig Block
-            daq_helpers.software_clear_ws_trig_block(self.cmd_interpret)
         
         print("Translate Thread gracefully ending") 
         self.translate_thread_handle.set()

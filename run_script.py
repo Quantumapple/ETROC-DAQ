@@ -187,6 +187,9 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("Stopping QInj + Ext L1A train...")
         daq_helpers.configure_memo_FC(cmd_interpret,Initialize=False,QInj=False,L1A=False,BCR=False,Triggerbit=True)
 
+    if(options.ws_testing):
+        daq_helpers.software_clear_ws_trig_block(cmd_interpret)
+
     if(not options.nodaq):
         userdefinedir = options.output_directory
         today = datetime.date.today()
@@ -232,7 +235,8 @@ def main(options, cmd_interpret, IPC_queue = None):
         if(not options.ws_testing): 
             translate_data_thread = translate_data.Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords)
         else: 
-            translate_data_thread = ws_testing.Translate_ws_data('Translate_ws_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords)
+            ws_chip = ws_testing.return_initialized_ws_chip(options.ws_i2c_port, options.ws_chip_address, options.ws_address)
+            translate_data_thread = ws_testing.Translate_ws_data('Translate_ws_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords, ws_chip, options.ws_chipname, options.ws_i2c_port, options.ws_chip_address, options.ws_address)
         try:
             # Start the thread
             receive_data.start()
