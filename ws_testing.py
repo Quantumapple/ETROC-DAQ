@@ -185,46 +185,52 @@ class Translate_ws_data(threading.Thread):
         if(need_int): return int(handle.get(), base=16)
         else: return handle.get()
 
-    def ws_decoded_register_write(self, decodedRegisterName, data_to_write):
-        bit_depth = register_decoding["Waveform Sampler"]["Register Blocks"]["Config"][decodedRegisterName]["bits"]
-        print("Got bit depth")
-        handle = self.chip.get_decoded_display_var("Waveform Sampler", "Config", decodedRegisterName)
-        print("GOt handle")
-        self.chip.read_decoded_value("Waveform Sampler", "Config", decodedRegisterName)
-        print("Read decoded value")
-        if len(data_to_write)!=bit_depth: print("Binary data_to_write is of incorrect length for",decodedRegisterName, "with bit depth", bit_depth)
-        data_hex_modified = hex(int(data_to_write, base=2))
-        if(bit_depth>1): handle.set(data_hex_modified)
-        elif(bit_depth==1): handle.set(data_to_write)
-        else: print(decodedRegisterName, "!!!ERROR!!! Bit depth <1, how did we get here...")
-        print("handle set")
-        self.chip.write_decoded_value("Waveform Sampler", "Config", decodedRegisterName)
-        print("wrote decoded value")
+    # def ws_decoded_register_write(self, decodedRegisterName, data_to_write):
+    #     bit_depth = register_decoding["Waveform Sampler"]["Register Blocks"]["Config"][decodedRegisterName]["bits"]
+    #     print("Got bit depth")
+    #     handle = self.chip.get_decoded_display_var("Waveform Sampler", "Config", decodedRegisterName)
+    #     print("GOt handle")
+    #     self.chip.read_decoded_value("Waveform Sampler", "Config", decodedRegisterName)
+    #     print("Read decoded value")
+    #     if len(data_to_write)!=bit_depth: print("Binary data_to_write is of incorrect length for",decodedRegisterName, "with bit depth", bit_depth)
+    #     data_hex_modified = hex(int(data_to_write, base=2))
+    #     if(bit_depth>1): handle.set(data_hex_modified)
+    #     elif(bit_depth==1): handle.set(data_to_write)
+    #     else: print(decodedRegisterName, "!!!ERROR!!! Bit depth <1, how did we get here...")
+    #     print("handle set")
+    #     self.chip.write_decoded_value("Waveform Sampler", "Config", decodedRegisterName)
+    #     print("wrote decoded value")
 
-    def ws_decoded_config_read(self, decodedRegisterName, need_int=False):
-        handle = self.chip.get_decoded_display_var("Waveform Sampler", f"Config", decodedRegisterName)
-        self.chip.read_decoded_value("Waveform Sampler", f"Config", decodedRegisterName)
-        if(need_int): return int(handle.get(), base=16)
-        else: return handle.get()
+    # def ws_decoded_config_read(self, decodedRegisterName, need_int=False):
+    #     handle = self.chip.get_decoded_display_var("Waveform Sampler", f"Config", decodedRegisterName)
+    #     self.chip.read_decoded_value("Waveform Sampler", f"Config", decodedRegisterName)
+    #     if(need_int): return int(handle.get(), base=16)
+    #     else: return handle.get()
 
-    def ws_decoded_status_read(self, decodedRegisterName, need_int=False):
-        handle = self.chip.get_decoded_display_var("Waveform Sampler", f"Status", decodedRegisterName)
-        self.chip.read_decoded_value("Waveform Sampler", f"Status", decodedRegisterName)
-        if(need_int): return int(handle.get(), base=16)
-        else: return handle.get()
+    # def ws_decoded_status_read(self, decodedRegisterName, need_int=False):
+    #     handle = self.chip.get_decoded_display_var("Waveform Sampler", f"Status", decodedRegisterName)
+    #     self.chip.read_decoded_value("Waveform Sampler", f"Status", decodedRegisterName)
+    #     if(need_int): return int(handle.get(), base=16)
+    #     else: return handle.get()
 
     def start_ws_sampling(self):
-        regOut1F_handle = self.chip.get_display_var("Waveform Sampler", "Config", "regOut1F")
-        regOut1F_handle.set("0x22")
-        self.chip.write_register("Waveform Sampler", "Config", "regOut1F")
-        regOut1F_handle.set("0x0b")
-        self.chip.write_register("Waveform Sampler", "Config", "regOut1F")
-        # ws_decoded_register_write("mem_rstn", "0")                      # 0: reset memory
-        # ws_decoded_register_write("clk_gen_rstn", "0")                  # 0: reset clock generation
-        # ws_decoded_register_write("sel1", "0")                          # 0: Bypass mode, 1: VGA mode
-        self.ws_decoded_register_write("DDT", format(0, '016b'))             # Time Skew Calibration set to 0
-        self.ws_decoded_register_write("CTRL", format(0x2, '02b'))           # CTRL default = 0x10 for regOut0D
-        self.ws_decoded_register_write("comp_cali", format(0, '03b'))        # Comparator calibration should be off
+        i2c_controller: I2C_Connection_Helper = self.chip._i2c_controller
+        reg_all = i2c_controller.read_device_memory(self.ws_address, 0x0D, 17, 8)
+        reg_all[-1] = 0x22
+        i2c_controller.write_device_memory(self.ws_address, 0x1F, [reg_all[-1]], 8)
+        reg_all[-1] = 0x4b
+        i2c_controller.write_device_memory(self.ws_address, 0x1F, [reg_all[-1]], 8)
+        # reg_all[-1] = reg_all[-1] & 0b11111110                 # 0: mem_rstn, reset memory
+        # i2c_controller.write_device_memory(self.ws_address, 0x1F, [reg_all[-1]], 8)
+        # reg_all[-1] = reg_all[-1] | 0b00000001                 # 0: mem_rstn, reset memory
+        # i2c_controller.write_device_memory(self.ws_address, 0x1F, [reg_all[-1]], 8)
+        # reg_all[-1] = reg_all[-1] & 0b11110111               # 0: clk_gen_rstn, reset clock generation
+        # reg_all[-1] = reg_all[-1] & 0b01111111               # sel1, 0: Bypass mode, 1: VGA mode
+        reg_all[2] = 0x00                                      # DDT 0F, Time Skew Calibration set to 0
+        reg_all[1] = 0x00                                      # DDT 0E, Time Skew Calibration set to 0
+        reg_all[0] = (reg_all[0] & 0b11110111) | 0b00010000    # 0D CTRL default = 0x10 for regOut0D
+        reg_all[0] = reg_all[0] & 0b00011111                   # 0D comp_cali Comparator calibration should be off
+        i2c_controller.write_device_memory(self.ws_address, 0x0D, reg_all, 8)
 
     def reset_params(self):
         self.translate_deque.clear()
@@ -237,6 +243,10 @@ class Translate_ws_data(threading.Thread):
     def run(self):
         t = threading.current_thread()
         t.alive      = True
+        plot_counter = 0
+
+        # daq_helpers.software_clear_error(self.cmd_interpret)
+        daq_helpers.software_clear_ws_trig_block(self.cmd_interpret)
 
         if(not self.skip_translation): 
             outfile  = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
@@ -286,7 +296,7 @@ class Translate_ws_data(threading.Thread):
                 # TODO EVENT TYPE?
                 self.translate_deque.append(binary)
                 # Set valid_data to true once we see fresh data
-                if(self.event_number==1): self.valid_data = True
+                if(self.event_number==0): self.valid_data = True
                 continue
             # Event Header Line Two NOT Found after the Header
             elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]!=self.firmware_key)):
@@ -319,32 +329,43 @@ class Translate_ws_data(threading.Thread):
             # This is where we translate the TDC data from this data frame
             TDC_data = translate_data.etroc_translate_binary(self.translate_deque, self.valid_data, self.board_ID, self.compressed_translation, self.channel_header_pattern, self.header_pattern, self.trailer_pattern, self.debug_event_translation)
             TDC_len = len(TDC_data)
+            TDC_event_number = int(TDC_data[-1].split()[-1])
             print(TDC_data)
             if((not self.skip_translation) and (TDC_len>0)): 
                 for TDC_line in TDC_data:
                     outfile.write("%s\n"%TDC_line)
                 self.file_lines  = self.file_lines  + TDC_len
+            # Reset all params before moving onto the next line
+            del TDC_data, TDC_len, binary
+            self.reset_params()
+
+            # Handle events before event counter reset
+            if(not self.valid_data): 
+                print("Skipping this event only")
+                continue
 
             # This is where we do the WS I2C stuff
             print("Entering WS I2C Reading...")
+            i2c_controller: I2C_Connection_Helper = self.chip._i2c_controller
+
             ### Read from WS memory
-            self.ws_decoded_register_write("rd_en_I2C", "1")
+            reg1F = i2c_controller.read_device_memory(self.ws_address, 0x1F, 1, 8)
+            reg1F[0] = reg1F[0] | 0b00000100
+            i2c_controller.write_device_memory(self.ws_address, 0x1F, reg1F, 8)
+
+            #self.ws_decoded_register_write("rd_en_I2C", "1")
             print("rd_en_I2C set to 1")
             max_steps = 1024  # Size of the data buffer inside the WS
             lastUpdateTime = time.time_ns()
             base_data = []
             coeff = 0.05/5*8.5  # This number comes from the example script in the manual
             time_coeff = 1/2.56  # 2.56 GHz WS frequency
-            i2c_controller: I2C_Connection_Helper = self.chip._i2c_controller
             addr_regs = [0x00, 0x00]  # regOut1C and regOut1D
             for address in range(max_steps):
-                print(f'Address Loop {address}')
                 addr_regs[0] = ((address & 0b11) << 6)          # 0x1C
                 addr_regs[1] = ((address & 0b1111111100) >> 2)  # 0x1D
                 i2c_controller.write_device_memory(self.ws_address, 0x1C, addr_regs, 8)
-                print("i2c controler write device memory done")
                 tmp_data = i2c_controller.read_device_memory(self.ws_address, 0x20, 2, 8)
-                print("i2c controller read device memory done")
                 data = hex((tmp_data[0] >> 2) + (tmp_data[1] << 6))
                 binary_data = bin(int(data, 0))[2:].zfill(14)  # because dout is 14 bits long
                 Dout_S1 = int('0b'+binary_data[1:7], 0)
@@ -390,64 +411,63 @@ class Translate_ws_data(threading.Thread):
             df.set_index('Time Index', inplace=True)
             df.sort_index(inplace=True)
             # Disable reading data from WS:
-            self.ws_decoded_register_write("rd_en_I2C", "0")
+            reg1F = i2c_controller.read_device_memory(self.ws_address, 0x1F, 1, 8)
+            reg1F[0] = reg1F[0] & 0b11111011
+            i2c_controller.write_device_memory(self.ws_address, 0x1F, reg1F, 8)
             # Restart the WS Sampler
             self.start_ws_sampling()
-
-            output = f"rawdataWS_{self.ws_chipname}_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M") + ".csv"
-            outfile = self.base_dir / output
-            df.to_csv(outfile)
+            print("rd_en_i2c set to 0 AND restarted WS")
+            output = f"rawdataWS_{self.ws_chipname}_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M") + f"_{plot_counter}.csv"
+            outfilename = self.base_dir +f"/{output}"
+            df.to_csv(outfilename)
             df['Aout'] = -(df['Dout']-(31.5-coeff*31.5)*1.2)/32
-            output = f"rawdataWS_{self.ws_chipname}_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M") + ".png"
-            outfile = self.base_dir / output
-            fig, ax = plt.subplots(figsize=(20, 8))
-            ax.plot(df['Time [ns]'], df['Dout'])
-            ax.set_xlabel('Time [ns]', fontsize=15)
-            plt.savefig(outfile)
+            output = f"rawdataWS_{self.ws_chipname}_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M") + f"_{plot_counter}.png"
+            outfilename = self.base_dir +f"/{output}"
+            # fig, ax = plt.subplots(figsize=(20, 8))
+            # ax.plot(df['Time [ns]'], df['Dout'])
+            # ax.set_xlabel('Time [ns]', fontsize=15)
+            # plt.savefig(outfilename)
 
-            # fig_aout = px.line(
-            #     df,
-            #     x="Time [ns]",
-            #     y="Aout",
-            #     labels = {
-            #         "Time [ns]": "Time [ns]",
-            #         "Aout": "",
-            #     },
-            #     title = "Waveform (Aout) from the board {}".format(self.ws_chipname),
-            #     markers=True
-            # )
-            # fig_dout = px.line(
-            #     df,
-            #     x="Time [ns]",
-            #     y="Dout",
-            #     labels = {
-            #         "Time [ns]": "Time [ns]",
-            #         "Dout": "",
-            #     },
-            #     title = "Waveform (Dout) from the board {}".format(self.ws_chipname),
-            #     markers=True
-            # )
-            # # todaystr = "../ETROC-figures/" + today.isoformat() + "_Array_Test_Results/"
-            # # base_dir = Path(todaystr)
-            # # base_dir.mkdir(exist_ok=True)
-            # fig_aout.write_html(
-            #     self.base_dir / f'WS_Aout_{self.ws_chipname}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")}.html',
-            #     full_html = False,
-            #     include_plotlyjs = 'cdn',
-            # )
-            # fig_dout.write_html(
-            #     self.base_dir / f'WS_Dout_{self.ws_chipname}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")}.html',
-            #     full_html = False,
-            #     include_plotlyjs = 'cdn',
-            # )
+            fig_aout = px.line(
+                df,
+                x="Time [ns]",
+                y="Aout",
+                labels = {
+                    "Time [ns]": "Time [ns]",
+                    "Aout": "",
+                },
+                title = "Waveform (Aout) from the board {}".format(self.ws_chipname),
+                markers=True
+            )
+            fig_dout = px.line(
+                df,
+                x="Time [ns]",
+                y="Dout",
+                labels = {
+                    "Time [ns]": "Time [ns]",
+                    "Dout": "",
+                },
+                title = "Waveform (Dout) from the board {}".format(self.ws_chipname),
+                markers=True
+            )
+            # todaystr = "../ETROC-figures/" + today.isoformat() + "_Array_Test_Results/"
+            # base_dir = Path(todaystr)
+            # base_dir.mkdir(exist_ok=True)
+            fig_aout.write_html(
+                self.base_dir + f'/WS_Aout_{self.ws_chipname}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")}_{plot_counter}.html',
+                full_html = False,
+                include_plotlyjs = 'cdn',
+            )
+            fig_dout.write_html(
+                self.base_dir + f'/WS_Dout_{self.ws_chipname}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")}_{plot_counter}.html',
+                full_html = False,
+                include_plotlyjs = 'cdn',
+            )
 
             # Clear WS Trig Block
             daq_helpers.software_clear_ws_trig_block(self.cmd_interpret)
-            print("Done with WS I2C Reading")
-
-            # Reset all params before moving onto the next line
-            del TDC_data, TDC_len, binary
-            self.reset_params()
+            print("Done with WS I2C Reading and Released L1A Block")
+            plot_counter += 1
         
         print("Translate Thread gracefully ending") 
         self.translate_thread_handle.set()

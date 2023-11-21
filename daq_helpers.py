@@ -52,7 +52,7 @@ def set_all_trigger_linked(cmd_interpret, inspect=False):
     return linked_flag
 
 #--------------------------------------------------------------------------#
-def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Initialize = True, Triggerbit=True):
+def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Initialize = True, Triggerbit=True, repeatedQInj=False):
     if(Initialize):
         register_11(cmd_interpret, 0x0deb)
         time.sleep(0.01)
@@ -79,6 +79,27 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
         cmd_interpret.write_config_reg(9, 0x0005)
         fc_init_pulse(cmd_interpret)
         time.sleep(0.01)
+        if(repeatedQInj):
+            register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
+            cmd_interpret.write_config_reg(10, 0x0008)
+            cmd_interpret.write_config_reg(9, 0x0008)
+            fc_init_pulse(cmd_interpret)
+            time.sleep(0.01)
+            register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
+            cmd_interpret.write_config_reg(10, 0x000c)
+            cmd_interpret.write_config_reg(9, 0x000c)
+            fc_init_pulse(cmd_interpret)
+            time.sleep(0.01)
+            register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
+            cmd_interpret.write_config_reg(10, 0x0011)
+            cmd_interpret.write_config_reg(9, 0x0011)
+            fc_init_pulse(cmd_interpret)
+            time.sleep(0.01)
+            register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
+            cmd_interpret.write_config_reg(10, 0x0017)
+            cmd_interpret.write_config_reg(9, 0x0017)
+            fc_init_pulse(cmd_interpret)
+            time.sleep(0.01)
 
     ### Send L1A
     if(L1A):

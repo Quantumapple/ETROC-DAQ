@@ -166,7 +166,7 @@ class Translate_data(threading.Thread):
 #----------------------------------------------------------------------------------------#
 def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_translation, channel_header_pattern, header_pattern, trailer_pattern, debug=False):
     TDC_data = []
-    if(not valid_data): return TDC_data
+    # if(not valid_data): return TDC_data
     header_1 = translate_deque.popleft()
     header_2 = translate_deque.popleft()
     trailer  = translate_deque.pop()
