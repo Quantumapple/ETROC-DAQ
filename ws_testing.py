@@ -218,7 +218,7 @@ class Translate_ws_data(threading.Thread):
         reg_all = i2c_controller.read_device_memory(self.ws_address, 0x0D, 17, 8)
         reg_all[-1] = 0x22
         i2c_controller.write_device_memory(self.ws_address, 0x1F, [reg_all[-1]], 8)
-        reg_all[-1] = 0x4b
+        reg_all[-1] = 0x0b
         i2c_controller.write_device_memory(self.ws_address, 0x1F, [reg_all[-1]], 8)
         # reg_all[-1] = reg_all[-1] & 0b11111110                 # 0: mem_rstn, reset memory
         # i2c_controller.write_device_memory(self.ws_address, 0x1F, [reg_all[-1]], 8)
@@ -228,9 +228,14 @@ class Translate_ws_data(threading.Thread):
         # reg_all[-1] = reg_all[-1] & 0b01111111               # sel1, 0: Bypass mode, 1: VGA mode
         reg_all[2] = 0x00                                      # DDT 0F, Time Skew Calibration set to 0
         reg_all[1] = 0x00                                      # DDT 0E, Time Skew Calibration set to 0
+        i2c_controller.write_device_memory(self.ws_address, 0x0E, [reg_all[1],reg_all[2]], 8)
         reg_all[0] = (reg_all[0] & 0b11110111) | 0b00010000    # 0D CTRL default = 0x10 for regOut0D
+        # reg_all[0] = (reg_all[0] & 0b11101111) | 0b00001000    # 0D CTRL default = 0x01 for regOut0D
+        # reg_all[0] = reg_all[0] | 0b00011000                   # 0D CTRL default = 0x11 for regOut0D
+        # reg_all[0] = reg_all[0] & 0b11100111                   # 0D CTRL default = 0x00 for regOut0D
         reg_all[0] = reg_all[0] & 0b00011111                   # 0D comp_cali Comparator calibration should be off
         i2c_controller.write_device_memory(self.ws_address, 0x0D, reg_all, 8)
+        print("Chip WS COnfig Done!")
 
     def reset_params(self):
         self.translate_deque.clear()
@@ -352,9 +357,9 @@ class Translate_ws_data(threading.Thread):
             reg1F = i2c_controller.read_device_memory(self.ws_address, 0x1F, 1, 8)
             reg1F[0] = reg1F[0] | 0b00000100
             i2c_controller.write_device_memory(self.ws_address, 0x1F, reg1F, 8)
-
             #self.ws_decoded_register_write("rd_en_I2C", "1")
             print("rd_en_I2C set to 1")
+
             max_steps = 1024  # Size of the data buffer inside the WS
             lastUpdateTime = time.time_ns()
             base_data = []
@@ -427,6 +432,7 @@ class Translate_ws_data(threading.Thread):
             # ax.plot(df['Time [ns]'], df['Dout'])
             # ax.set_xlabel('Time [ns]', fontsize=15)
             # plt.savefig(outfilename)
+            # plt.close()
 
             fig_aout = px.line(
                 df,

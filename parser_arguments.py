@@ -59,7 +59,7 @@ def create_parser():
     parser.add_option("--ws_testing",action="store_true", dest="ws_testing", default=False, help="Perform WS Testing rather than usual DAQ")
     parser.add_option('--ws_chipname',metavar = 'NAME',type = str,help = 'Board label',dest = 'ws_chipname',default="chipname_NA")
     parser.add_option('--ws_ip_address',metavar = 'NAME',type = str,help = 'KC705 FPGA IP address',default="192.168.2.3",dest = 'ws_ip_address')
-    parser.add_option('--ws_i2c_port',metavar = 'NAME',type = str,help = 'USB ISS port name',default='/dev/ttyACM0',dest = 'ws_i2c_port')
+    parser.add_option('--ws_i2c_port',metavar = 'NAME',type = str,help = 'USB ISS port name',default='/dev/ttyACM1',dest = 'ws_i2c_port')
     parser.add_option("--ws_chip_address", type="int",action="store", dest="ws_chip_address", default=0x0060, help="Chip I2C Address for WS Testing Purposes")
     parser.add_option("--ws_address", type="int",action="store", dest="ws_address", default=0x0040, help="Chip WS I2C Address for WS Testing Purposes")
     # parser.add_argument('--ws_read_mode',metavar='MODE',type = str,choices=["WS", "I2C", "High Level"],default='WS',help='The read mode algorithm to use for reading the WS. Options are: WS - to read with the WS controller; I2C - to read with the I2C controller; High Level - to use the high level functions. Default: WS')
