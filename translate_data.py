@@ -65,7 +65,7 @@ class Translate_data(threading.Thread):
         t.alive      = True
         
         if(not self.skip_translation): 
-            outfile  = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
+            outfile  = open("%s/TDC_Data_translated_%d.nem"%(self.store_dict, self.file_counter), 'w')
             print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
         else:
             print("{} is reading queue and translating...".format(self.getName()))
@@ -78,7 +78,7 @@ class Translate_data(threading.Thread):
                 outfile.close()
                 self.file_lines   = 0
                 self.file_counter = self.file_counter + 1
-                outfile = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
+                outfile = open("%s/TDC_Data_translated_%d.nem"%(self.store_dict, self.file_counter), 'w')
                 print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
             binary = ""
             # Attempt to pop off the translate_queue for 30 secs, fail if nothing found
