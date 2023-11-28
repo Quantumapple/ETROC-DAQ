@@ -179,6 +179,7 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
     crc        = trailer[-8:]
     overflow_count = trailer[18:21]
     hamming_count  = trailer[21:24]
+    if(int(hits_count, base=2)==0 and compressed_translation): return TDC_data
     TDC_data.append(f"EH {version} {event_num} {int(hits_count, base=2)} {num_words}")
     # TODO Bad Data count, Overflow data count, Hamming Error Count
     active_channels = []
