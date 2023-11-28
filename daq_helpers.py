@@ -52,7 +52,7 @@ def set_all_trigger_linked(cmd_interpret, inspect=False):
     return linked_flag
 
 #--------------------------------------------------------------------------#
-def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Initialize = True, Triggerbit=True, repeatedQInj=False):
+def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Initialize = True, Triggerbit=True, repeatedQInj=False, L1ARange = False):
     if(Initialize):
         register_11(cmd_interpret, 0x0deb)
         time.sleep(0.01)
@@ -108,6 +108,20 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
         cmd_interpret.write_config_reg(9, 0x01fd)
         fc_init_pulse(cmd_interpret)
         time.sleep(0.01)
+
+        ### Send L1A Range
+        if(L1ARange):
+            register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
+            cmd_interpret.write_config_reg(10, 0x01fc)
+            cmd_interpret.write_config_reg(9, 0x01fc)
+            fc_init_pulse(cmd_interpret)
+            time.sleep(0.01)
+            
+            register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
+            cmd_interpret.write_config_reg(10, 0x01fe)
+            cmd_interpret.write_config_reg(9, 0x01fe)
+            fc_init_pulse(cmd_interpret)
+            time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
     time.sleep(0.01)
@@ -264,15 +278,19 @@ class Receive_data(threading.Thread):
                         words = message.split(' ')[1:]
                         QInj=False
                         L1A=False
+                        L1ARange=False
                         BCR=False
                         Triggerbit=False
                         Initialize = False
                         if("QInj" in words): QInj=True
                         if("L1A" in words): L1A=True
+                        if("L1ARange" in words):
+                            L1A=True
+                            L1ARange=True
                         if("BCR" in words): BCR=True
                         if("Triggerbit" in words): Triggerbit=True
                         if("Start" in words): Initialize=True
-                        configure_memo_FC(self.cmd_interpret,Initialize=Initialize,QInj=QInj,L1A=L1A,BCR=BCR,Triggerbit=Triggerbit)
+                        configure_memo_FC(self.cmd_interpret,Initialize=Initialize,QInj=QInj,L1A=L1A,BCR=BCR,Triggerbit=Triggerbit,L1ARange=L1ARange)
                     else:
                         print(f'Unknown message: {message}')
                 except queue.Empty:
