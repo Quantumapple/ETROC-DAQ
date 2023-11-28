@@ -216,9 +216,9 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
               print("The active_channels deque is empty, more headers found than event mask can allow")
               TDC_data.append(f"THIS IS A BROKEN EVENT SINCE MORE HEADERS THAN MASK FOUND")
             TDC_data.append(f"H {current_channel} {int(etroc_word[18:26], base=2)} {etroc_word[26:28]} {int(etroc_word[28:40], base=2)}")
-        # DATA "D {channel} {EA} {COL} {ROW} {TOA} {TOT} {CAL}"
+        # DATA "D {channel} {EA} {ROW} {COL} {TOA} {TOT} {CAL}"
         elif(etroc_word[0]=='1'):
-            TDC_data.append(f"D {current_channel} {int(etroc_word[1:3], base=2)} {int(etroc_word[3:7], base=2)} {int(etroc_word[7:11], base=2)} {int(etroc_word[11:21], base=2)} {int(etroc_word[21:30], base=2)} {int(etroc_word[30:40], base=2)}")
+            TDC_data.append(f"D {current_channel} {int(etroc_word[1:3], base=2)} {int(etroc_word[7:11], base=2)} {int(etroc_word[3:7], base=2)} {int(etroc_word[11:21], base=2)} {int(etroc_word[21:30], base=2)} {int(etroc_word[30:40], base=2)}")
         # TRAILER "T {channel} {Status} {Hits} {CRC}"
         elif(etroc_word[0:18]=='0'+board_ID[int(current_channel)]):
             TDC_data.append(f"T {current_channel} {int(etroc_word[18:24], base=2)} {int(etroc_word[24:32], base=2)} {int(etroc_word[32:40], base=2)}")
