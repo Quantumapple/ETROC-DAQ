@@ -63,8 +63,8 @@ class Translate_data(threading.Thread):
     def run(self):
         t = threading.current_thread()
         t.alive      = True
-        
-        if(not self.skip_translation): 
+
+        if(not self.skip_translation):
             outfile  = open("%s/TDC_Data_translated_%d.nem"%(self.store_dict, self.file_counter), 'w')
             print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
         else:
@@ -73,7 +73,7 @@ class Translate_data(threading.Thread):
             if not t.alive:
                 print("Translate Thread detected alive=False")
                 if(not self.skip_translation): outfile.close()
-                break 
+                break
             if((not self.skip_translation) and self.file_lines>self.num_line):
                 outfile.close()
                 self.file_lines   = 0
@@ -97,6 +97,8 @@ class Translate_data(threading.Thread):
                     continue
                 print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!!")
                 break
+            # Filler
+            if(len(binary)<32): continue
             # Event Header Found
             if(binary[0:28]==self.header_pattern):
                 self.reset_params()
@@ -142,13 +144,13 @@ class Translate_data(threading.Thread):
             else: continue
 
             # We only come here if we saw a Trailer, but let's put a failsafe regardless
-            if((not self.debug_event_translation) and len(self.translate_deque)!=self.eth_words_in_event+3): 
+            if((not self.debug_event_translation) and len(self.translate_deque)!=self.eth_words_in_event+3):
                 self.reset_params()
                 continue
 
             TDC_data = etroc_translate_binary(self.translate_deque, self.valid_data, self.board_ID, self.compressed_translation, self.channel_header_pattern, self.header_pattern, self.trailer_pattern, self.debug_event_translation)
             TDC_len = len(TDC_data)
-            if((not self.skip_translation) and (TDC_len>0)): 
+            if((not self.skip_translation) and (TDC_len>0)):
                 for TDC_line in TDC_data:
                     outfile.write("%s\n"%TDC_line)
                 self.file_lines  = self.file_lines  + TDC_len
@@ -156,8 +158,8 @@ class Translate_data(threading.Thread):
             # Reset all params before moving onto the next line
             del TDC_data, TDC_len, binary
             self.reset_params()
-        
-        print("Translate Thread gracefully ending") 
+
+        print("Translate Thread gracefully ending")
         self.translate_thread_handle.set()
         del t
         if(not self.skip_translation): outfile.close()
@@ -197,7 +199,7 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
             running_word = running_word + translate_deque.popleft()
         except IndexError:
             print("Empty queue in while loop")
-        if(len(running_word)<40): 
+        if(len(running_word)<40):
             try:
                 running_word = running_word + translate_deque.popleft()
             except IndexError:
@@ -205,7 +207,7 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
         etroc_word   = running_word[0:40]
         running_word = running_word[40:]
         current_word += 1
-        if(debug): 
+        if(debug):
             TDC_data.append(f"{etroc_word}")
             if(not translate_deque): TDC_data.append(f"{running_word}")
             continue

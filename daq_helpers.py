@@ -116,7 +116,7 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
             cmd_interpret.write_config_reg(9, 0x01fc)
             fc_init_pulse(cmd_interpret)
             time.sleep(0.01)
-            
+
             register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
             cmd_interpret.write_config_reg(10, 0x01fe)
             cmd_interpret.write_config_reg(9, 0x01fe)
@@ -236,7 +236,7 @@ class Receive_data(threading.Thread):
         else:
             self.daq_on = True
             self.stop_DAQ_event.clear()
-    
+
     def run(self):
         t = threading.current_thread()
         t.alive = True
@@ -302,14 +302,14 @@ class Receive_data(threading.Thread):
                     print("No data in buffer! Will try to read again")
                     time.sleep(1.01)
                     mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
-                
+
                 for mem_line in mem_data:
-                    self.read_queue.put(mem_line) 
+                    self.read_queue.put(mem_line)
                 # print("memdata added to queue:", mem_data)
             # print("In loop, attempting to test alive condition")
             if not t.alive:
                 print("Read Thread detected alive=False")
-                break  
+                break
             # print("In loop, attempting to test read_handle condition")
             if self.read_thread_handle.is_set():
                 print("Read Thread received STOP signal")
@@ -318,7 +318,7 @@ class Receive_data(threading.Thread):
                     self.write_thread_handle.set()
                 print("Stopping Read Thread")
                 break
-        print("Read Thread gracefully sending STOP signal to other threads") 
+        print("Read Thread gracefully sending STOP signal to other threads")
         self.read_thread_handle.set()
         print("Sending stop signal to Write Thread")
         self.write_thread_handle.set()
@@ -347,6 +347,7 @@ class Write_data(threading.Thread):
     def run(self):
         t = threading.current_thread()
         t.alive      = True
+        prev_status_on_data_stream = ""
         if(not self.skip_binary):
             outfile = open("%s/TDC_Data_%d.dat"%(self.store_dict, self.file_counter), 'w')
             print("{} is reading queue and writing file {}...".format(self.getName(), self.file_counter))
@@ -356,7 +357,7 @@ class Write_data(threading.Thread):
             if not t.alive:
                 print("Write Thread detected alive=False")
                 outfile.close()
-                break 
+                break
             if(self.file_lines>self.num_line and (not self.skip_binary)):
                 outfile.close()
                 self.file_lines   = 0
@@ -380,13 +381,20 @@ class Write_data(threading.Thread):
                     continue
                 print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM READ_QUEUE!!!")
                 break
+            binary = format(int(mem_data), '032b')
             # Handle the raw (binary) line
-            if int(mem_data) == 1431655765: continue # Ethernet Filler Line
+            # if int(mem_data) == 1431655765: continue # Ethernet Filler Line
+            if binary[0:16] == '0101010101010101':
+                if(prev_status_on_data_stream!=binary[16:]):
+                    print(f"(Unique) Status on Data Stream: {binary[16:]}")
+                    prev_status_on_data_stream = binary[16:]
+                if(not self.skip_translation):
+                    self.translate_queue.put("0")
+                continue # Ethernet Filler Line
             # if int(mem_data) == 0: continue # Waiting for IPC
             # if int(mem_data) == 38912: continue # got a Filler
             # if int(mem_data) == 9961472: continue # got a Filler
             # if int(mem_data) == 2550136832: continue # got a Filler
-            binary = format(int(mem_data), '032b')
             if(not self.skip_binary):
                 if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
                 else: outfile.write('%s\n'%binary)
@@ -400,7 +408,7 @@ class Write_data(threading.Thread):
                     print("Sending stop signal to Translate Thread")
                     self.translate_thread_handle.set()
             del binary, mem_data
-        print("Write Thread gracefully sending STOP signal to translate thread") 
+        print("Write Thread gracefully sending STOP signal to translate thread")
         self.translate_thread_handle.set()
         self.write_thread_handle.set()
         del t
@@ -451,7 +459,7 @@ def fc_init_pulse(cmd_interpret):
 ## y is disable GTX
 ## x is polarity
 ## w is the Enable debug mode flag
-## {12'bxxxxxxxxx,add_ethernet_filler,debug_mode,dumping_mode,notGTXPolarity,notGTX,enableAutoSync} 
+## {12'bxxxxxxxxx,add_ethernet_filler,debug_mode,dumping_mode,notGTXPolarity,notGTX,enableAutoSync}
 def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
     cmd_interpret.write_config_reg(14, val)
 
@@ -468,7 +476,7 @@ def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
 # 0xWXYZ
 # Z is a bit 4 bit binary wxyz Channel Enable (1=Enable)
 # Y is a bit 4 bit binary wxyz Board Type (1=Etroc2)
-def active_channels(cmd_interpret, key = 0x0003): 
+def active_channels(cmd_interpret, key = 0x0003):
     print(f"writing: {bin(key)} into register 15")
     cmd_interpret.write_config_reg(15, key)
 
@@ -490,7 +498,7 @@ def timestamp(cmd_interpret, key=0x0000):
 ## WX (8 bit) - Duration
 ## Y - N/A,N/A,Period,Hold
 ## Z - Input command
-def register_12(cmd_interpret, key = 0x0000): 
+def register_12(cmd_interpret, key = 0x0000):
     cmd_interpret.write_config_reg(12, key)
 
 #--------------------------------------------------------------------------#
@@ -498,7 +506,7 @@ def register_12(cmd_interpret, key = 0x0000):
 ## 4-digit 16 bit hex, 0xWXYZ
 ## WX (8 bit) - N/A
 ## YZ (8 bit) - Error Mask
-def register_11(cmd_interpret, key = 0x0000): 
+def register_11(cmd_interpret, key = 0x0000):
     cmd_interpret.write_config_reg(11, key)
 
 #--------------------------------------------------------------------------#
@@ -506,14 +514,14 @@ def register_11(cmd_interpret, key = 0x0000):
 ## 4-digit 16 bit hex
 ## LSB 10 bits are delay, LSB 11th bit is delay enabled
 ## 0000||0100||0000||0000 = 0x0400: shift of one clock cycle
-def triggerBitDelay(cmd_interpret, key = 0x0400): 
+def triggerBitDelay(cmd_interpret, key = 0x0400):
     cmd_interpret.write_config_reg(8, key)
 
 #--------------------------------------------------------------------------#
 ## Register 7
 ## 4-digit 16 bit hex
 ## LSB 6 bits  - time (s) for FPGA counters
-## Next 4 bits are the channel delay abcd = board: 3,2,1,0. 
+## Next 4 bits are the channel delay abcd = board: 3,2,1,0.
 ## This delays the trigger bit of set channels by 1 clock cycle
-def counterDuration(cmd_interpret, key = 0x0001): 
+def counterDuration(cmd_interpret, key = 0x0001):
     cmd_interpret.write_config_reg(7, key)

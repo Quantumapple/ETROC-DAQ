@@ -19,8 +19,8 @@ import platform
 '''
 @author: Murtaza Safdari
 @date: 2023-03-24
-This script is used for testing ETROC2 Array chips. 
-The main function of this driver script is to facilitate I2C write and read, Ethernet communication, 
+This script is used for testing ETROC2 Array chips.
+The main function of this driver script is to facilitate I2C write and read, Ethernet communication,
 instrument control and so on, handling the New Event Model (Sept 2023)
 '''
 port = 1024
@@ -106,6 +106,8 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("Channel Enable     : ", string_15[-4:])
         print("WS Trig Stop Delay : ", string_15[-7:-4])
         print("Enable WS Trigger  : ", string_15[-8:-7])
+        print("Triple Trigger     : ", string_15[-9:-8])
+        print("Trigger OR Logic   : ", string_15[-10:-9])
         print('\n')
         if(string_13[-2:]!='00'):
             def unpack_state_history(dumped_data):
@@ -155,7 +157,7 @@ def main(options, cmd_interpret, IPC_queue = None):
             del temp_reg, modified_timestamp
         del read_register_7,read_register_8,read_register_11,read_register_12,read_register_13,read_register_14,read_register_15
         del string_7,string_8,string_13,string_14,string_15
-    
+
     if(options.clear_fifo):
         print("Clearing FIFO...")
         daq_helpers.software_clear_fifo(cmd_interpret)
@@ -163,7 +165,7 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("Waited for 2 secs")
 
     if(options.clear_error or options.check_valid_data_start):
-        print("Clearing Event Counter...") 
+        print("Clearing Event Counter...")
         daq_helpers.software_clear_error(cmd_interpret)
         time.sleep(0.1)
 
@@ -172,11 +174,11 @@ def main(options, cmd_interpret, IPC_queue = None):
         daq_helpers.resume_in_debug_mode(cmd_interpret)
         time.sleep(2.1)
         print("Waited for 2 secs")
-    
+
     if(options.reset_all_till_trigger_linked):
         print("Resetting/Checking link of all boards...")
         daq_helpers.set_all_trigger_linked(cmd_interpret, options.inpect_links_only)
-    
+
     if(options.start_dev_qinj_fc):
         print("Starting QInj + Ext L1A train...")
         daq_helpers.configure_memo_FC(cmd_interpret,Initialize=True,QInj=True,L1A=True,BCR=True,Triggerbit=True)
@@ -207,7 +209,7 @@ def main(options, cmd_interpret, IPC_queue = None):
             os.mkdir(userdefine_dir)
         except FileExistsError:
             print("User defined directory %s already created!"%(userdefine_dir))
-            if(options.overwrite != True): 
+            if(options.overwrite != True):
                 print("Overwriting is not enabled, exiting code abruptly...")
                 sys.exit(1)
 
@@ -224,7 +226,7 @@ def main(options, cmd_interpret, IPC_queue = None):
     if(not options.nodaq):
         store_dict = userdefine_dir
         read_queue = queue.Queue()
-        translate_queue = queue.Queue() 
+        translate_queue = queue.Queue()
         read_thread_handle = threading.Event()      # This is how we stop the read thread
         write_thread_handle = threading.Event()     # This is how we stop the write thread
         translate_thread_handle = threading.Event() # This is how we stop the translate thread (if translate enabled) (set down below...)
@@ -232,9 +234,9 @@ def main(options, cmd_interpret, IPC_queue = None):
                                                     # Kill order is read, write, translate
         receive_data = daq_helpers.Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
         write_data = daq_helpers.Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.skip_translation, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
-        if(not options.ws_testing): 
+        if(not options.ws_testing):
             translate_data_thread = translate_data.Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords)
-        else: 
+        else:
             ws_chip = ws_testing.return_initialized_ws_chip(options.ws_i2c_port, options.ws_chip_address, options.ws_address)
             translate_data_thread = ws_testing.Translate_ws_data('Translate_ws_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords, ws_chip, options.ws_chipname, options.ws_i2c_port, options.ws_chip_address, options.ws_address)
         try:
@@ -278,11 +280,11 @@ if __name__ == "__main__":
         print("DAQ Runtime <= 0, setting no DAQ mode...")
         options.nodaq = True
 
-    if(options.verbose): 
+    if(options.verbose):
         for option, value in vars(options).items(): print('%s = %s' % (option, value))
 
     system = platform.system()
     if system == 'Windows' or system == '':
         options.useIPC = False
- 
+
     main_process(None, options)
