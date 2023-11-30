@@ -173,8 +173,8 @@ def etroc2_translate(line, timestamp, queues, links, board_ID, hitmap, compresse
             # Translating data
             last_line = last_line + "DATA "
             last_line = last_line + "EA " + last_element[1:3] + " "
-            last_line = last_line + "COL " + "{:d} ".format(int(last_element[3:7], base=2))
             last_line = last_line + "ROW " + "{:d} ".format(int(last_element[7:11], base=2))
+            last_line = last_line + "COL " + "{:d} ".format(int(last_element[3:7], base=2))
             last_line = last_line + "TOA " + "{:d} ".format(int(last_element[11:21], base=2))
             last_line = last_line + "TOT " + "{:d} ".format(int(last_element[21:30], base=2))
             last_line = last_line + "CAL " + "{:d} ".format(int(last_element[30:40], base=2))
