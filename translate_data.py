@@ -114,7 +114,7 @@ class Translate_data(threading.Thread):
                 # TODO EVENT TYPE?
                 self.translate_deque.append(binary)
                 # Set valid_data to true once we see fresh data
-                if(self.event_number==0): self.valid_data = True
+                if(self.event_number==1 or self.event_number==0): self.valid_data = True
                 continue
             # Event Header Line Two NOT Found after the Header
             elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]!=self.firmware_key)):
