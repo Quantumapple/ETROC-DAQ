@@ -133,8 +133,8 @@ def link_reset(cmd_interpret):
     time.sleep(2.01)
 
 #--------------------------------------------------------------------------#
-def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
-    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val)
+def get_fpga_data(cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val):
+    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val)
     try:
         fpga_data.start()
         while fpga_data.is_alive():
@@ -145,12 +145,13 @@ def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj
 
 # define a threading class for saving data from FPGA Registers only
 class Save_FPGA_data(threading.Thread):
-    def __init__(self, name, cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
+    def __init__(self, name, cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val):
         threading.Thread.__init__(self, name=name)
         self.cmd_interpret    = cmd_interpret
         self.time_limit       = time_limit
         self.overwrite        = overwrite
         self.output_directory = output_directory
+        self.run_name         = run_name
         self.isQInj           = isQInj
         self.DAC_Val          = DAC_Val
 
@@ -164,7 +165,10 @@ class Save_FPGA_data(threading.Thread):
         print("{} is saving FPGA data directly...".format(self.getName()))
         userdefinedir = self.output_directory
         today = datetime.date.today()
-        todaystr = "../ETROC-Data/" + today.isoformat() + "_Array_Test_Results"
+        final_dir_str = today.isoformat() + "_Array_Test_Results"
+        if self.run_name is not None:
+            final_dir_str = self.run_name
+        todaystr = "../ETROC-Data/" + final_dir_str
         try:
             os.mkdir(todaystr)
             print("Directory %s was created!"%todaystr)
