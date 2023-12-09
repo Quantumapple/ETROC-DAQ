@@ -221,10 +221,13 @@ def main(options, cmd_interpret, IPC_queue = None):
     if(not options.nodaq):
         userdefinedir = options.output_directory
         today = datetime.date.today()
+        final_dir_str = today.isoformat() + "_Array_Test_Results"
+        if options.run_name is not None:
+            final_dir_str = options.run_name
         if(options.ssd):
-            todaystr = "/run/media/daq/T7/" + today.isoformat() + "_Array_Test_Results"
+            todaystr = "/run/media/daq/T7/" + final_dir_str
         else:
-            todaystr = "../ETROC-Data/" + today.isoformat() + "_Array_Test_Results"
+            todaystr = "../ETROC-Data/" + final_dir_str
         try:
             os.mkdir(todaystr)
             print("Directory %s was created!"%todaystr)
@@ -240,13 +243,13 @@ def main(options, cmd_interpret, IPC_queue = None):
                 sys.exit(1)
 
     if(options.fpga_data or options.fpga_data_QInj):
-        daq_helpers.get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
+        daq_helpers.get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.run_name, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
         if(options.check_all_trigger_link_at_end):
             print("Checking trigger link of all boards at end")
             linked_flag = daq_helpers.set_all_trigger_linked(cmd_interpret, True)
             while linked_flag is False:
                 daq_helpers.set_all_trigger_linked(cmd_interpret)
-                daq_helpers.get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
+                daq_helpers.get_fpga_data(cmd_interpret, options.fpga_data_time_limit, options.overwrite, options.run_name, options.output_directory, options.fpga_data_QInj, options.DAC_Val)
                 linked_flag = daq_helpers.set_all_trigger_linked(cmd_interpret, True)
 
     if(not options.nodaq):

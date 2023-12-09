@@ -1,7 +1,7 @@
 from optparse import OptionParser
 
 def create_parser():
-    
+
     def int_list_callback(option, opt, value, parser):
         setattr(parser.values, option.dest, list(map(int, value.split(','))))
 
@@ -18,6 +18,7 @@ def create_parser():
     #------------------------------------------------------------------------#
     parser.add_option("-t", "--time_limit", dest="time_limit", action="store", type="int", help="Number of integer seconds to run this code", default=-1)
     #------------------------------------------------------------------------#
+    parser.add_option("--run_name", dest="run_name", type="string", help="Run name under which to store the data, if not set will store the data under a timestamped directory.")
     parser.add_option("-o", "--output_directory", dest="output_directory", action="store", type="string", help="User defined output directory", default="unnamed_output_directory")
     parser.add_option("--ssd",action="store_true", dest="ssd", default=False, help="Save TDC data to ssd path")
     #------------------------------------------------------------------------#
