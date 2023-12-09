@@ -171,6 +171,30 @@ def main(options, cmd_interpret, IPC_queue = None):
         daq_helpers.software_clear_error(cmd_interpret)
         time.sleep(0.1)
 
+    if(options.do_start_DAQ_pulse):
+        print("Starting DAQ on FPGA...")
+        modified_timestamp = format(options.timestamp, '016b')
+        modified_timestamp = modified_timestamp[:-2] + '10'
+        daq_helpers.timestamp(cmd_interpret, key = int(modified_timestamp, base=2))
+        time.sleep(0.1)
+        read_register_13 = cmd_interpret.read_config_reg(13)
+        string_13   = format(read_register_13, '016b')
+        print("Written into Reg 13: ", string_13)
+        print("Data Rate              : ", string_13[-7:-5])
+        print("LED pages              : ", string_13[-5:-2])
+        print("Testmode               : ", string_13[-2])
+        print("Timestamp (active low) : ", string_13[-1])
+        print("DEV Status Page        : ", string_13[-2:])
+        print("Status of DAQ Toggle before Start Pulse: ", format(cmd_interpret.read_status_reg(5), '016b'))
+        for test_i in range(11):
+            print(format(cmd_interpret.read_status_reg(test_i), '016b'))
+        daq_helpers.start_DAQ_pulse(cmd_interpret)
+        time.sleep(0.1)
+        print("Status of DAQ Toggle after Start Pulse: ", format(cmd_interpret.read_status_reg(5), '016b'))
+        for test_i in range(11):
+            print(format(cmd_interpret.read_status_reg(test_i), '016b'))
+        
+
     if(options.resume_in_debug_mode):
         print("Resetting and Resuming State Machine in Debug Mode..")
         daq_helpers.resume_in_debug_mode(cmd_interpret)
@@ -266,6 +290,29 @@ def main(options, cmd_interpret, IPC_queue = None):
             if(not options.skip_translation): translate_data_thread.join()
             write_data.join()
         # wait for thread to finish before proceeding)
+
+    if(options.do_stop_DAQ_pulse):
+        print("Stopping DAQ on FPGA...")
+        modified_timestamp = format(options.timestamp, '016b')
+        modified_timestamp = modified_timestamp[:-2] + '10'
+        daq_helpers.timestamp(cmd_interpret, key = int(modified_timestamp, base=2))
+        time.sleep(0.1)
+        read_register_13 = cmd_interpret.read_config_reg(13)
+        string_13   = format(read_register_13, '016b')
+        print("Written into Reg 13: ", string_13)
+        print("Data Rate              : ", string_13[-7:-5])
+        print("LED pages              : ", string_13[-5:-2])
+        print("Testmode               : ", string_13[-2])
+        print("Timestamp (active low) : ", string_13[-1])
+        print("DEV Status Page        : ", string_13[-2:])
+        print("Status of DAQ Toggle before Stop Pulse: ", format(cmd_interpret.read_status_reg(5), '016b'))
+        for test_i in range(11):
+            print(format(cmd_interpret.read_status_reg(test_i), '016b'))
+        daq_helpers.stop_DAQ_pulse(cmd_interpret)
+        time.sleep(0.1)
+        print("Status of DAQ Toggle after Stop Pulse: ", format(cmd_interpret.read_status_reg(5), '016b'))
+        for test_i in range(11):
+            print(format(cmd_interpret.read_status_reg(test_i), '016b'))
 
 #--------------------------------------------------------------------------#
 if __name__ == "__main__":

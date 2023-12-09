@@ -64,6 +64,10 @@ def create_parser():
     parser.add_option("--ws_address", type="int",action="store", dest="ws_address", default=0x0040, help="Chip WS I2C Address for WS Testing Purposes")
     # parser.add_argument('--ws_read_mode',metavar='MODE',type = str,choices=["WS", "I2C", "High Level"],default='WS',help='The read mode algorithm to use for reading the WS. Options are: WS - to read with the WS controller; I2C - to read with the I2C controller; High Level - to use the high level functions. Default: WS')
     #------------------------------------------------------------------------#
+    parser.add_option("--start_hist_counter",action="store_true", dest="do_start_hist_counter", default=False, help="Start histogram ounter for gloabl trigger latency determination")
+    parser.add_option("--start_DAQ_pulse",action="store_true", dest="do_start_DAQ_pulse", default=False, help="Start DAQ on the FPGA")
+    parser.add_option("--stop_DAQ_pulse",action="store_true", dest="do_stop_DAQ_pulse", default=False, help="Stop DAQ on the FPGA and delete last event if any")
+    #------------------------------------------------------------------------#
 
 
     return parser

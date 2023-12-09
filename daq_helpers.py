@@ -267,6 +267,13 @@ class Receive_data(threading.Thread):
                         self.stop_DAQ_event.set()
                     elif message == 'link reset':
                         link_reset(self.cmd_interpret)
+                    elif message == 'start DAQ pulse':
+                        start_DAQ_pulse(self.cmd_interpret)
+                    elif message == 'start DAQ pulse and reset counter':
+                        software_clear_error(self.cmd_interpret)
+                        start_DAQ_pulse(self.cmd_interpret)
+                    elif message == 'stop DAQ pulse':
+                        stop_DAQ_pulse(self.cmd_interpret)
                     # elif message == 'reset till linked':
                     #     set_trigger_linked(self.cmd_interpret)
                     ## Special if condition for delay change during the DAQ
@@ -415,6 +422,13 @@ class Write_data(threading.Thread):
         if(not self.skip_binary): outfile.close()
         print("%s finished!"%self.getName())
 
+        # 
+        # Pulse Register:
+# Reg[15:0] = 
+# {5'bxxx,stop_DAQ_pulse,start_DAQ_pulse,start_hist_counter,
+# resumePulse,clear_ws_trig_block_pulse,clrError,initPulse,
+# errInjPulse,fcStart,fifo_reset,START}
+
 #--------------------------------------------------------------------------#
 ## software clear fifo
 ## MSB..10, i.e., trigger pulser_reg[1]
@@ -450,6 +464,24 @@ def fc_signal_start(cmd_interpret):
 ## MSB..10000, i.e., trigger pulser_reg[4]
 def fc_init_pulse(cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0010)
+
+#--------------------------------------------------------------------------#
+## start_hist_counter
+## MSB..100000000, i.e., trigger pulser_reg[8]
+def start_hist_counter(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0100)
+
+#--------------------------------------------------------------------------#
+## start_DAQ_pulse
+## MSB..1000000000, i.e., trigger pulser_reg[9]
+def start_DAQ_pulse(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0200)
+
+#--------------------------------------------------------------------------#
+## stop_DAQ_pulse
+## MSB..10000000000, i.e., trigger pulser_reg[10]
+def stop_DAQ_pulse(cmd_interpret):
+    cmd_interpret.write_pulse_reg(0x0400)
 
 #--------------------------------------------------------------------------#
 ## Enable FPGA Descrambler
