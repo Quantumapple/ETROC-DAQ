@@ -133,8 +133,8 @@ def link_reset(cmd_interpret):
     time.sleep(2.01)
 
 #--------------------------------------------------------------------------#
-def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
-    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val)
+def get_fpga_data(cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val):
+    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val)
     try:
         fpga_data.start()
         while fpga_data.is_alive():
@@ -145,12 +145,13 @@ def get_fpga_data(cmd_interpret, time_limit, overwrite, output_directory, isQInj
 
 # define a threading class for saving data from FPGA Registers only
 class Save_FPGA_data(threading.Thread):
-    def __init__(self, name, cmd_interpret, time_limit, overwrite, output_directory, isQInj, DAC_Val):
+    def __init__(self, name, cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val):
         threading.Thread.__init__(self, name=name)
         self.cmd_interpret    = cmd_interpret
         self.time_limit       = time_limit
         self.overwrite        = overwrite
         self.output_directory = output_directory
+        self.run_name         = run_name
         self.isQInj           = isQInj
         self.DAC_Val          = DAC_Val
 
@@ -164,7 +165,10 @@ class Save_FPGA_data(threading.Thread):
         print("{} is saving FPGA data directly...".format(self.getName()))
         userdefinedir = self.output_directory
         today = datetime.date.today()
-        todaystr = "../ETROC-Data/" + today.isoformat() + "_Array_Test_Results"
+        final_dir_str = today.isoformat() + "_Array_Test_Results"
+        if self.run_name is not None:
+            final_dir_str = self.run_name
+        todaystr = "../ETROC-Data/" + final_dir_str
         try:
             os.mkdir(todaystr)
             print("Directory %s was created!"%todaystr)
@@ -351,12 +355,18 @@ class Write_data(threading.Thread):
         self.file_counter            = 0
         self.retry_count             = 0
 
+        self.file_mode = 'w'
+        self.file_extension = 'dat'
+        if self.compressed_binary:
+            self.file_mode = 'wb'
+            self.file_extension = 'bin'
+
     def run(self):
         t = threading.current_thread()
         t.alive      = True
         prev_status_on_data_stream = ""
         if(not self.skip_binary):
-            outfile = open("%s/TDC_Data_%d.dat"%(self.store_dict, self.file_counter), 'w')
+            outfile = open("%s/TDC_Data_%d.%s"%(self.store_dict, self.file_counter, self.file_extension), self.file_mode)
             print("{} is reading queue and writing file {}...".format(self.getName(), self.file_counter))
         else:
             print("{} is reading queue and pushing binary onwards...".format(self.getName()))
@@ -369,7 +379,7 @@ class Write_data(threading.Thread):
                 outfile.close()
                 self.file_lines   = 0
                 self.file_counter = self.file_counter + 1
-                outfile = open("%s/TDC_Data_%d.dat"%(self.store_dict, self.file_counter), 'w')
+                outfile = open("%s/TDC_Data_%d.%s"%(self.store_dict, self.file_counter, self.file_extension), self.file_mode)
                 print("{} is reading queue and writing file {}...".format(self.getName(), self.file_counter))
             mem_data = ""
             # Attempt to pop off the read_queue for 30 secs, fail if nothing found
@@ -403,7 +413,7 @@ class Write_data(threading.Thread):
             # if int(mem_data) == 9961472: continue # got a Filler
             # if int(mem_data) == 2550136832: continue # got a Filler
             if(not self.skip_binary):
-                if(self.compressed_binary): outfile.write('%d\n'%int(mem_data))
+                if(self.compressed_binary): outfile.write(int(mem_data).to_bytes(4, 'little'))
                 else: outfile.write('%s\n'%binary)
             # Increment line counters
             self.file_lines = self.file_lines + 1

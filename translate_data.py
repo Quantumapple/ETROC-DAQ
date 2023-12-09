@@ -38,7 +38,7 @@ class Translate_data(threading.Thread):
         self.compressed_translation  = compressed_translation
         self.debug_event_translation = debug_event_translation
         self.lock_translation_numwords = lock_translation_numwords
-        self.translate_deque         = deque()
+        self.translate_list          = []
         self.valid_data              = False if check_valid_data_start else True
         self.header_pattern          = format(0xc3a3c3a, "028b")
         self.trailer_pattern         = '001011'
@@ -53,7 +53,7 @@ class Translate_data(threading.Thread):
         self.event_number            = -1
 
     def reset_params(self):
-        self.translate_deque.clear()
+        self.translate_list = []
         self.in_event           = False
         self.eth_words_in_event = -1
         self.words_in_event     = -1
@@ -103,7 +103,7 @@ class Translate_data(threading.Thread):
             if(binary[0:28]==self.header_pattern):
                 self.reset_params()
                 self.in_event = True
-                self.translate_deque.append(binary)
+                self.translate_list.append(binary)
                 continue
             # Event Header Line Two Found
             elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]==self.firmware_key)):
@@ -112,9 +112,9 @@ class Translate_data(threading.Thread):
                 self.words_in_event     = int(binary[20:30], base=2)
                 self.eth_words_in_event = div_ceil(40*self.words_in_event,32)
                 # TODO EVENT TYPE?
-                self.translate_deque.append(binary)
+                self.translate_list.append(binary)
                 # Set valid_data to true once we see fresh data
-                if(self.event_number==0): self.valid_data = True
+                if(self.event_number==1 or self.event_number==0): self.valid_data = True
                 continue
             # Event Header Line Two NOT Found after the Header
             elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]!=self.firmware_key)):
@@ -130,25 +130,25 @@ class Translate_data(threading.Thread):
                 continue
             # Trailer Found - DO NOT CONTINUE
             elif(self.in_event and (self.eth_words_in_event==self.current_word) and (binary[0:6]==self.trailer_pattern) and (not self.debug_event_translation)):
-                self.translate_deque.append(binary)
+                self.translate_list.append(binary)
             # Trailer Found - Debug is true
             elif(self.in_event and (binary[0:6]==self.trailer_pattern) and (self.debug_event_translation)):
                 if((self.eth_words_in_event==self.current_word and self.lock_translation_numwords) or (not self.lock_translation_numwords)):
-                    self.translate_deque.append(binary)
+                    self.translate_list.append(binary)
             # Event Data Word
             elif(self.in_event):
-                self.translate_deque.append(binary)
+                self.translate_list.append(binary)
                 self.current_word += 1
                 continue
             # Ethernet Line not inside Event, Skip it
             else: continue
 
             # We only come here if we saw a Trailer, but let's put a failsafe regardless
-            if((not self.debug_event_translation) and len(self.translate_deque)!=self.eth_words_in_event+3):
+            if((not self.debug_event_translation) and len(self.translate_list)!=self.eth_words_in_event+3):
                 self.reset_params()
                 continue
 
-            TDC_data = etroc_translate_binary(self.translate_deque, self.valid_data, self.board_ID, self.compressed_translation, self.channel_header_pattern, self.header_pattern, self.trailer_pattern, self.debug_event_translation)
+            TDC_data = etroc_translate_binary(self.translate_list, self.valid_data, self.board_ID, self.compressed_translation, self.channel_header_pattern, self.header_pattern, self.trailer_pattern, self.debug_event_translation)
             TDC_len = len(TDC_data)
             if((not self.skip_translation) and (TDC_len>0)):
                 for TDC_line in TDC_data:
@@ -166,12 +166,14 @@ class Translate_data(threading.Thread):
         print("%s finished!"%self.getName())
 
 #----------------------------------------------------------------------------------------#
-def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_translation, channel_header_pattern, header_pattern, trailer_pattern, debug=False):
+def etroc_translate_binary(translate_list, valid_data, board_ID, compressed_translation, channel_header_pattern, header_pattern, trailer_pattern, debug=False):
     TDC_data = []
     if(not valid_data): return TDC_data
-    header_1 = translate_deque.popleft()
-    header_2 = translate_deque.popleft()
-    trailer  = translate_deque.pop()
+    header_1 = translate_list[0]
+    header_2 = translate_list[1]
+    trailer  = translate_list[-1]
+    list_position = 2  # Current position in the list
+    list_last_position = len(translate_list) - 1  # Account for the trailer
     event_mask = header_1[-4:]
     version    = header_2[0:4]
     event_num  = int(header_2[4:20],  base=2)
@@ -194,14 +196,16 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
     etroc_word   = ""
     current_channel = -1
     # pattern_3c5c = '0011110001011100'
-    while translate_deque:
+    while list_position < list_last_position:
         try:
-            running_word = running_word + translate_deque.popleft()
+            running_word = running_word + translate_list[list_position]
+            list_position += 1
         except IndexError:
             print("Empty queue in while loop")
         if(len(running_word)<40):
             try:
-                running_word = running_word + translate_deque.popleft()
+                running_word = running_word + translate_list[list_position]
+                list_position += 1
             except IndexError:
                 print("Empty queue when reading twice in the same loop")
         etroc_word   = running_word[0:40]
@@ -209,7 +213,7 @@ def etroc_translate_binary(translate_deque, valid_data, board_ID, compressed_tra
         current_word += 1
         if(debug):
             TDC_data.append(f"{etroc_word}")
-            if(not translate_deque): TDC_data.append(f"{running_word}")
+            if(list_position >= list_last_position): TDC_data.append(f"{running_word}")
             continue
         # HEADER "H {channel} {L1Counter} {Type} {BCID}"
         if(etroc_word[0:18]==channel_header_pattern+'00'):
