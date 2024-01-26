@@ -69,6 +69,8 @@ def create_parser():
     parser.add_option("--start_DAQ_pulse",action="store_true", dest="do_start_DAQ_pulse", default=False, help="Start DAQ on the FPGA")
     parser.add_option("--stop_DAQ_pulse",action="store_true", dest="do_stop_DAQ_pulse", default=False, help="Stop DAQ on the FPGA and delete last event if any")
     #------------------------------------------------------------------------#
+    parser.add_option("--show_trigger_hist",action="store_true", dest="show_trigger_hist", default=False, help="Show 32 counters in hist for Global Trigger latency evaluation")
+    #------------------------------------------------------------------------#
 
 
     return parser

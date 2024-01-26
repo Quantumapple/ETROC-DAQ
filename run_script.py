@@ -111,52 +111,6 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("Enable Global Trigger: ", string_15[-11:-10])
         print("Global Trigger Delay : ", string_15[-16:-11])
         print('\n')
-        # if(string_13[-2:]!='00'):
-        #     def unpack_state_history(dumped_data):
-        #         print("State! ->")
-        #         print("chip_data_buffer_din         :", dumped_data[-40:])
-        #         print("state (state machine)        :", dumped_data[-43:-40])
-        #         print("chip_data_ready              :", dumped_data[-44:-43])
-        #         print("sortMask                     :", dumped_data[-48:-44])
-        #         print("readToken                    :", dumped_data[-50:-48])
-        #         print("chip_data_buffer_empty       :", dumped_data[-51:-50])
-        #         print("chip_data_buffer_full        :", dumped_data[-52:-51])
-        #         print("chip_data_buffer_wren        :", dumped_data[-53:-52])
-        #         print("isHeader[readToken]          :", dumped_data[-54:-53])
-        #         print("emptyETROC2FIFOCh[readToken] :", dumped_data[-55:-54])
-        #         print("rdenETROC2FIFOCh[readToken]  :", dumped_data[-56:-55])
-        #     print("Data from Status Registers for debugging, printed from latest state to oldest state:")
-        #     for status_page in ["01","10","11"]:
-        #         modified_timestamp = format(options.timestamp, '016b')
-        #         modified_timestamp = modified_timestamp[:-2] + status_page
-        #         daq_helpers.timestamp(cmd_interpret, key = int(modified_timestamp, base=2))
-        #         time.sleep(1.1)
-        #         print("Waited for 1 sec")
-        #         print(fr"Status Page {status_page} Set, data as follows ->")
-        #         temp_reg = ""
-        #         temp_reg = format(cmd_interpret.read_status_reg(0), '016b') + temp_reg
-        #         temp_reg = format(cmd_interpret.read_status_reg(1), '016b') + temp_reg
-        #         temp_reg = format(cmd_interpret.read_status_reg(2), '016b') + temp_reg
-        #         temp_reg = format(cmd_interpret.read_status_reg(3), '016b')[-8:] + temp_reg
-        #         unpack_state_history(temp_reg)
-        #         temp_reg = ""
-        #         temp_reg = format(cmd_interpret.read_status_reg(3), '016b')[-16:-8] + temp_reg
-        #         temp_reg = format(cmd_interpret.read_status_reg(4), '016b') + temp_reg
-        #         temp_reg = format(cmd_interpret.read_status_reg(5), '016b') + temp_reg
-        #         temp_reg = format(cmd_interpret.read_status_reg(6), '016b') + temp_reg
-        #         unpack_state_history(temp_reg)
-        #         temp_reg = ""
-        #         temp_reg = format(cmd_interpret.read_status_reg(7), '016b') + temp_reg
-        #         temp_reg = format(cmd_interpret.read_status_reg(8), '016b') + temp_reg
-        #         temp_reg = format(cmd_interpret.read_status_reg(9), '016b') + temp_reg
-        #         temp_reg = format(cmd_interpret.read_status_reg(10), '016b')[-8:] + temp_reg
-        #         unpack_state_history(temp_reg)
-        #         if(status_page=="10"):
-        #             print("Special registers start ->")
-        #             print("Buffer almost full : ", format(cmd_interpret.read_status_reg(10), '016b')[-10:-9])
-        #             print("Hold L1A           : ", format(cmd_interpret.read_status_reg(10), '016b')[-9 :-8])
-        #             print("Special registers end")
-        #     del temp_reg, modified_timestamp
         del read_register_7,read_register_8,read_register_11,read_register_12,read_register_13,read_register_14,read_register_15
         del string_7,string_8,string_13,string_14,string_15
 
@@ -177,22 +131,14 @@ def main(options, cmd_interpret, IPC_queue = None):
         modified_timestamp = modified_timestamp[:-2] + '10'
         daq_helpers.timestamp(cmd_interpret, key = int(modified_timestamp, base=2))
         time.sleep(0.1)
-        read_register_13 = cmd_interpret.read_config_reg(13)
-        string_13   = format(read_register_13, '016b')
-        print("Written into Reg 13: ", string_13)
-        print("Data Rate              : ", string_13[-7:-5])
-        print("LED pages              : ", string_13[-5:-2])
-        print("Testmode               : ", string_13[-2])
-        print("Timestamp (active low) : ", string_13[-1])
-        print("DEV Status Page        : ", string_13[-2:])
         print("Status of DAQ Toggle before Start Pulse: ", format(cmd_interpret.read_status_reg(5), '016b'))
-        for test_i in range(11):
-            print(format(cmd_interpret.read_status_reg(test_i), '016b'))
         daq_helpers.start_DAQ_pulse(cmd_interpret)
         time.sleep(0.1)
         print("Status of DAQ Toggle after Start Pulse: ", format(cmd_interpret.read_status_reg(5), '016b'))
-        for test_i in range(11):
-            print(format(cmd_interpret.read_status_reg(test_i), '016b'))
+
+    if(options.show_trigger_hist):
+        daq_helpers.start_hist_counter(cmd_interpret)
+        print("Started the hist counter")
         
 
     if(options.resume_in_debug_mode):
@@ -300,22 +246,34 @@ def main(options, cmd_interpret, IPC_queue = None):
         modified_timestamp = modified_timestamp[:-2] + '10'
         daq_helpers.timestamp(cmd_interpret, key = int(modified_timestamp, base=2))
         time.sleep(0.1)
-        read_register_13 = cmd_interpret.read_config_reg(13)
-        string_13   = format(read_register_13, '016b')
-        print("Written into Reg 13: ", string_13)
-        print("Data Rate              : ", string_13[-7:-5])
-        print("LED pages              : ", string_13[-5:-2])
-        print("Testmode               : ", string_13[-2])
-        print("Timestamp (active low) : ", string_13[-1])
-        print("DEV Status Page        : ", string_13[-2:])
         print("Status of DAQ Toggle before Stop Pulse: ", format(cmd_interpret.read_status_reg(5), '016b'))
-        for test_i in range(11):
-            print(format(cmd_interpret.read_status_reg(test_i), '016b'))
         daq_helpers.stop_DAQ_pulse(cmd_interpret)
         time.sleep(0.1)
         print("Status of DAQ Toggle after Stop Pulse: ", format(cmd_interpret.read_status_reg(5), '016b'))
+
+    if(options.show_trigger_hist):
+        modified_timestamp = format(options.timestamp, '016b')
+        modified_timestamp = modified_timestamp[:-2] + '10'
+        daq_helpers.timestamp(cmd_interpret, key = int(modified_timestamp, base=2))
+        time.sleep(0.1)
+        print("Status Page for Hist Counter Done: ", format(cmd_interpret.read_config_reg(13), '016b')[-2:])
+        print("Is the Hist Counter Done?: ", format(cmd_interpret.read_status_reg(5), '016b')[-1:])
+        modified_timestamp = format(options.timestamp, '016b')
+        modified_timestamp = modified_timestamp[:-2] + '01'
+        daq_helpers.timestamp(cmd_interpret, key = int(modified_timestamp, base=2))
+        time.sleep(0.1)
+        print("Status Page for 1st Hist Counter Data: ", format(cmd_interpret.read_config_reg(13), '016b')[-2:])
         for test_i in range(11):
-            print(format(cmd_interpret.read_status_reg(test_i), '016b'))
+            print(2*test_i, format(cmd_interpret.read_status_reg(test_i), '016b')[-8:])
+            print(1+2*test_i, format(cmd_interpret.read_status_reg(test_i), '016b')[-16:-8])
+        modified_timestamp = format(options.timestamp, '016b')
+        modified_timestamp = modified_timestamp[:-2] + '10'
+        daq_helpers.timestamp(cmd_interpret, key = int(modified_timestamp, base=2))
+        time.sleep(0.1)
+        print("Status Page for 2nd Hist Counter Data: ", format(cmd_interpret.read_config_reg(13), '016b')[-2:])
+        for test_i in range(5):
+            print(22+2*test_i, format(cmd_interpret.read_status_reg(test_i), '016b')[-8:])
+            print(22+1+2*test_i, format(cmd_interpret.read_status_reg(test_i), '016b')[-16:-8])
 
 #--------------------------------------------------------------------------#
 if __name__ == "__main__":

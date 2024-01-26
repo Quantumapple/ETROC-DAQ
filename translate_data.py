@@ -98,7 +98,9 @@ class Translate_data(threading.Thread):
                 print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!!")
                 break
             # Filler
-            if(len(binary)<32): continue
+            if(len(binary)<32): 
+                outfile.write("%s\n"%binary)
+                self.file_lines  = self.file_lines  + 1
             # Event Header Found
             if(binary[0:28]==self.header_pattern):
                 self.reset_params()
@@ -229,7 +231,7 @@ def etroc_translate_binary(translate_list, valid_data, board_ID, compressed_tran
         # TRAILER "T {channel} {Status} {Hits} {CRC}"
         elif(etroc_word[0:18]=='0'+board_ID[int(current_channel)]):
             TDC_data.append(f"T {current_channel} {int(etroc_word[18:24], base=2)} {int(etroc_word[24:32], base=2)} {int(etroc_word[32:40], base=2)}")
-    # TDC_data.append(f"ET {event_num} {event_type} {overflow_count} {hamming_count} {crc}")
-    TDC_data.append(f"ET {event_num}")
+    TDC_data.append(f"ET {event_num} {event_type} {overflow_count} {hamming_count} {crc}")
+    # TDC_data.append(f"ET {event_num}")
     return TDC_data
 
