@@ -22,8 +22,9 @@ def div_ceil(x,y):
 #--------------------------------------------------------------------------#
 # Threading class to only TRANSLATE the binary data and save to disk
 class Translate_data(threading.Thread):
-    def __init__(self, name, firmware_key, check_valid_data_start, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None, debug_event_translation = False, lock_translation_numwords = False):
+    def __init__(self, name, verbose, firmware_key, check_valid_data_start, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None, debug_event_translation = False, lock_translation_numwords = False):
         threading.Thread.__init__(self, name=name)
+        self.verbose                 = verbose
         self.firmware_key            = firmware_key
         self.check_valid_data_start  = check_valid_data_start
         self.translate_queue         = translate_queue
@@ -66,7 +67,8 @@ class Translate_data(threading.Thread):
 
         if(not self.skip_translation):
             outfile  = open("%s/TDC_Data_translated_%d.nem"%(self.store_dict, self.file_counter), 'w')
-            print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
+            if(self.verbose): print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
+            else: print("{} is reading queue and translating...".format(self.getName()))
         else:
             print("{} is reading queue and translating...".format(self.getName()))
         while True:
@@ -79,7 +81,7 @@ class Translate_data(threading.Thread):
                 self.file_lines   = 0
                 self.file_counter = self.file_counter + 1
                 outfile = open("%s/TDC_Data_translated_%d.nem"%(self.store_dict, self.file_counter), 'w')
-                print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
+                if(self.verbose): print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
             binary = ""
             # Attempt to pop off the translate_queue for 30 secs, fail if nothing found
             try:
@@ -150,7 +152,7 @@ class Translate_data(threading.Thread):
                 self.reset_params()
                 continue
 
-            TDC_data = etroc_translate_binary(self.translate_list, self.valid_data, self.board_ID, self.compressed_translation, self.channel_header_pattern, self.header_pattern, self.trailer_pattern, self.debug_event_translation)
+            TDC_data = etroc_translate_binary(self.verbose, self.translate_list, self.valid_data, self.board_ID, self.compressed_translation, self.channel_header_pattern, self.header_pattern, self.trailer_pattern, self.debug_event_translation)
             TDC_len = len(TDC_data)
             if((not self.skip_translation) and (TDC_len>0)):
                 for TDC_line in TDC_data:
@@ -168,7 +170,7 @@ class Translate_data(threading.Thread):
         print("%s finished!"%self.getName())
 
 #----------------------------------------------------------------------------------------#
-def etroc_translate_binary(translate_list, valid_data, board_ID, compressed_translation, channel_header_pattern, header_pattern, trailer_pattern, debug=False):
+def etroc_translate_binary(verbose, translate_list, valid_data, board_ID, compressed_translation, channel_header_pattern, header_pattern, trailer_pattern, debug=False):
     TDC_data = []
     if(not valid_data): return TDC_data
     header_1 = translate_list[0]
@@ -203,13 +205,13 @@ def etroc_translate_binary(translate_list, valid_data, board_ID, compressed_tran
             running_word = running_word + translate_list[list_position]
             list_position += 1
         except IndexError:
-            print("Empty queue in while loop")
+            if(verbose): print("Empty queue in while loop")
         if(len(running_word)<40):
             try:
                 running_word = running_word + translate_list[list_position]
                 list_position += 1
             except IndexError:
-                print("Empty queue when reading twice in the same loop")
+                if(verbose): print("Empty queue when reading twice in the same loop")
         etroc_word   = running_word[0:40]
         running_word = running_word[40:]
         current_word += 1
@@ -222,7 +224,7 @@ def etroc_translate_binary(translate_list, valid_data, board_ID, compressed_tran
             try:
               current_channel=active_channels.popleft()
             except IndexError:
-              print("The active_channels deque is empty, more headers found than event mask can allow")
+              if(verbose): print("The active_channels deque is empty, more headers found than event mask can allow")
               TDC_data.append(f"THIS IS A BROKEN EVENT SINCE MORE HEADERS THAN MASK FOUND")
             TDC_data.append(f"H {current_channel} {int(etroc_word[18:26], base=2)} {etroc_word[26:28]} {int(etroc_word[28:40], base=2)}")
         # DATA "D {channel} {EA} {ROW} {COL} {TOA} {TOT} {CAL}"

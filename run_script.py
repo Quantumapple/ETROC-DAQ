@@ -207,13 +207,13 @@ def main(options, cmd_interpret, IPC_queue = None):
         translate_thread_handle = threading.Event() # This is how we stop the translate thread (if translate enabled) (set down below...)
         stop_DAQ_event = threading.Event()          # This is how we notify the Read thread that we are done taking data
                                                     # Kill order is read, write, translate
-        receive_data = daq_helpers.Receive_data('Receive_data', read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
-        write_data = daq_helpers.Write_data('Write_data', read_queue, translate_queue, options.num_line, store_dict, options.skip_translation, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
+        receive_data = daq_helpers.Receive_data('Receive_data', options.verbose, read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
+        write_data = daq_helpers.Write_data('Write_data', options.verbose, read_queue, translate_queue, options.num_line, store_dict, options.skip_translation, options.compressed_binary, options.skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
         if(not options.ws_testing):
-            translate_data_thread = translate_data.Translate_data('Translate_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords)
+            translate_data_thread = translate_data.Translate_data('Translate_data', options.verbose, options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords)
         else:
             ws_chip = ws_testing.return_initialized_ws_chip(options.ws_i2c_port, options.ws_chip_address, options.ws_address)
-            translate_data_thread = ws_testing.Translate_ws_data('Translate_ws_data', options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords, ws_chip, options.ws_chipname, options.ws_i2c_port, options.ws_chip_address, options.ws_address)
+            translate_data_thread = ws_testing.Translate_ws_data('Translate_ws_data', options.verbose, options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords, ws_chip, options.ws_chipname, options.ws_i2c_port, options.ws_chip_address, options.ws_address)
         try:
             # Start the thread
             receive_data.start()

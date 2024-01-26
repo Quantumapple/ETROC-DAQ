@@ -220,8 +220,9 @@ class Save_FPGA_data(threading.Thread):
 #--------------------------------------------------------------------------#
 # Threading class to only READ off the ethernet buffer
 class Receive_data(threading.Thread):
-    def __init__(self, name, read_queue, cmd_interpret, num_fifo_read, read_thread_handle, write_thread_handle, time_limit, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
+    def __init__(self, name, verbose, read_queue, cmd_interpret, num_fifo_read, read_thread_handle, write_thread_handle, time_limit, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
         threading.Thread.__init__(self, name=name)
+        self.verbose             = verbose
         self.read_queue          = read_queue
         self.cmd_interpret       = cmd_interpret
         self.num_fifo_read       = num_fifo_read
@@ -248,7 +249,6 @@ class Receive_data(threading.Thread):
         total_start_time = time.time()
         print("{} is reading data and pushing to the queue...".format(self.getName()))
         while ((time.time()-total_start_time<=self.time_limit)):
-            # print("while looped...")
             if self.use_IPC:
                 try:
                     message = self.IPC_queue.get(False)
@@ -278,8 +278,6 @@ class Receive_data(threading.Thread):
                         start_DAQ_pulse(self.cmd_interpret)
                     elif message == 'stop DAQ pulse':
                         stop_DAQ_pulse(self.cmd_interpret)
-                    # elif message == 'reset till linked':
-                    #     set_trigger_linked(self.cmd_interpret)
                     ## Special if condition for delay change during the DAQ
                     ## Example: change delay 0x0421
                     ##   becomes: change delay 1057
@@ -307,21 +305,16 @@ class Receive_data(threading.Thread):
                 except queue.Empty:
                     pass
             if self.daq_on:
-                # print("In loop and daq_on, attempting to access read_data_fifo")
                 mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
                 if mem_data == []:
                     print("No data in buffer! Will try to read again")
                     time.sleep(1.01)
                     mem_data = self.cmd_interpret.read_data_fifo(self.num_fifo_read)
-
                 for mem_line in mem_data:
                     self.read_queue.put(mem_line)
-                # print("memdata added to queue:", mem_data)
-            # print("In loop, attempting to test alive condition")
             if not t.alive:
                 print("Read Thread detected alive=False")
                 break
-            # print("In loop, attempting to test read_handle condition")
             if self.read_thread_handle.is_set():
                 print("Read Thread received STOP signal")
                 if not self.write_thread_handle.is_set():
@@ -338,8 +331,9 @@ class Receive_data(threading.Thread):
 #--------------------------------------------------------------------------#
 # Threading class to only WRITE the raw binary data to disk
 class Write_data(threading.Thread):
-    def __init__(self, name, read_queue, translate_queue, num_line, store_dict, skip_translation, compressed_binary, skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event = None):
+    def __init__(self, name, verbose, read_queue, translate_queue, num_line, store_dict, skip_translation, compressed_binary, skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
+        self.verbose                 = verbose
         self.read_queue              = read_queue
         self.translate_queue         = translate_queue
         self.num_line                = num_line
@@ -383,7 +377,7 @@ class Write_data(threading.Thread):
                 self.binary_bytes = 0
                 self.file_counter = self.file_counter + 1
                 outfile = open("%s/TDC_Data_%d.%s"%(self.store_dict, self.file_counter, self.file_extension), self.file_mode)
-                print("{} is reading queue and writing file {}...".format(self.getName(), self.file_counter))
+                if(self.verbose): print("{} is reading queue and writing file {}...".format(self.getName(), self.file_counter))
             mem_data = ""
             # Attempt to pop off the read_queue for 30 secs, fail if nothing found
             try:
@@ -409,22 +403,22 @@ class Write_data(threading.Thread):
             if ((not self.skip_binary) and (not self.compressed_binary)) or (not self.skip_translation):
                 binary = format(int(mem_data), '032b')
                 # Handle the raw (binary) line
+                # if int(mem_data) == 0: continue # Waiting for IPC
+                # if int(mem_data) == 38912: continue # got a Filler
+                # if int(mem_data) == 9961472: continue # got a Filler
+                # if int(mem_data) == 2550136832: continue # got a Filler
                 # if int(mem_data) == 1431655765: continue # Ethernet Filler Line
+                if ((not self.skip_binary) and (not self.compressed_binary)):
+                    outfile.write('%s\n'%binary)
+                    # Increment line counters
+                    self.file_lines = self.file_lines + 1
                 if binary[0:16] == '0101010101010101':
                     if(prev_status_on_data_stream!=binary[16:]):
                         print(f"(Unique) Status on Data Stream: {binary[16:]}")
                         prev_status_on_data_stream = binary[16:]
                     if(not self.skip_translation):
-                        self.translate_queue.put("0")
+                        self.translate_queue.put(f"FILLER {binary[16:]}")
                     continue # Ethernet Filler Line
-                # if int(mem_data) == 0: continue # Waiting for IPC
-                # if int(mem_data) == 38912: continue # got a Filler
-                # if int(mem_data) == 9961472: continue # got a Filler
-                # if int(mem_data) == 2550136832: continue # got a Filler
-                if (not self.skip_binary):
-                    outfile.write('%s\n'%binary)
-                    # Increment line counters
-                    self.file_lines = self.file_lines + 1
                 # Perform translation related activities if requested
                 if(not self.skip_translation):
                     self.translate_queue.put(binary)
@@ -440,7 +434,6 @@ class Write_data(threading.Thread):
         if(not self.skip_binary): outfile.close()
         print("%s finished!"%self.getName())
 
-# 
 # Pulse Register:
 # Reg[15:0] = 
 # {5'bxxx,stop_DAQ_pulse,start_DAQ_pulse,start_hist_counter,
@@ -503,42 +496,20 @@ def stop_DAQ_pulse(cmd_interpret):
 
 #--------------------------------------------------------------------------#
 ## Enable FPGA Descrambler
-## 0xWXYZ
-## Z is a bit 4 bit binary wxyz
-## z is the enable descrambler
-## y is disable GTX
-## x is polarity
-## w is the Enable debug mode flag
 ## {12'bxxxxxxxxx,add_ethernet_filler,debug_mode,dumping_mode,notGTXPolarity,notGTX,enableAutoSync}
 def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
     cmd_interpret.write_config_reg(14, val)
 
 #--------------------------------------------------------------------------#
 ## Register 15
-## Enable channel
-## 4 bit binary, WXYZ
-## W - ch3
-## X - ch2
-## Y - ch1
-## Z - ch0
-## Note that the input needs to be a 4-digit 16 bit hex, 0x000(WXYZ)
-## Register 15, needs firmware option
-# 0xWXYZ
-# Z is a bit 4 bit binary wxyz Channel Enable (1=Enable)
-# Y is a bit 4 bit binary wxyz Board Type (1=Etroc2)
+## Reg 15 : {global_trig_delay[4:0],global_trig,trig_or_logic,triple_trig,en_ws_trig,ws_trig_stop_delay[2:0],enableCh[3:0]}
 def active_channels(cmd_interpret, key = 0x0003):
     print(f"writing: {bin(key)} into register 15")
     cmd_interpret.write_config_reg(15, key)
 
 #--------------------------------------------------------------------------#
 ## Register 13
-## TimeStamp and Testmode
-## Following is binary key, 4 bit binary WXYZ
-## 0000: Enable  Testmode & Enable TimeStamp
-## 0001: Enable  Testmode & Disable TimeStamp
-## 0010: Disable Testmode & Enable TimeStamp
-## 0011: Disable Testmode & Disable TimeStamp  ##BUGGED as of 03-04-2023
-## Note that the input needs to be a 4-digit 16 bit hex, 0x000(WXYZ)
+## Reg 13 : {dataRate[1:0],LED_Pages[2:0],status_Pages[1:0]} 
 def timestamp(cmd_interpret, key=0x0000):
     cmd_interpret.write_config_reg(13, key)
 
@@ -553,25 +524,18 @@ def register_12(cmd_interpret, key = 0x0000):
 
 #--------------------------------------------------------------------------#
 ## Register 11
-## 4-digit 16 bit hex, 0xWXYZ
-## WX (8 bit) - N/A
-## YZ (8 bit) - Error Mask
+## Reg 11 : {4'bxxxx,duration[11:0]} \ Reg 12 : {errorMask[7:0],trigDataSize[1:0],period,1'bx,inputCmd[3:0]} 
 def register_11(cmd_interpret, key = 0x0000):
     cmd_interpret.write_config_reg(11, key)
 
 #--------------------------------------------------------------------------#
 ## Register 8
-## 4-digit 16 bit hex
-## LSB 10 bits are delay, LSB 11th bit is delay enabled
-## 0000||0100||0000||0000 = 0x0400: shift of one clock cycle
+## Reg 8 : {trigSelMask[3:0],enhenceData,enableL1Trig,L1Delay[9:0]} 
 def triggerBitDelay(cmd_interpret, key = 0x0400):
     cmd_interpret.write_config_reg(8, key)
 
 #--------------------------------------------------------------------------#
 ## Register 7
-## 4-digit 16 bit hex
-## LSB 6 bits  - time (s) for FPGA counters
-## Next 4 bits are the channel delay abcd = board: 3,2,1,0.
-## This delays the trigger bit of set channels by 1 clock cycle
+## Reg 7 : {6'bxxxxxx,delayTrigCh[3:0],6'bxxxxxx} //trigbit delay or not 
 def counterDuration(cmd_interpret, key = 0x0001):
     cmd_interpret.write_config_reg(7, key)
