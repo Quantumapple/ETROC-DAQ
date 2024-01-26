@@ -362,7 +362,6 @@ class Write_data(threading.Thread):
         if self.compressed_binary:
             self.file_mode = 'wb'
             self.file_extension = 'bin'
-            
 
     def run(self):
         t = threading.current_thread()
@@ -402,11 +401,10 @@ class Write_data(threading.Thread):
                     continue
                 print("BREAKING OUT OF WRITE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM READ_QUEUE!!!")
                 break
+
             if (not self.skip_binary) and (self.compressed_binary):
-                bin_data = int(mem_data)
-                if (bin_data >> 16) == 0b0101010101010101:
-                    outfile.write(int(mem_data).to_bytes(4, 'little'))
-                    self.binary_bytes += 4
+                outfile.write(int(mem_data).to_bytes(4, 'little'))
+                self.binary_bytes += 4
 
             if ((not self.skip_binary) and (not self.compressed_binary)) or (not self.skip_translation):
                 binary = format(int(mem_data), '032b')
@@ -423,7 +421,7 @@ class Write_data(threading.Thread):
                 # if int(mem_data) == 38912: continue # got a Filler
                 # if int(mem_data) == 9961472: continue # got a Filler
                 # if int(mem_data) == 2550136832: continue # got a Filler
-                if (not self.skip_binary) and (not self.compressed_binary):
+                if (not self.skip_binary):
                     outfile.write('%s\n'%binary)
                     # Increment line counters
                     self.file_lines = self.file_lines + 1
@@ -442,8 +440,8 @@ class Write_data(threading.Thread):
         if(not self.skip_binary): outfile.close()
         print("%s finished!"%self.getName())
 
-        # 
-        # Pulse Register:
+# 
+# Pulse Register:
 # Reg[15:0] = 
 # {5'bxxx,stop_DAQ_pulse,start_DAQ_pulse,start_hist_counter,
 # resumePulse,clear_ws_trig_block_pulse,clrError,initPulse,
