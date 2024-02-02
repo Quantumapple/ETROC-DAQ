@@ -331,7 +331,7 @@ class Receive_data(threading.Thread):
 #--------------------------------------------------------------------------#
 # Threading class to only WRITE the raw binary data to disk
 class Write_data(threading.Thread):
-    def __init__(self, name, verbose, read_queue, translate_queue, num_line, store_dict, skip_translation, compressed_binary, skip_binary, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event = None):
+    def __init__(self, name, verbose, read_queue, translate_queue, num_line, store_dict, skip_translation, compressed_binary, skip_binary, suppress_fillers, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event = None):
         threading.Thread.__init__(self, name=name)
         self.verbose                 = verbose
         self.read_queue              = read_queue
@@ -342,6 +342,7 @@ class Write_data(threading.Thread):
         self.skip_translation        = skip_translation
         self.compressed_binary       = compressed_binary
         self.skip_binary             = skip_binary
+        self.suppress_fillers        = suppress_fillers
         self.read_thread_handle      = read_thread_handle
         self.write_thread_handle     = write_thread_handle
         self.translate_thread_handle = translate_thread_handle
@@ -416,7 +417,7 @@ class Write_data(threading.Thread):
                     if(prev_status_on_data_stream!=binary[16:]):
                         print(f"(Unique) Status on Data Stream: {binary[16:]}")
                         prev_status_on_data_stream = binary[16:]
-                    if(not self.skip_translation):
+                    if((not self.skip_translation) and (not self.suppress_fillers)):
                         self.translate_queue.put(f"FILLER {binary[16:]}")
                     continue # Ethernet Filler Line
                 # Perform translation related activities if requested

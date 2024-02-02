@@ -26,6 +26,7 @@ def create_parser():
     parser.add_option("--skip_binary",action="store_true", dest="skip_binary", default=False, help="DO NOT save (raw) binary outputs to files")
     parser.add_option("--compressed_translation",action="store_true", dest="compressed_translation", default=False, help="Save only FPGA translated data frames with DATA")
     parser.add_option("--skip_translation",action="store_true", dest="skip_translation", default=False, help="DO NOT Save the translated FPGA data to files")
+    parser.add_option("--suppress_fillers",action="store_true", dest="suppress_fillers", default=False, help="DO NOT Save the translated fillers to files")
     parser.add_option("--debug_event_translation",action="store_true", dest="debug_event_translation", default=False, help="DEV dump ETROC raw data in each event")
     parser.add_option("--lock_translation_numwords",action="store_true", dest="lock_translation_numwords", default=False, help="Requires the correct number of 40bit words in the event")
     #------------------------------------------------------------------------#
