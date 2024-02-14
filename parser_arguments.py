@@ -20,7 +20,8 @@ def create_parser():
     #------------------------------------------------------------------------#
     parser.add_option("--run_name", dest="run_name", type="string", help="Run name under which to store the data, if not set will store the data under a timestamped directory.")
     parser.add_option("-o", "--output_directory", dest="output_directory", action="store", type="string", help="User defined output directory", default="unnamed_output_directory")
-    parser.add_option("--ssd",action="store_true", dest="ssd", default=False, help="Save TDC data to ssd path")
+    parser.add_option("--ssd",action="store_true", dest="ssd", default=False, help="Save TDC data to default ssd path /run/media/daq/T7/")
+    parser.add_option("--ssd_path",dest="ssd_path", type="string", default="", help="Save TDC data to inputed ssd path, default blue ssd path is: --ssd_path /run/media/daq/T7/")
     #------------------------------------------------------------------------#
     parser.add_option("--compressed_binary",action="store_true", dest="compressed_binary", default=False, help="Save FPGA binary data (raw output) in int format")
     parser.add_option("--skip_binary",action="store_true", dest="skip_binary", default=False, help="DO NOT save (raw) binary outputs to files")
