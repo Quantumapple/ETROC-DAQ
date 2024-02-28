@@ -93,6 +93,7 @@ def main(options, cmd_interpret, IPC_queue = None):
         read_register_14 = cmd_interpret.read_config_reg(14)
         string_14   = format(read_register_14, '016b')
         print("Written into Reg 14: ", string_14)
+        print("Fixed time filler (every 25ms) : ", string_14[-15])
         print("Bit Latency                    : ", string_14[-14:-10])
         print("Falling Edge                   : ", string_14[-10])
         print("Manual mode (set polarity man) : ", string_14[-9])
@@ -144,7 +145,7 @@ def main(options, cmd_interpret, IPC_queue = None):
     if(options.show_trigger_hist):
         daq_helpers.start_hist_counter(cmd_interpret)
         print("Started the hist counter")
-        
+
 
     if(options.resume_in_debug_mode):
         print("Resetting and Resuming State Machine in Debug Mode..")
