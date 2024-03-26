@@ -52,7 +52,7 @@ def set_all_trigger_linked(cmd_interpret, inspect=False):
     return linked_flag
 
 #--------------------------------------------------------------------------#
-def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Initialize = True, Triggerbit=True, repeatedQInj=False, L1ARange = False):
+def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Initialize = True, Triggerbit=True, repeatedQInj=False, qinj_loop=1, L1ARange = False):
     if(Initialize):
         register_11(cmd_interpret, 0x0deb)
         time.sleep(0.01)
@@ -80,7 +80,7 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
         fc_init_pulse(cmd_interpret)
         time.sleep(0.01)
         if(repeatedQInj):
-            for i in range(4):
+            for i in range(qinj_loop):
                 register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
                 cmd_interpret.write_config_reg(10, 0x0015 + i*0x0010)
                 cmd_interpret.write_config_reg(9, 0x0015 + i*0x0010)
@@ -97,7 +97,7 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
 
         ### Send L1A Range
         if(L1ARange):
-            for i in range(4):
+            for i in range(qinj_loop):
                 register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
                 cmd_interpret.write_config_reg(10, 0x020d + i*0x0010)
                 cmd_interpret.write_config_reg(9, 0x020d + i*0x0010)
@@ -279,9 +279,16 @@ class Receive_data(threading.Thread):
                         Triggerbit=False
                         Initialize = False
                         if("QInj" in words): QInj=True
-                        if("repeatedQInj" in words): 
+
+                        if("repeatedQInj" in words):
                             QInj=True
                             repeatedQInj = True
+                            matching_elements = [element for element in words if "repeatedQInj" in element]
+                            try:
+                                qinj_loop = int(matching_elements[0].split('=')[1])
+                            except:
+                                qinj_loop = 1
+
                         if("L1A" in words): L1A=True
                         if("L1ARange" in words):
                             L1A=True
@@ -289,7 +296,8 @@ class Receive_data(threading.Thread):
                         if("BCR" in words): BCR=True
                         if("Triggerbit" in words): Triggerbit=True
                         if("Start" in words): Initialize=True
-                        configure_memo_FC(self.cmd_interpret,Initialize=Initialize,QInj=QInj,L1A=L1A,BCR=BCR,Triggerbit=Triggerbit,L1ARange=L1ARange,repeatedQInj=repeatedQInj)
+                        configure_memo_FC(self.cmd_interpret,Initialize=Initialize,QInj=QInj,L1A=L1A,BCR=BCR,
+                                          Triggerbit=Triggerbit,repeatedQInj=repeatedQInj, qinj_loop=qinj_loop, L1ARange=L1ARange)
                     else:
                         print(f'Unknown message: {message}')
                 except queue.Empty:
