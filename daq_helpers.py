@@ -278,16 +278,19 @@ class Receive_data(threading.Thread):
                         BCR=False
                         Triggerbit=False
                         Initialize = False
+                        qinj_loop = 1
                         if("QInj" in words): QInj=True
 
-                        if("repeatedQInj" in words):
+                        matching_elements = [element for element in words if "repeatedQInj" in element]
+                        try:
+                            qinj_loop = int(matching_elements[0].split('=')[1])
                             QInj=True
                             repeatedQInj = True
-                            matching_elements = [element for element in words if "repeatedQInj" in element]
-                            try:
-                                qinj_loop = int(matching_elements[0].split('=')[1])
-                            except:
-                                qinj_loop = 1
+                            print(f'Repeat charge injection by {qinj_loop}')
+                        except:
+                            qinj_loop = 1
+                            QInj=True
+                            print('Oops, something is wrong, only do single charge injection')
 
                         if("L1A" in words): L1A=True
                         if("L1ARange" in words):
