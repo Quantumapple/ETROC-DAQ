@@ -96,8 +96,8 @@ def configure_memo_FC(
             for i in range(qinj_loop):
                 register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
                 if not (uniform_mode):
-                    cmd_interpret.write_config_reg(10, 0x0015 + i*0x0010)
-                    cmd_interpret.write_config_reg(9, 0x0015 + i*0x0010)
+                    cmd_interpret.write_config_reg(10, 0x0005 + i*0x0010)
+                    cmd_interpret.write_config_reg(9, 0x0005 + i*0x0010)
                     fc_init_pulse(cmd_interpret)
                     time.sleep(0.01)
                 else:
@@ -121,8 +121,8 @@ def configure_memo_FC(
             for i in range(qinj_loop):
                 register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
                 if not (uniform_mode):
-                    cmd_interpret.write_config_reg(10, 0x020d + i*0x0010)
-                    cmd_interpret.write_config_reg(9, 0x020d + i*0x0010)
+                    cmd_interpret.write_config_reg(10, 0x01fd + i*0x0010)
+                    cmd_interpret.write_config_reg(9, 0x01fd + i*0x0010)
                     fc_init_pulse(cmd_interpret)
                     time.sleep(0.01)
                 else:
