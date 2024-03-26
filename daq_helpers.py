@@ -306,6 +306,7 @@ class Receive_data(threading.Thread):
                         Triggerbit=False
                         Initialize = False
                         qinj_loop = 1
+                        uniform_mode = False
                         if("QInj" in words): QInj=True
 
                         matching_elements = [element for element in words if "repeatedQInj" in element]
@@ -326,8 +327,11 @@ class Receive_data(threading.Thread):
                         if("BCR" in words): BCR=True
                         if("Triggerbit" in words): Triggerbit=True
                         if("Start" in words): Initialize=True
+
+                        if('uniform' in words): uniform_mode=True
+
                         configure_memo_FC(self.cmd_interpret,Initialize=Initialize,QInj=QInj,L1A=L1A,BCR=BCR,
-                                          Triggerbit=Triggerbit,repeatedQInj=repeatedQInj, qinj_loop=qinj_loop, L1ARange=L1ARange)
+                                          Triggerbit=Triggerbit,repeatedQInj=repeatedQInj, qinj_loop=qinj_loop, L1ARange=L1ARange, uniform_mode=uniform_mode)
                     else:
                         print(f'Unknown message: {message}')
                 except queue.Empty:
