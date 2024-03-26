@@ -126,8 +126,8 @@ def configure_memo_FC(
                     fc_init_pulse(cmd_interpret)
                     time.sleep(0.01)
                 else:
-                    cmd_interpret.write_config_reg(10, 0x0005 + interval * i * 0x0010)
-                    cmd_interpret.write_config_reg(9, 0x0005 + interval * i * 0x0010)
+                    cmd_interpret.write_config_reg(10, 0x01fd + interval * i * 0x0010)
+                    cmd_interpret.write_config_reg(9, 0x01fd + interval * i * 0x0010)
                     fc_init_pulse(cmd_interpret)
                     time.sleep(0.01)
 
