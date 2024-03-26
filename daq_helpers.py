@@ -80,26 +80,12 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
         fc_init_pulse(cmd_interpret)
         time.sleep(0.01)
         if(repeatedQInj):
-            register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
-            cmd_interpret.write_config_reg(10, 0x0008)
-            cmd_interpret.write_config_reg(9, 0x0008)
-            fc_init_pulse(cmd_interpret)
-            time.sleep(0.01)
-            register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
-            cmd_interpret.write_config_reg(10, 0x000c)
-            cmd_interpret.write_config_reg(9, 0x000c)
-            fc_init_pulse(cmd_interpret)
-            time.sleep(0.01)
-            register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
-            cmd_interpret.write_config_reg(10, 0x0011)
-            cmd_interpret.write_config_reg(9, 0x0011)
-            fc_init_pulse(cmd_interpret)
-            time.sleep(0.01)
-            register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
-            cmd_interpret.write_config_reg(10, 0x0017)
-            cmd_interpret.write_config_reg(9, 0x0017)
-            fc_init_pulse(cmd_interpret)
-            time.sleep(0.01)
+            for i in range(4):
+                register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
+                cmd_interpret.write_config_reg(10, 0x0015 + i*0x0010)
+                cmd_interpret.write_config_reg(9, 0x0015 + i*0x0010)
+                fc_init_pulse(cmd_interpret)
+                time.sleep(0.01)
 
     ### Send L1A
     if(L1A):
@@ -111,17 +97,13 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
 
         ### Send L1A Range
         if(L1ARange):
-            register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
-            cmd_interpret.write_config_reg(10, 0x01fc)
-            cmd_interpret.write_config_reg(9, 0x01fc)
-            fc_init_pulse(cmd_interpret)
-            time.sleep(0.01)
+            for i in range(4):
+                register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
+                cmd_interpret.write_config_reg(10, 0x020d + i*0x0010)
+                cmd_interpret.write_config_reg(9, 0x020d + i*0x0010)
+                fc_init_pulse(cmd_interpret)
+                time.sleep(0.01)
 
-            register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
-            cmd_interpret.write_config_reg(10, 0x01fe)
-            cmd_interpret.write_config_reg(9, 0x01fe)
-            fc_init_pulse(cmd_interpret)
-            time.sleep(0.01)
 
     fc_signal_start(cmd_interpret)
     time.sleep(0.01)
@@ -131,6 +113,10 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
 def link_reset(cmd_interpret):
     software_clear_fifo(cmd_interpret)
     time.sleep(2.01)
+
+#--------------------------------------------
+
+#--------------------------------------------
 
 #--------------------------------------------------------------------------#
 def get_fpga_data(cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val):
@@ -286,12 +272,16 @@ class Receive_data(threading.Thread):
                     elif ' '.join(message.split(' ')[:1]) == 'memoFC':
                         words = message.split(' ')[1:]
                         QInj=False
+                        repeatedQInj = False
                         L1A=False
                         L1ARange=False
                         BCR=False
                         Triggerbit=False
                         Initialize = False
                         if("QInj" in words): QInj=True
+                        if("repeatedQInj" in words): 
+                            QInj=True
+                            repeatedQInj = True
                         if("L1A" in words): L1A=True
                         if("L1ARange" in words):
                             L1A=True
@@ -299,7 +289,7 @@ class Receive_data(threading.Thread):
                         if("BCR" in words): BCR=True
                         if("Triggerbit" in words): Triggerbit=True
                         if("Start" in words): Initialize=True
-                        configure_memo_FC(self.cmd_interpret,Initialize=Initialize,QInj=QInj,L1A=L1A,BCR=BCR,Triggerbit=Triggerbit,L1ARange=L1ARange)
+                        configure_memo_FC(self.cmd_interpret,Initialize=Initialize,QInj=QInj,L1A=L1A,BCR=BCR,Triggerbit=Triggerbit,L1ARange=L1ARange,repeatedQInj=repeatedQInj)
                     else:
                         print(f'Unknown message: {message}')
                 except queue.Empty:
@@ -421,6 +411,13 @@ class Write_data(threading.Thread):
                         self.translate_queue.put(f"FILLER {binary[12:]}")
                     continue # Ethernet Filler Line
                 # Perform translation related activities if requested
+                elif binary[0:12] == '010101011001':
+                    if(prev_status_on_data_stream!=binary[12:]):
+                        print(f"(Unique) Status on Data Stream: {binary[12:]}")
+                        prev_status_on_data_stream = binary[12:]
+                    if((not self.skip_translation) and (not self.suppress_fillers)):
+                        self.translate_queue.put(f"CLOCK {binary[12:]}")
+                    continue # Ethernet Filler Line
                 if(not self.skip_translation):
                     self.translate_queue.put(binary)
                 if self.write_thread_handle.is_set():
