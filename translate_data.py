@@ -103,8 +103,9 @@ class Translate_data(threading.Thread):
             if(len(binary)<32): 
                 outfile.write("%s\n"%binary)
                 self.file_lines  = self.file_lines  + 1
+                continue
             # Event Header Found
-            if(binary[0:28]==self.header_pattern):
+            elif(binary[0:28]==self.header_pattern):
                 self.reset_params()
                 self.in_event = True
                 self.translate_list.append(binary)
