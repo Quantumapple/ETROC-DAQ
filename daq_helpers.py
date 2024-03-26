@@ -52,7 +52,19 @@ def set_all_trigger_linked(cmd_interpret, inspect=False):
     return linked_flag
 
 #--------------------------------------------------------------------------#
-def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Initialize = True, Triggerbit=True, repeatedQInj=False, qinj_loop=1, L1ARange = False):
+def configure_memo_FC(
+        cmd_interpret,
+        BCR = False,
+        QInj = False,
+        L1A = False,
+        Initialize = True,
+        Triggerbit=True,
+        repeatedQInj=False,
+        qinj_loop=1,
+        L1ARange = False,
+        uniform_mode = False,
+    ):
+
     if(Initialize):
         register_11(cmd_interpret, 0x0deb)
         time.sleep(0.01)
@@ -80,12 +92,20 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
         fc_init_pulse(cmd_interpret)
         time.sleep(0.01)
         if(repeatedQInj):
+            interval = (3000//16)//qinj_loop
             for i in range(qinj_loop):
                 register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
-                cmd_interpret.write_config_reg(10, 0x0015 + i*0x0010)
-                cmd_interpret.write_config_reg(9, 0x0015 + i*0x0010)
-                fc_init_pulse(cmd_interpret)
-                time.sleep(0.01)
+                if not (uniform_mode):
+                    cmd_interpret.write_config_reg(10, 0x0015 + i*0x0010)
+                    cmd_interpret.write_config_reg(9, 0x0015 + i*0x0010)
+                    fc_init_pulse(cmd_interpret)
+                    time.sleep(0.01)
+                else:
+                    cmd_interpret.write_config_reg(10, 0x0005 + interval * i * 0x0010)
+                    cmd_interpret.write_config_reg(9, 0x0005 + interval * i * 0x0010)
+                    fc_init_pulse(cmd_interpret)
+                    time.sleep(0.01)
+                    pass
 
     ### Send L1A
     if(L1A):
@@ -97,12 +117,19 @@ def configure_memo_FC(cmd_interpret, BCR = False, QInj = False, L1A = False, Ini
 
         ### Send L1A Range
         if(L1ARange):
+            interval = (3000//16)//qinj_loop
             for i in range(qinj_loop):
                 register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
-                cmd_interpret.write_config_reg(10, 0x020d + i*0x0010)
-                cmd_interpret.write_config_reg(9, 0x020d + i*0x0010)
-                fc_init_pulse(cmd_interpret)
-                time.sleep(0.01)
+                if not (uniform_mode):
+                    cmd_interpret.write_config_reg(10, 0x020d + i*0x0010)
+                    cmd_interpret.write_config_reg(9, 0x020d + i*0x0010)
+                    fc_init_pulse(cmd_interpret)
+                    time.sleep(0.01)
+                else:
+                    cmd_interpret.write_config_reg(10, 0x0005 + interval * i * 0x0010)
+                    cmd_interpret.write_config_reg(9, 0x0005 + interval * i * 0x0010)
+                    fc_init_pulse(cmd_interpret)
+                    time.sleep(0.01)
 
 
     fc_signal_start(cmd_interpret)
