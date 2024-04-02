@@ -93,6 +93,7 @@ def main(options, cmd_interpret, IPC_queue = None):
         read_register_14 = cmd_interpret.read_config_reg(14)
         string_14   = format(read_register_14, '016b')
         print("Written into Reg 14: ", string_14)
+        print("Auto PreScale                  : ", string_14[-16])
         print("Fixed time filler (every 25ms) : ", string_14[-15])
         print("Bit Latency                    : ", string_14[-14:-10])
         print("Falling Edge                   : ", string_14[-10])
