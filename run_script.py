@@ -178,9 +178,9 @@ def main(options, cmd_interpret, IPC_queue = None):
         if options.run_name is not None:
             final_dir_str = options.run_name
         if(options.ssd and options.ssd_path == ""):
-            todaystr = "/run/media/daq/T7/" + final_dir_str
+            todaystr = "/run/media/daq/T7" + "/" + final_dir_str
         elif(options.ssd_path != ""):
-            todaystr = options.ssd_path + final_dir_str
+            todaystr = options.ssd_path + "/" + final_dir_str
         else:
             todaystr = "../ETROC-Data/" + final_dir_str
         try:

@@ -307,18 +307,16 @@ class Receive_data(threading.Thread):
                         Initialize = False
                         qinj_loop = 1
                         uniform_mode = False
-                        if("QInj" in words): QInj=True
-
-                        matching_elements = [element for element in words if "repeatedQInj" in element]
-                        try:
-                            qinj_loop = int(matching_elements[0].split('=')[1])
+                        if("QInj" in words): 
                             QInj=True
-                            repeatedQInj = True
-                            print(f'Repeat charge injection by {qinj_loop}')
-                        except:
-                            qinj_loop = 1
-                            QInj=True
-                            print('Oops, something is wrong, only do single charge injection')
+                            matching_elements = [element for element in words if "repeatedQInj" in element]
+                            try:
+                                qinj_loop = int(matching_elements[0].split('=')[1])
+                                repeatedQInj = True
+                                print(f'Repeat charge injection by {qinj_loop}')
+                            except:
+                                qinj_loop = 1
+                                print('Oops, something is wrong, only do single charge injection')
 
                         if("L1A" in words): L1A=True
                         if("L1ARange" in words):
