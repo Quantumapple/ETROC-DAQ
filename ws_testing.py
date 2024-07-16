@@ -25,7 +25,6 @@ from i2c_gui.chips.address_space_controller import Address_Space_Controller
 from i2c_gui.i2c_connection_helper import I2C_Connection_Helper
 from notebooks.notebook_helpers import *
 import pandas as pd
-from scripts.log_action import log_action_v2
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 #========================================================================================#
@@ -63,8 +62,9 @@ def return_initialized_ws_chip(ws_i2c_port, ws_chip_address, ws_address):
 #--------------------------------------------------------------------------#
 # Threading class to only TRANSLATE the binary data and save to disk
 class Translate_ws_data(threading.Thread):
-    def __init__(self, name, firmware_key, check_valid_data_start, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None, debug_event_translation = False, lock_translation_numwords = False, ws_chip=None, ws_chipname=None, ws_i2c_port=None, ws_chip_address=None, ws_address=None):
+    def __init__(self, name, verbose, firmware_key, check_valid_data_start, translate_queue, cmd_interpret, num_line, store_dict, skip_translation, board_ID, write_thread_handle, translate_thread_handle, compressed_translation, stop_DAQ_event = None, debug_event_translation = False, lock_translation_numwords = False, ws_chip=None, ws_chipname=None, ws_i2c_port=None, ws_chip_address=None, ws_address=None):
         threading.Thread.__init__(self, name=name)
+        self.verbose                 = verbose
         self.firmware_key            = firmware_key
         self.check_valid_data_start  = check_valid_data_start
         self.translate_queue         = translate_queue
@@ -98,7 +98,8 @@ class Translate_ws_data(threading.Thread):
         self.ws_chip_address         = ws_chip_address
         self.ws_address              = ws_address
         self.chip                    = ws_chip
-        self.start_ws_sampling()
+        # self.run()
+        # self.start_ws_sampling()
 
         # today = datetime.date.today()
         # todaystr = "../ETROC-Data/" + today.isoformat() + "_Array_Test_Results/"
@@ -235,7 +236,7 @@ class Translate_ws_data(threading.Thread):
         # reg_all[0] = reg_all[0] & 0b11100111                   # 0D CTRL default = 0x00 for regOut0D
         reg_all[0] = reg_all[0] & 0b00011111                   # 0D comp_cali Comparator calibration should be off
         i2c_controller.write_device_memory(self.ws_address, 0x0D, reg_all, 8)
-        print("Chip WS COnfig Done!")
+        print("Chip WS Config Done!")
 
     def reset_params(self):
         self.translate_deque.clear()
@@ -245,109 +246,148 @@ class Translate_ws_data(threading.Thread):
         self.current_word       = -1
         self.event_number       = -1
 
+    def single_run(self):
+        t = threading.current_thread()
+        t.alive      = True
+
+        # This is where we do the WS I2C stuff
+        print("Entering WS I2C Reading...")
+        i2c_controller: I2C_Connection_Helper = self.chip._i2c_controller
+
+        ### Read from WS memory
+        reg1F = i2c_controller.read_device_memory(self.ws_address, 0x1F, 1, 8)
+        reg1F[0] = reg1F[0] | 0b00000100
+        i2c_controller.write_device_memory(self.ws_address, 0x1F, reg1F, 8)
+        #self.ws_decoded_register_write("rd_en_I2C", "1")
+        print("rd_en_I2C set to 1")
+
+        max_steps = 1024  # Size of the data buffer inside the WS
+        lastUpdateTime = time.time_ns()
+        base_data = []
+        coeff = 0.05/5*8.5  # This number comes from the example script in the manual
+        time_coeff = 1/2.56  # 2.56 GHz WS frequency
+        addr_regs = [0x00, 0x00]  # regOut1C and regOut1D
+        for address in range(max_steps):
+            addr_regs[0] = ((address & 0b11) << 6)          # 0x1C
+            addr_regs[1] = ((address & 0b1111111100) >> 2)  # 0x1D
+            i2c_controller.write_device_memory(self.ws_address, 0x1C, addr_regs, 8)
+            tmp_data = i2c_controller.read_device_memory(self.ws_address, 0x20, 2, 8)
+            data = hex((tmp_data[0] >> 2) + (tmp_data[1] << 6))
+            binary_data = bin(int(data, 0))[2:].zfill(14)  # because dout is 14 bits long
+            Dout_S1 = int('0b'+binary_data[1:7], 0)
+            Dout_S2 = int(binary_data[ 7]) * 24 + \
+                        int(binary_data[ 8]) * 16 + \
+                        int(binary_data[ 9]) * 10 + \
+                        int(binary_data[10]) *  6 + \
+                        int(binary_data[11]) *  4 + \
+                        int(binary_data[12]) *  2 + \
+                        int(binary_data[13])
+            base_data.append(
+                {
+                    "Data Address": address,
+                    "Data": int(data, 0),
+                    "Raw Data": bin(int(data, 0))[2:].zfill(14),
+                    "pointer": int(binary_data[0]),
+                    "Dout_S1": Dout_S1,
+                    "Dout_S2": Dout_S2,
+                    "Dout": Dout_S1 - coeff * Dout_S2,
+                }
+            )
+        print("Done with Address Loop")
+        df = pd.DataFrame(base_data)
+        df_length = len(df)
+        channels = 8
+        df_per_ch : list[pd.DataFrame] = []
+        for ch in range(channels):
+            df_per_ch += [df.iloc[int(ch * df_length/channels):int((ch + 1) * df_length/channels)].copy()]
+            df_per_ch[ch].reset_index(inplace = True, drop = True)
+        pointer_idx = df_per_ch[-1]["pointer"].loc[df_per_ch[-1]["pointer"] != 0].index  # TODO: Maybe add a search of the pointer in any channel, not just the last one
+        if len(pointer_idx) != 0:  # If pointer found, reorder the data
+            pointer_idx = pointer_idx[0]
+            new_idx = list(set(range(len(df_per_ch[-1]))).difference(range(pointer_idx+1))) + list(range(pointer_idx+1))
+            for ch in range(channels):
+                df_per_ch[ch] = df_per_ch[ch].iloc[new_idx].reset_index(drop = True)  # Fix indexes after reordering
+        # interleave the channels
+        for ch in range(channels):
+            df_per_ch[ch]["Time Index"] = df_per_ch[ch].index * channels + (channels - 1 - ch)  # Flip the order of the channels in the interleave...
+            df_per_ch[ch]["Channel"] = ch + 1
+        # Actually put it all together in one dataframe and sort the data correctly
+        df = pd.concat(df_per_ch)
+        df["Time [ns]"] = df["Time Index"] * time_coeff
+        df.set_index('Time Index', inplace=True)
+        df.sort_index(inplace=True)
+        # Disable reading data from WS:
+        reg1F = i2c_controller.read_device_memory(self.ws_address, 0x1F, 1, 8)
+        reg1F[0] = reg1F[0] & 0b11111011
+        i2c_controller.write_device_memory(self.ws_address, 0x1F, reg1F, 8)
+        # Restart the WS Sampler
+        self.start_ws_sampling()
+        print("rd_en_i2c set to 0 AND restarted WS")
+        output = f"rawdataWS_{self.ws_chipname}_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M") + f"_{plot_counter}.csv"
+        outfilename = self.base_dir +f"/{output}"
+        df.to_csv(outfilename)
+        df['Aout'] = -(df['Dout']-(31.5-coeff*31.5)*1.2)/32
+        output = f"rawdataWS_{self.ws_chipname}_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M") + f"_{plot_counter}.png"
+        outfilename = self.base_dir +f"/{output}"
+        # fig, ax = plt.subplots(figsize=(20, 8))
+        # ax.plot(df['Time [ns]'], df['Dout'])
+        # ax.set_xlabel('Time [ns]', fontsize=15)
+        # plt.savefig(outfilename)
+        # plt.close()
+
+        fig_aout = px.line(
+            df,
+            x="Time [ns]",
+            y="Aout",
+            labels = {
+                "Time [ns]": "Time [ns]",
+                "Aout": "",
+            },
+            title = "Waveform (Aout) from the board {}".format(self.ws_chipname),
+            markers=True
+        )
+        fig_dout = px.line(
+            df,
+            x="Time [ns]",
+            y="Dout",
+            labels = {
+                "Time [ns]": "Time [ns]",
+                "Dout": "",
+            },
+            title = "Waveform (Dout) from the board {}".format(self.ws_chipname),
+            markers=True
+        )
+        # todaystr = "../ETROC-figures/" + today.isoformat() + "_Array_Test_Results/"
+        # base_dir = Path(todaystr)
+        # base_dir.mkdir(exist_ok=True)
+        fig_aout.write_html(
+            self.base_dir + f'/WS_Aout_{self.ws_chipname}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")}_{plot_counter}.html',
+            full_html = False,
+            include_plotlyjs = 'cdn',
+        )
+        fig_dout.write_html(
+            self.base_dir + f'/WS_Dout_{self.ws_chipname}_{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")}_{plot_counter}.html',
+            full_html = False,
+            include_plotlyjs = 'cdn',
+        )
+
+        # Clear WS Trig Block
+        daq_helpers.software_clear_ws_trig_block(self.cmd_interpret)
+        print("Done with WS I2C Reading and Released L1A Block")
+        plot_counter += 1
+        print("WS Thread gracefully ending")
+        self.translate_thread_handle.set()
+        del t
+        print("%s finished!"%self.getName())
+
     def run(self):
         t = threading.current_thread()
         t.alive      = True
         plot_counter = 0
-
-        # daq_helpers.software_clear_error(self.cmd_interpret)
-        daq_helpers.software_clear_ws_trig_block(self.cmd_interpret)
-
-        if(not self.skip_translation): 
-            outfile  = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
-            print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
-        else:
-            print("{} is reading queue and translating...".format(self.getName()))
         while True:
             if not t.alive:
                 print("Translate Thread detected alive=False")
-                if(not self.skip_translation): outfile.close()
-                break 
-            if((not self.skip_translation) and self.file_lines>self.num_line):
-                outfile.close()
-                self.file_lines   = 0
-                self.file_counter = self.file_counter + 1
-                outfile = open("%s/TDC_Data_translated_%d.dat"%(self.store_dict, self.file_counter), 'w')
-                print("{} is reading queue and translating file {}...".format(self.getName(), self.file_counter))
-            binary = ""
-            # Attempt to pop off the translate_queue for 30 secs, fail if nothing found
-            try:
-                binary = self.translate_queue.get(True, 1)
-                self.retry_count = 0
-            except queue.Empty:
-                if not self.stop_DAQ_event.is_set:
-                    self.retry_count = 0
-                    continue
-                if self.translate_thread_handle.is_set():
-                    print("Translate Thread received STOP signal AND ran out of data to translate")
-                    break
-                self.retry_count += 1
-                if self.retry_count < 30:
-                    continue
-                print("BREAKING OUT OF TRANSLATE LOOP CAUSE I'VE WAITING HERE FOR 30s SINCE LAST FETCH FROM TRANSLATE_QUEUE!!!")
                 break
-            # Event Header Found
-            if(binary[0:28]==self.header_pattern):
-                self.reset_params()
-                self.in_event = True
-                self.translate_deque.append(binary)
-                continue
-            # Event Header Line Two Found
-            elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]==self.firmware_key)):
-                self.current_word       = 0
-                self.event_number       = int(binary[ 4:20], base=2)
-                self.words_in_event     = int(binary[20:30], base=2)
-                self.eth_words_in_event = div_ceil(40*self.words_in_event,32)
-                # TODO EVENT TYPE?
-                self.translate_deque.append(binary)
-                # Set valid_data to true once we see fresh data
-                if(self.event_number==0): self.valid_data = True
-                continue
-            # Event Header Line Two NOT Found after the Header
-            elif(self.in_event and (self.words_in_event==-1) and (binary[0:4]!=self.firmware_key)):
-                self.reset_params()
-                continue
-            # Trailer NOT Found after the required number of ethernet words was read
-            elif(self.in_event and (self.eth_words_in_event==self.current_word) and (binary[0:6]!=self.trailer_pattern) and (not self.debug_event_translation)):
-                self.reset_params()
-                continue
-            # Trailer Found - DO NOT CONTINUE
-            elif(self.in_event and (self.eth_words_in_event==self.current_word) and (binary[0:6]==self.trailer_pattern) and (not self.debug_event_translation)):
-                self.translate_deque.append(binary)
-            # Trailer Found - Debug is true
-            elif(self.in_event and (binary[0:6]==self.trailer_pattern) and (self.debug_event_translation)):
-                if((self.eth_words_in_event==self.current_word and self.lock_translation_numwords) or (not self.lock_translation_numwords)):
-                    self.translate_deque.append(binary)
-            # Event Data Word
-            elif(self.in_event):
-                self.translate_deque.append(binary)
-                self.current_word += 1
-                continue
-            # Ethernet Line not inside Event, Skip it
-            else: continue
-
-            # We only come here if we saw a Trailer, but let's put a failsafe regardless
-            if((not self.debug_event_translation) and len(self.translate_deque)!=self.eth_words_in_event+3): 
-                self.reset_params()
-                continue
-
-            # This is where we translate the TDC data from this data frame
-            TDC_data = translate_data.etroc_translate_binary(self.translate_deque, self.valid_data, self.board_ID, self.compressed_translation, self.channel_header_pattern, self.header_pattern, self.trailer_pattern, self.debug_event_translation)
-            TDC_len = len(TDC_data)
-            TDC_event_number = int(TDC_data[-1].split()[-1])
-            print(TDC_data)
-            if((not self.skip_translation) and (TDC_len>0)): 
-                for TDC_line in TDC_data:
-                    outfile.write("%s\n"%TDC_line)
-                self.file_lines  = self.file_lines  + TDC_len
-            # Reset all params before moving onto the next line
-            del TDC_data, TDC_len, binary
-            self.reset_params()
-
-            # Handle events before event counter reset
-            if(not self.valid_data): 
-                print("Skipping this event only")
-                continue
 
             # This is where we do the WS I2C stuff
             print("Entering WS I2C Reading...")
@@ -474,9 +514,11 @@ class Translate_ws_data(threading.Thread):
             daq_helpers.software_clear_ws_trig_block(self.cmd_interpret)
             print("Done with WS I2C Reading and Released L1A Block")
             plot_counter += 1
+            if self.translate_thread_handle.is_set():
+                # print("Translate Thread received STOP signal AND ran out of data to translate")
+                break
         
         print("Translate Thread gracefully ending") 
         self.translate_thread_handle.set()
         del t
-        if(not self.skip_translation): outfile.close()
         print("%s finished!"%self.getName())
