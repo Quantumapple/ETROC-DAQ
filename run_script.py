@@ -13,8 +13,8 @@ import parser_arguments
 import command_interpret
 import daq_helpers
 import translate_data
-import ws_testing
 import platform
+import ws_testing
 #========================================================================================#
 '''
 @author: Murtaza Safdari
@@ -168,8 +168,15 @@ def main(options, cmd_interpret, IPC_queue = None):
         print("Stopping QInj + Ext L1A train...")
         daq_helpers.configure_memo_FC(cmd_interpret,Initialize=False,QInj=False,L1A=False,BCR=False,Triggerbit=True)
 
-    # if(options.ws_testing):
-    #     daq_helpers.software_clear_ws_trig_block(cmd_interpret)
+    if(options.start_dev_ws_beam_fc):
+        print("Starting ws train...")
+        daq_helpers.configure_memo_FC(cmd_interpret,Initialize=True,QInj=False,L1A=False,BCR=True,Triggerbit=True)
+    if(options.stop_dev_ws_beam_fc):
+        print("Stopping ws train...")
+        daq_helpers.configure_memo_FC(cmd_interpret,Initialize=False,QInj=False,L1A=False,BCR=False,Triggerbit=True)
+
+    if(options.ws_testing_en):
+        daq_helpers.software_clear_ws_trig_block(cmd_interpret)
 
     if(not options.nodaq):
         userdefinedir = options.output_directory
@@ -218,10 +225,11 @@ def main(options, cmd_interpret, IPC_queue = None):
                                                     # Kill order is read, write, translate
         receive_data = daq_helpers.Receive_data('Receive_data', options.verbose, read_queue, cmd_interpret, options.num_fifo_read, read_thread_handle, write_thread_handle, options.time_limit, options.useIPC, stop_DAQ_event, IPC_queue)
         write_data = daq_helpers.Write_data('Write_data', options.verbose, read_queue, translate_queue, options.num_line, store_dict, options.skip_translation, options.compressed_binary, options.skip_binary, options.suppress_fillers, read_thread_handle, write_thread_handle, translate_thread_handle, stop_DAQ_event)
-        if(not options.ws_testing):
+        if(not options.ws_testing_en):
             translate_data_thread = translate_data.Translate_data('Translate_data', options.verbose, options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords)
         else:
-            ws_chip = ws_testing.return_initialized_ws_chip(options.ws_i2c_port, options.ws_chip_address, options.ws_address)
+            from ws_testing import return_initialized_ws_chip
+            ws_chip = return_initialized_ws_chip(options.ws_i2c_port, options.ws_chip_address, options.ws_address)
             translate_data_thread = ws_testing.Translate_ws_data('Translate_ws_data', options.verbose, options.firmware_key, options.check_valid_data_start, translate_queue, cmd_interpret, options.num_line, store_dict, options.skip_translation, board_ID, write_thread_handle, translate_thread_handle, options.compressed_translation, stop_DAQ_event, options.debug_event_translation, options.lock_translation_numwords, ws_chip, options.ws_chipname, options.ws_i2c_port, options.ws_chip_address, options.ws_address)
         try:
             # Start the thread
