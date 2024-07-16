@@ -443,6 +443,13 @@ class Write_data(threading.Thread):
                     outfile.write('%s\n'%binary)
                     # Increment line counters
                     self.file_lines = self.file_lines + 1
+                # if binary[0:16] == '0101010101010101':
+                #     if(prev_status_on_data_stream!=binary[16:]):
+                #         print(f"(Unique) Status on Data Stream: {binary[16:]}")
+                #         prev_status_on_data_stream = binary[16:]
+                #     if((not self.skip_translation) and (not self.suppress_fillers)):
+                #         self.translate_queue.put(f"FILLER {binary[16:]}")
+                #     continue # Ethernet Filler Line
                 if binary[0:12] == '010101010110':
                     if(prev_status_on_data_stream!=binary[12:]):
                         print(f"(Unique) Status on Data Stream: {binary[12:]}")
