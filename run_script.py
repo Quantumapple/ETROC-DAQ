@@ -303,7 +303,8 @@ def main(options, cmd_interpret, IPC_queue = None):
 if __name__ == "__main__":
 
     parser = parser_arguments.create_parser()
-    (options, args) = parser.parse_args()
+    #(options, args) = parser.parse_args()
+    options = parser.parse_args()
 
     # See command_interpret.py read_memory()
     if(options.num_fifo_read>65536):
