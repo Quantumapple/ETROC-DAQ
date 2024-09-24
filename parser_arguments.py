@@ -37,6 +37,7 @@ def create_parser():
     parser.add_option("-d", "--trigger_bit_delay", type="int",action="store", dest="trigger_bit_delay", default=0x0400, help="Set FPGA Config Register 8, see daq_helpers for more info")
     parser.add_option("-c", "--counter_duration", type="int",action="store", dest="counter_duration", default=None, help="Set FPGA Config Register 7, see daq_helpers for more info")
     parser.add_option("-a", "--active_channel", type="int",action="store", dest="active_channel", default=0x0001, help="LSB 4 bits - Channel Enable")
+    parser.add_option("--prescale_factor", type="int", default=2048, choices=[2048, 4096, 8192, 16384], help="Select which prescale factor to use between [2048, 4096, 8192, 16384], if the prescale is enabled in register 14. Default: 2048")
     #------------------------------------------------------------------------#
     parser.add_option("--nodaq",action="store_true", dest="nodaq", default=False, help="Switch off DAQ via the FPGA")
     parser.add_option("--useIPC",action="store_true", dest="useIPC", default=False, help="Use Inter Process Communication to control L1A enable/disable")

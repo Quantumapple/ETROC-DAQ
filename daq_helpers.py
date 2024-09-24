@@ -63,6 +63,7 @@ def configure_memo_FC(
         qinj_loop=1,
         L1ARange = False,
         uniform_mode = False,
+        prescale_factor = 2048,
     ):
 
     if(Initialize):
@@ -71,24 +72,24 @@ def configure_memo_FC(
 
     # IDLE
     register_12(cmd_interpret, 0x0070 if Triggerbit else 0x0030)
-    cmd_interpret.write_config_reg(10, 0x0000)
-    cmd_interpret.write_config_reg(9, 0x0deb)
+    register_10(cmd_interpret, prescale_factor, 0x000)
+    register_9(cmd_interpret, 0xdeb)
     fc_init_pulse(cmd_interpret)
     time.sleep(0.01)
 
     if(BCR):
         # BCR
         register_12(cmd_interpret, 0x0072 if Triggerbit else 0x0032)
-        cmd_interpret.write_config_reg(10, 0x0000)
-        cmd_interpret.write_config_reg(9, 0x0000)
+        register_10(cmd_interpret, prescale_factor, 0x000)
+        register_9(cmd_interpret, 0x000)
         fc_init_pulse(cmd_interpret)
         time.sleep(0.01)
 
     # QInj FC
     if(QInj):
         register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
-        cmd_interpret.write_config_reg(10, 0x0005)
-        cmd_interpret.write_config_reg(9, 0x0005)
+        register_10(cmd_interpret, prescale_factor, 0x005)
+        register_9(cmd_interpret, 0x005)
         fc_init_pulse(cmd_interpret)
         time.sleep(0.01)
         if(repeatedQInj):
@@ -96,13 +97,13 @@ def configure_memo_FC(
             for i in range(qinj_loop):
                 register_12(cmd_interpret, 0x0075 if Triggerbit else 0x0035)
                 if not (uniform_mode):
-                    cmd_interpret.write_config_reg(10, 0x0005 + i*0x0010)
-                    cmd_interpret.write_config_reg(9, 0x0005 + i*0x0010)
+                    register_10(cmd_interpret, prescale_factor, 0x005 + i*0x010)
+                    register_9(cmd_interpret, 0x005 + i*0x010)
                     fc_init_pulse(cmd_interpret)
                     time.sleep(0.01)
                 else:
-                    cmd_interpret.write_config_reg(10, 0x0005 + interval * i * 0x0010)
-                    cmd_interpret.write_config_reg(9, 0x0005 + interval * i * 0x0010)
+                    register_10(cmd_interpret, prescale_factor, 0x005 + interval * i*0x010)
+                    register_9(cmd_interpret, 0x005 + interval * i*0x010)
                     fc_init_pulse(cmd_interpret)
                     time.sleep(0.01)
                     pass
@@ -110,8 +111,8 @@ def configure_memo_FC(
     ### Send L1A
     if(L1A):
         register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
-        cmd_interpret.write_config_reg(10, 0x01fd)
-        cmd_interpret.write_config_reg(9, 0x01fd)
+        register_10(cmd_interpret, prescale_factor, 0x1fd)
+        register_9(cmd_interpret, 0x1fd)
         fc_init_pulse(cmd_interpret)
         time.sleep(0.01)
 
@@ -121,13 +122,13 @@ def configure_memo_FC(
             for i in range(qinj_loop):
                 register_12(cmd_interpret, 0x0076 if Triggerbit else 0x0036)
                 if not (uniform_mode):
-                    cmd_interpret.write_config_reg(10, 0x01fd + i*0x0010)
-                    cmd_interpret.write_config_reg(9, 0x01fd + i*0x0010)
+                    register_10(cmd_interpret, prescale_factor, 0x1fd + i*0x010)
+                    register_9(cmd_interpret, 0x1fd + i*0x010)
                     fc_init_pulse(cmd_interpret)
                     time.sleep(0.01)
                 else:
-                    cmd_interpret.write_config_reg(10, 0x01fd + interval * i * 0x0010)
-                    cmd_interpret.write_config_reg(9, 0x01fd + interval * i * 0x0010)
+                    register_10(cmd_interpret, prescale_factor, 0x1fd + interval * i*0x010)
+                    register_9(cmd_interpret, 0x1fd + interval * i*0x010)
                     fc_init_pulse(cmd_interpret)
                     time.sleep(0.01)
 
@@ -145,9 +146,16 @@ def link_reset(cmd_interpret):
 
 #--------------------------------------------
 
+valid_prescale_factors = {
+     2048: 0b00,
+     4096: 0b01,
+     8192: 0b10,
+    16384: 0b11,
+}
+
 #--------------------------------------------------------------------------#
-def get_fpga_data(cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val):
-    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val)
+def get_fpga_data(cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val, prescale_factor):
+    fpga_data = Save_FPGA_data('Save_FPGA_data', cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val, prescale_factor)
     try:
         fpga_data.start()
         while fpga_data.is_alive():
@@ -158,7 +166,7 @@ def get_fpga_data(cmd_interpret, time_limit, overwrite, run_name, output_directo
 
 # define a threading class for saving data from FPGA Registers only
 class Save_FPGA_data(threading.Thread):
-    def __init__(self, name, cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val):
+    def __init__(self, name, cmd_interpret, time_limit, overwrite, run_name, output_directory, isQInj, DAC_Val, prescale_factor):
         threading.Thread.__init__(self, name=name)
         self.cmd_interpret    = cmd_interpret
         self.time_limit       = time_limit
@@ -167,12 +175,13 @@ class Save_FPGA_data(threading.Thread):
         self.run_name         = run_name
         self.isQInj           = isQInj
         self.DAC_Val          = DAC_Val
+        self.prescale_factor  = prescale_factor
 
     def run(self):
         if(self.isQInj):
-            configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True)
+            configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True, prescale_factor=self.prescale_factor)
         else:
-            configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=False,L1A=False)
+            configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=False,L1A=False, prescale_factor=self.prescale_factor)
         t = threading.current_thread()              # Local reference of THIS thread object
         t.alive = True                              # Thread is alive by default
         print("{} is saving FPGA data directly...".format(self.getName()))
@@ -227,13 +236,13 @@ class Save_FPGA_data(threading.Thread):
             fpga_triggerbit = int(format(self.cmd_interpret.read_status_reg(9), '016b')+format(self.cmd_interpret.read_status_reg(8), '016b'), base=2)
         outfile.write(f'{fpga_state},{en_L1A},{fpga_duration},{fpga_data},{fpga_header},{fpga_triggerbit},{self.DAC_Val}\n')
         outfile.close()
-        configure_memo_FC(self.cmd_interpret,Initialize=False,QInj=False,L1A=False)
+        configure_memo_FC(self.cmd_interpret,Initialize=False,QInj=False,L1A=False,prescale_factor=self.prescale_factor)
         print("%s finished!"%self.getName())
 
 #--------------------------------------------------------------------------#
 # Threading class to only READ off the ethernet buffer
 class Receive_data(threading.Thread):
-    def __init__(self, name, verbose, read_queue, cmd_interpret, num_fifo_read, read_thread_handle, write_thread_handle, time_limit, use_IPC = False, stop_DAQ_event = None, IPC_queue = None):
+    def __init__(self, name, verbose, read_queue, cmd_interpret, num_fifo_read, read_thread_handle, write_thread_handle, time_limit, use_IPC = False, stop_DAQ_event = None, IPC_queue = None, prescale_factor = 2048):
         threading.Thread.__init__(self, name=name)
         self.verbose             = verbose
         self.read_queue          = read_queue
@@ -245,6 +254,7 @@ class Receive_data(threading.Thread):
         self.use_IPC             = use_IPC
         self.stop_DAQ_event      = stop_DAQ_event
         self.IPC_queue           = IPC_queue
+        self.prescale_factor     = prescale_factor
         if self.use_IPC and self.IPC_queue is None:
             self.use_IPC = False
         if not self.use_IPC:
@@ -271,15 +281,15 @@ class Receive_data(threading.Thread):
                     elif message == 'stop DAQ':
                         self.daq_on = False
                     elif message == 'start L1A':
-                        configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True,BCR=True,Triggerbit=False)
+                        configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True,BCR=True,Triggerbit=False, prescale_factor=self.prescale_factor)
                     elif message == 'start L1A trigger bit':
-                        configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True)
+                        configure_memo_FC(self.cmd_interpret,Initialize=True,QInj=True,L1A=True, prescale_factor=self.prescale_factor)
                     elif message == 'start L1A trigger bit data':
-                        configure_memo_FC(self.cmd_interpret,Initialize=True) #IDLE FC Only
+                        configure_memo_FC(self.cmd_interpret,Initialize=True, prescale_factor=self.prescale_factor) #IDLE FC Only
                     elif message == 'stop L1A':
-                        configure_memo_FC(self.cmd_interpret,Initialize=False,Triggerbit=False)
+                        configure_memo_FC(self.cmd_interpret,Initialize=False,Triggerbit=False, prescale_factor=self.prescale_factor)
                     elif message == 'stop L1A trigger bit':
-                        configure_memo_FC(self.cmd_interpret,Initialize=False)
+                        configure_memo_FC(self.cmd_interpret,Initialize=False, prescale_factor=self.prescale_factor)
                     elif message == 'allow threads to exit':
                         self.stop_DAQ_event.set()
                     elif message == 'link reset':
@@ -329,7 +339,7 @@ class Receive_data(threading.Thread):
                         if('uniform' in words): uniform_mode=True
 
                         configure_memo_FC(self.cmd_interpret,Initialize=Initialize,QInj=QInj,L1A=L1A,BCR=BCR,
-                                          Triggerbit=Triggerbit,repeatedQInj=repeatedQInj, qinj_loop=qinj_loop, L1ARange=L1ARange, uniform_mode=uniform_mode)
+                                          Triggerbit=Triggerbit,repeatedQInj=repeatedQInj, qinj_loop=qinj_loop, L1ARange=L1ARange, uniform_mode=uniform_mode, prescale_factor=self.prescale_factor)
                     else:
                         print(f'Unknown message: {message}')
                 except queue.Empty:
@@ -540,6 +550,7 @@ def stop_DAQ_pulse(cmd_interpret):
     cmd_interpret.write_pulse_reg(0x0400)
 
 #--------------------------------------------------------------------------#
+## Register 14
 ## Enable FPGA Descrambler
 ## {12'bxxxxxxxxx,add_ethernet_filler,debug_mode,dumping_mode,notGTXPolarity,notGTX,enableAutoSync}
 def Enable_FPGA_Descramblber(cmd_interpret, val=0x000b):
@@ -572,6 +583,19 @@ def register_12(cmd_interpret, key = 0x0000):
 ## Reg 11 : {4'bxxxx,duration[11:0]} \ Reg 12 : {errorMask[7:0],trigDataSize[1:0],period,1'bx,inputCmd[3:0]} 
 def register_11(cmd_interpret, key = 0x0000):
     cmd_interpret.write_config_reg(11, key)
+
+## Register 10
+def register_10(cmd_interpret, prescale_factor, init_address_first = 0x000):
+    if prescale_factor not in valid_prescale_factors:
+        raise RuntimeError("You did not choose a valid prescale factor")
+    prescale_bitmask = valid_prescale_factors[prescale_factor]
+    key = ((prescale_bitmask & 0b11) << 12) + (init_address_first & 0xfff)
+    cmd_interpret.write_config_reg(10, key)
+
+## Register 9
+def register_9(cmd_interpret, init_address_last = 0x000):
+    key = (init_address_last & 0xfff)
+    cmd_interpret.write_config_reg(9, key)
 
 #--------------------------------------------------------------------------#
 ## Register 8
