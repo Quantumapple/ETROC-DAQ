@@ -476,9 +476,9 @@ class Write_data(threading.Thread):
                         self.translate_queue.put(f"CLOCK {binary[12:]}")
                     continue # Ethernet Filler Line
                 elif binary[0:12] == '010101010011':
-                    if(prev_status_on_data_stream!=binary[12:]):
-                        print(f"(Unique) Status on Data Stream: {binary[12:]}")
-                        prev_status_on_data_stream = binary[12:]
+                    #if(prev_status_on_data_stream!=binary[12:]):
+                    #    print(f"(Unique) Status on Data Stream: {binary[12:]}")
+                    #    prev_status_on_data_stream = binary[12:]
                     if((not self.skip_translation) and (not self.suppress_fillers)):
                         self.translate_queue.put(f"CLOCK 2 {binary[12:]}")
                     continue # Ethernet Filler Line
